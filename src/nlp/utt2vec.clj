@@ -1,14 +1,15 @@
 (ns nlp.utt2vec
   (:require
-   [clojure.string :as str]
-   [clj-time.local :as l]
-   [clj-time.core  :as t]
-   [clojure.data.json :as json]
-   [taoensso.nippy :refer [freeze-to-out! thaw-from-in!]]
-   [clojure.core.async :refer [go go-loop thread >! <! >!! <!! chan timeout alt! alts! close!]]
-   [clojure.java.io :refer [reader writer]]
-   [matrix.default :refer [sum minus times dot outer transpose gemv]]
-   [unit :refer [derivative tanh sigmoid softmax model-rand]]))
+    [clojure.string :as str]
+    [clj-time.local :as l]
+    [clj-time.core  :as t]
+    [clojure.data.json :as json]
+    [taoensso.nippy :refer [freeze-to-out! thaw-from-in!]]
+    [clojure.core.async :refer [go go-loop thread >! <! >!! <!! chan timeout alt! alts! close!]]
+    [clojure.java.io :refer [reader writer]]
+    [matrix.default :refer [sum minus times dot outer transpose gemv]]
+    [util :refer [progress-format make-wl]]
+    [unit :refer [derivative tanh sigmoid softmax model-rand]]))
 
 (defn save-model [obj target-path]
   (with-open [w (clojure.java.io/output-stream target-path)]
@@ -35,60 +36,6 @@
         (assoc :em word-em)
         (save-model (str utt2vec-model-path ".top" top-n ".light")))))
 
-
-(defn- wl-progress-format [done all interval-done interval-ms unit]
-  (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] "
-       done "/" all ", "
-       (if (zero? interval-ms)
-         "0.0"
-         (format "%.1f" (float (/ interval-done (/ interval-ms 1000)))))
-       " " unit " "
-       (format "(%.2f" (float (* 100 (/ done all))))
-       "%)"))
-
-;; (progress-format 4 10 2 10000 "lines/s")
-
-(defn make-wl
-  [input-file & [option]]; {:keys [min-count wl workers wait-ms step] :or {min-count 5 wl {} workers 4 wait-ms 30000 step 1000000}}]
-  (let [min-count (or (:min-count option) 5)
-        wl        (or (:wl option) {})
-        workers   (or (:workers option) 4)
-        wait-ms   (or (:wait-ms  option) 30000)
-        step      (or (:step option) 1000000)
-        all-lines (with-open [r (reader input-file)]
-                    (count (line-seq r)))
-        over-all     (atom 0)
-        done-lines   (atom 0)
-        done-workers (atom 0)
-        all-wl (atom {})]
-    (with-open [r (reader input-file)]
-      (dotimes [w workers]
-        (go-loop [local-wl {} local-counnter step]
-                 (if-let [line (.readLine r)]
-                   (let [word-freq (frequencies (remove #(or (= "<eos>" %) (= "" %) (= " " %) (= "　" %)) (str/split line #" ")))
-                         updated-wl (merge-with + local-wl word-freq)]
-                     (swap! done-lines inc)
-                     (if (zero? local-counnter)
-                       (do
-                         (reset! all-wl (merge-with + @all-wl updated-wl))
-                         (recur {} step))
-                       (recur updated-wl (dec step))))
-                   (do
-                     (reset! all-wl (merge-with + @all-wl local-wl))
-                     (swap! done-workers inc)))))
-      (loop [c 0]
-        (if-not (= @done-workers workers)
-          (let [diff @done-lines
-                updated-c (+ c diff)
-                _ (reset! done-lines 0)]
-            (println (wl-progress-format updated-c all-lines diff wait-ms "lines/s"))
-            (Thread/sleep wait-ms)
-            (recur updated-c))
-          (reduce (fn [acc [k v]] (if (>= v min-count)
-                                    (assoc acc k (+ v (get acc k 0)))
-                                    (assoc acc "<unk>" (+ v (get acc "<unk>" 0)))))
-                  wl
-                  @all-wl))))))
 
 (defn uniform->cum-uniform [uniform-dist]
   (->> (sort-by second > uniform-dist)
@@ -195,11 +142,11 @@
 (defn negative-sampling
   [hidden-size model-output-seq positives negatives & [option]]
   (let [;{:keys [hidden-num]} model
-        negatives (remove (fn [n] (some #(= % n) positives)) negatives)
-        ;;         output-seq (sequential-output model x-seq positives negatives option)
-        output (last (:activation (last model-output-seq)))
-        ps (map (fn [p] [p (float (- 1 (get output p)))]) positives)
-        ns (map (fn [n] [n (float (- (get output n)))]) negatives)]
+         negatives (remove (fn [n] (some #(= % n) positives)) negatives)
+         ;;         output-seq (sequential-output model x-seq positives negatives option)
+         output (last (:activation (last model-output-seq)))
+         ps (map (fn [p] [p (float (- 1 (get output p)))]) positives)
+         ns (map (fn [n] [n (float (- (get output n)))]) negatives)]
     (vec (concat ps ns))))
 
 
@@ -459,48 +406,6 @@
     (update-model! model delta-list learning-rate)))
 
 
-
-(defn- progress-format [done all interval-done interval-ms unit]
-  (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] "
-       done "/" all ", "
-       (if (zero? interval-ms)
-         "0.0"
-         (format "%.1f" (float (/ interval-done (/ interval-ms 1000)))))
-       " " unit " "
-       (format "(%.2f" (float (* 100 (/ done all))))
-       "%)"))
-(comment
-  (defn train-by-file!
-    [model train-path & [option]]
-    (let [interval-ms (or (:interval-ms option) 10000) ;; 10 seconds
-          workers (or (:workers option) 4)
-          initial-learning-rate (or (:learning-rate option) 0.05)
-          min-learning-rate (or (:min-learning-rate option) 0.0001)
-          all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
-          local-counter (atom 0)
-          done-workers (atom 0)]
-      (let [r (reader train-path)]
-        (dotimes [w workers]
-          (go-loop [] (if-let [line (.readLine r)]
-                        (let [progress (/ @local-counter all-lines-num)
-                              learning-rate initial-learning-rate;(max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
-                              [x-seq positives negatives] (clojure.edn/read-string line)]
-                          (train! model x-seq positives negatives learning-rate option)
-                          (swap! local-counter inc)
-                          (recur))
-                        (swap! done-workers inc))))
-        (loop [counter 0]
-          (Thread/sleep interval-ms)
-          (when-not (= @done-workers workers)
-            (let [c @local-counter
-                  next-counter (+ counter c)]
-              (println (progress-format counter all-lines-num c interval-ms "line/s"))
-              (reset! local-counter 0)
-              (recur next-counter))))
-        (.close r))
-      ;;     (clojure.pprint/pprint option)
-      :done))
-  )
 (defn train-utt2vec!
   [model train-path & [option]]
   (let [interval-ms (or (:interval-ms option) 30000) ;; 30 seconds
@@ -524,7 +429,7 @@
                 (let [progress (/ @local-counter all-lines-num)
                       learning-rate initial-learning-rate;(max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
                       cnvs (partition 3 1 (concat [:padding] (str/split line #" <eos> ") [:padding]))
-;;                       _(println cnvs)
+                      ;;                       _(println cnvs)
                       next-negatives (drop (* negative (count cnvs)) negatives)]
                   ;    [x-seq positives negatives] (clojure.edn/read-string line)]
                   (->> cnvs
@@ -533,8 +438,8 @@
                                             target (vec (if (= :sparse input-type)
                                                           (->> coll (map #(if (get wl %) % "<unk>")))
                                                           (map #(get em % (get em "<unk>")) coll)))
-;;                                             _(println cnv)
-;;                                             _(println (second cnv))
+                                            ;;                                             _(println cnv)
+                                            ;;                                             _(println (second cnv))
                                             context (->> (concat [(first cnv)] [(last cnv)])
                                                          (remove #(= :padding %))
                                                          (map #(str/split % #" "))
@@ -542,8 +447,8 @@
                                                          (filter #(get wl %))
                                                          vec)
                                             negs (->> negatives (drop (* index negative)) (take negative) vec)]
-;;                                         (clojure.pprint/pprint target)
-;;                                         (println "context-> " context)
+                                        ;;                                         (clojure.pprint/pprint target)
+                                        ;;                                         (println "context-> " context)
                                         (train! model target context negs learning-rate option)
                                         )))
                        dorun)

@@ -1,10 +1,10 @@
 (ns nn.feedforward
-  (:require [shiki.unit :refer [unit-input activation derivative model-rand]]
+  (:require [unit :refer [activation derivative model-rand]]
             [matrix.default :as default]))
 
 (defn hidden-state-by-sparse
   [w sparse-inputs hidden-size & [option]]
-  (let [gemv (if-let [it (:gemv option)] it default/agemv)
+  (let [gemv (if-let [it (:gemv option)] it default/gemv)
         all-input-size (/ (count w) hidden-size)
         sparse-size (count sparse-inputs)
         ks (keys sparse-inputs)]
@@ -22,7 +22,7 @@
 ;(vec (hidden-state-by-sparse (float-array (range 6)) {1 1.0} 2))
 
 (defn network-output [model x-list & [option]]
-  (let [gemv (if-let [it (:gemv option)] it default/agemv)]
+  (let [gemv (if-let [it (:gemv option)] it default/gemv)]
 ;;         x-list (float-array x-list)]
     (loop [layers (:layers model), input-list x-list, acc [{:activation x-list}]]
       (if-let [layer (first layers)]
@@ -55,7 +55,7 @@
 
 
 (defn back-propagation [model training-x training-y & [option]]
-  (let [gemv (if-let [it (:gemv option)] it default/agemv)
+  (let [gemv (if-let [it (:gemv option)] it default/gemv)
         training-y (float-array training-y)]
     (loop [layers' (reverse (:layers model))
            output-layers' (reverse (network-output model training-x option))
@@ -80,7 +80,7 @@
                  (cond (nil? (second layers'))
                        nil
                        :else
-                       (gemv (default/atranspose unit-num w) delta))
+                       (gemv (default/transpose unit-num w) delta))
                  (cons param-delta acc)))
         acc))))
 

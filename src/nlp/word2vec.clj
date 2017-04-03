@@ -6,10 +6,8 @@
             [clj-time.core  :as t]
             [clojure.data.json :as json]
             [matrix.default :as default]
-            [nlp.util :refer [word-lookup morphological-analysis word->one-hot
-                              most-plausible-word-index make-wl] :as util]
-            [shiki.unit :refer [unit-input activation model-rand]]
-            ;[shiki.feedforward :refer [hidden-state-by-one-hot network-output back-propagation back-propagation:negative-sampling update-model init-model]]
+            [util :as util]
+            [unit :refer [activation model-rand]]
             ))
 
 
@@ -111,17 +109,7 @@
     (uniform-sampling neg-cum (repeatedly negative-num #(rand (dec m))))))
 
 ;; (get-negatives (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) 20)
-(defn progress-format [done all interval-done interval-ms unit]
-  (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] "
-       done "/" all ", "
-       (if (zero? interval-ms)
-         "0.0"
-         (format "%.1f" (float (/ interval-done (/ interval-ms 1000)))))
-       " " unit " "
-       (format "(%.2f" (float (* 100 (/ done all))))
-       "%)"))
 
-;; (progress-format 12 100 407 20000 "words/s")
 
 (defn make-sg-file [wl-path target-path export-path & [option]]
   (let [sg-buf (or (:sg-buf option) 0)
@@ -174,7 +162,7 @@
         (do
           (Thread/sleep interval-ms)
           (let [c @interval-count]
-            (println (progress-format counter limit c interval-ms " lines/s"))
+            (println (util/progress-format counter limit c interval-ms " lines/s"))
             (reset! interval-count 0)
             (recur (+ counter c))))))))
 
@@ -227,7 +215,7 @@
         words (concat positives negatives)
         output-w  (->> words (mapv #(get (:w (:output model)) %)))
         word-bias (->> words (map #(get (:bias (:output model)) %)) (map #(aget ^floats % 0)) float-array)
-        activations  (-> (default/sum (default/agemv' output-w hidden-activation) word-bias)
+        activations  (-> (default/sum (default/gemv' output-w hidden-activation) word-bias)
                          (activation :sigmoid)
                           vec)
         [p n] (split-at (count positives) activations)
@@ -248,7 +236,7 @@
                                   (aset ^floats mat (+ x (* i hidden-size)) (aget ^floats v x))))
                               vecs))
         delta (float-array (vals word-value-pairs))]
-    (default/agemv (default/atranspose hidden-size mat) delta)))
+    (default/gemv (default/transpose hidden-size mat) delta)))
 
 ;; (map #(aget ^floats (some-hot-bp tiny [["A" 0.5108695] ["C" 0.498649] ["D" -0.50098985] ["<unk>" -0.5097836]]) %) (range 10))
 
@@ -412,7 +400,7 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (progress-format counter all-lines-num c interval-ms "sgline/s"))
+            (println (util/progress-format counter all-lines-num c interval-ms "sgline/s"))
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
             (recur next-counter))))
@@ -420,16 +408,6 @@
       (.close r))
     (clojure.pprint/pprint option)
     :done))
-
-(defn save-model [model target-path & [info]]
-  (-> model
-      (assoc :info info)
-      (assoc :date (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"]"))
-      (util/save-model target-path)))
-
-(defn load-model [target-path]
-  (util/load-model target-path))
-
 
 (defn train-word2vec!
   [w2v-model train-path & [option]]
@@ -465,7 +443,7 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (progress-format counter all-lines-num c interval-ms "line/s"))
+            (println (util/progress-format counter all-lines-num c interval-ms "line/s"))
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
             (recur next-counter))))
@@ -476,23 +454,23 @@
 (defn make-word2vec
   [training-path export-path size & [option]]
   (let [_(println "making word list...")
-        wl (make-wl training-path)
+        wl (util/make-wl training-path)
         _(println "done")
         model (init-w2v-model wl size)]
     (train-word2vec! model training-path option)
     (println "Saving model ...")
-    (save-model model export-path)
+    (util/save-model model export-path)
     (println "Done")))
 
 (defn resume-train
   [model-path training-path & [n]]
-  (let [model (load-model model-path)
+  (let [model (util/load-model model-path)
         n (or n 1)]
     (loop [n n] (when-not (<= n 0)
                   (train-word2vec-by-sgnfile! model training-path)
                   (recur (dec n))))
     (println "Saving model ...")
-    (save-model model model-path)
+    (util/save-model model model-path)
     (println "Done")))
 
 

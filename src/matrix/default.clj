@@ -65,3 +65,18 @@
         (aset ^floats tmp-v row-index (float (* (aget ^floats matrix (+ (* col-index row-n) row-index)) (aget ^floats v row-index)))))
       (aset ^floats ret-v col-index (float (areduce tmp-v i ret (float 0) (+ ret (aget ^floats tmp-v i))))))
     ret-v))
+
+(defn gemv'
+  "for 2d-array (used in word2vec)"
+  [matrix v]
+  (let [row-n (count v)
+        col-n (count matrix)
+        tmp-v (float-array row-n)
+        ret-v (float-array col-n)]
+    (doall (map-indexed
+             (fn [col-index row]
+               (dotimes [row-index row-n];for a row
+                 (aset ^floats tmp-v row-index (float (* (aget ^floats row row-index) (aget ^floats v row-index)))))
+               (aset ^floats ret-v col-index (float (areduce tmp-v i ret (float 0) (+ ret (aget ^floats tmp-v i))))))
+             matrix))
+    ret-v))

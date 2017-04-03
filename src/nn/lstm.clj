@@ -1,13 +1,13 @@
 (ns nn.lstm
   (:require
     [matrix.default :refer [transpose sum times outer minus] :as default]
-    [shiki.unit :refer [sigmoid tanh activation derivative unit-input model-rand]]
+    [unit :refer [sigmoid tanh activation derivative model-rand]]
     [clj-time.format :as f]
     [clj-time.local  :as l]))
 
 
 (defn standard-activation [input-list model-layer & [lstm-option]]
-  (let [gemv (if-let [it (:gemv lstm-option)] it default/agemv)
+  (let [gemv (if-let [it (:gemv lstm-option)] it default/gemv)
         w (:w model-layer)
         v (gemv w input-list)
         w-num (count w)
@@ -19,7 +19,7 @@
     {:activation activation :state state}))
 
 (defn lstm-activation [model-layer bottom-input-list recurrent-input-list previous-cell-state & [lstm-option]]
-  (let [gemv (if-let [it (:gemv lstm-option)] it default/agemv)
+  (let [gemv (if-let [it (:gemv lstm-option)] it default/gemv)
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole unit-num sparse?
@@ -162,7 +162,7 @@
   offset-self   equals to all-bottom-unit-num (exclude self) in deep-model, also equals to bottom-unit-num in stack-model
   "
   [highest-hidden? model-type output-layer above-layer self-layer offset-output offset-above output-delta above-delta self-delta-list:t+1 & [lstm-option]]
-  (let [gemv (if-let [it (:gemv lstm-option)] it default/agemv)
+  (let [gemv (if-let [it (:gemv lstm-option)] it default/gemv)
         output-w   (:w output-layer)
         {above-block-w :block-w above-input-gate-w :input-gate-w above-forget-gate-w :forget-gate-w above-output-gate-w :output-gate-w} above-layer
         {above-block-delta :block-delta above-input-gate-delta :input-gate-delta above-forget-gate-delta :forget-gate-delta above-output-gate-delta :output-gate-delta} above-delta
@@ -197,7 +197,7 @@
               (aset ^floats _tmp (+ output-range above-range (* self-num self-num)   (* x self-num) y) (aget ^floats input-gate-wr  (+ (* x self-num) y)))
               (aset ^floats _tmp (+ output-range above-range (* self-num self-num 2) (* x self-num) y) (aget ^floats forget-gate-wr (+ (* x self-num) y)))
               (aset ^floats _tmp (+ output-range above-range (* self-num self-num 3) (* x self-num) y) (aget ^floats output-gate-wr (+ (* x self-num) y)))))
-        w (default/atranspose self-num _tmp)
+        w (default/transpose self-num _tmp)
         output-range (if need-output? output-num 0)
         above-range (if need-above? (* above-num 4) 0)
         delta-list (float-array (+ (if need-output? output-num 0) (if need-above? (* above-num 4) 0) (* self-num 4)))
