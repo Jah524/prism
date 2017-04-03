@@ -14,8 +14,8 @@
             (float-array hidden-size)
             (vec sparse-inputs))))
 
-(vec (hidden-state-by-sparse {"natural" (float-array [2 3]) "language" (float-array [10 20])}
-                             {"natural" -0.5 "language" 1} 2))
+;; (vec (hidden-state-by-sparse {"natural" (float-array [2 3]) "language" (float-array [10 20])}
+;;                              {"natural" -0.5 "language" 1} 2))
 
 
 ;{"natural" -1 "language" 1}
@@ -30,9 +30,6 @@
               state-list (default/sum (cond (and (= acc [{:activation x-list}]);input-layer
                                                  (= :sparse (:input-type model)))
                                             (hidden-state-by-sparse w input-list unit-num option)
-                                            (and (= :output layer-type)
-                                                 (= :sparse (:output-type model)))
-                                            :FIXME
                                             :else
                                             (gemv w input-list))
                                       bias)
@@ -140,10 +137,4 @@
                        acc)))
         (assoc model-design :layers (reverse acc))))))
 
-;; (init-model {:input-type :word :output-type :word
-;;              :layers [{:unit-num 3 :layer-type :input} {:unit-num 3 :layer-type :hidden} {:unit-num 3 :layer-type :output}]}
-;;             {"natural" 5 "language" 3 "processing" 2})
-;; (def a (init-model {:layers [{:unit-num 1000} {:unit-num 101}]}))
-;; (aset ^floats (:w (first (:layers a))) 4 1000.0)
-;; (aget (:w (first (:layers a))) 100001)
 

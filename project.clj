@@ -7,4 +7,5 @@
                  [clj-time "0.13.0"]
                  [com.taoensso/nippy "2.13.0"]
                  [org.clojure/data.json "0.2.6"]
-                 [org.clojure/core.async "0.3.442"]])
+                 [org.clojure/core.async "0.3.442"]
+                 [incanter "1.5.7"]])
