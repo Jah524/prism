@@ -501,13 +501,6 @@
        (let [l2-em (reduce (fn [acc kv] (assoc acc (first kv) (l2-normalize (second kv)))) {} word-em)]
          (util/save-model l2-em path))))))
 
-(defn short-floats [fs]
-  (str
-   "["
-   (apply str (interpose "," (map #(format "%.3f" (float %)) fs)))
-   "]"))
-
-
 ;; on embedding ;;
 
 (defn word2vec [embedding word]
