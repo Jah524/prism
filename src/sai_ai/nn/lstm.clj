@@ -1,4 +1,4 @@
-(ns nn.lstm
+(ns sai-ai.nn.lstm
   (:require
     [matrix.default :refer [transpose sum times outer minus] :as default]
     [unit :refer [sigmoid tanh activation derivative model-rand]]

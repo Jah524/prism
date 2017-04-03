@@ -1,4 +1,4 @@
-(ns nn.feedforward
+(ns sai-ai.nn.feedforward
   (:require [unit :refer [activation derivative model-rand]]
             [matrix.default :as default]))
 

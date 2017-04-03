@@ -1,4 +1,4 @@
-(ns nlp.utt2vec
+(ns sai-ai.nlp.utt2vec
   (:require
     [clojure.string :as str]
     [clj-time.local :as l]
@@ -8,7 +8,7 @@
     [clojure.core.async :refer [go go-loop thread >! <! >!! <!! chan timeout alt! alts! close!]]
     [clojure.java.io :refer [reader writer]]
     [matrix.default :refer [sum minus times dot outer transpose gemv]]
-    [util :refer [progress-format make-wl]]
+    [sai-ai.util :refer [progress-format make-wl]]
     [unit :refer [derivative tanh sigmoid softmax model-rand]]))
 
 (defn save-model [obj target-path]

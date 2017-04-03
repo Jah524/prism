@@ -1,7 +1,7 @@
 (ns nlp.word2vec-test
   (:require [clojure.test :refer :all]
             [clojure.string :refer [split]]
-            [nlp.word2vec :refer :all]))
+            [sai-ai.nlp.word2vec :refer :all]))
 
 (deftest word2ec-test
   (testing "subsampling"

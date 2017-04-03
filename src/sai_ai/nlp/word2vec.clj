@@ -1,4 +1,4 @@
-(ns nlp.word2vec
+(ns sai-ai.nlp.word2vec
   (:require [clojure.string :refer [split]]
             [clojure.java.io :refer [reader writer]]
             [clojure.core.async :refer [go go-loop]]
@@ -6,7 +6,7 @@
             [clj-time.core  :as t]
             [clojure.data.json :as json]
             [matrix.default :as default]
-            [util :as util]
+            [sai-ai.util :as util]
             [unit :refer [activation model-rand]]
             ))
 

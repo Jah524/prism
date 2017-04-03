@@ -1,4 +1,4 @@
-(ns util
+(ns sai-ai.util
   (:require
     [clojure.java.io :refer [reader writer]]
     [clojure.string :as str]

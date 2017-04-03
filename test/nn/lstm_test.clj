@@ -1,6 +1,6 @@
 (ns nn.lstm-test
   (:require [clojure.test :refer :all]
-            [nn.lstm :refer :all]))
+            [sai-ai.nn.lstm :refer :all]))
 
 
 (def sample-w-network-deep ;1->20->20->1

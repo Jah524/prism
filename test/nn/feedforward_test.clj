@@ -1,6 +1,6 @@
 (ns nn.feedforward-test
   (:require [clojure.test :refer :all]
-            [nn.feedforward :refer :all]))
+            [sai-ai.nn.feedforward :refer :all]))
 
 (def sample-model ;1->3->1
   {:model-type nil
