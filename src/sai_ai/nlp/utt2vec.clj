@@ -8,33 +8,8 @@
     [clojure.core.async :refer [go go-loop thread >! <! >!! <!! chan timeout alt! alts! close!]]
     [clojure.java.io :refer [reader writer]]
     [matrix.default :refer [sum minus times dot outer transpose gemv]]
-    [sai-ai.util :refer [progress-format make-wl]]
+    [sai-ai.util :refer [progress-format make-wl save-model load-model]]
     [unit :refer [derivative tanh sigmoid softmax model-rand]]))
-
-(defn save-model [obj target-path]
-  (with-open [w (clojure.java.io/output-stream target-path)]
-    (freeze-to-out! (java.io.DataOutputStream. w) obj)))
-
-(defn load-model [target-path]
-  (with-open [w (clojure.java.io/input-stream target-path)]
-    (thaw-from-in! (java.io.DataInputStream. w))))
-
-
-(defn dump-model-as-json [utt2vec-model-path export-path]
-  (let [u2v-model (load-model utt2vec-model-path)
-        mjson (-> u2v-model (dissoc :wl :output :em) json/write-str)]
-    (with-open [w (writer export-path)]
-      (.write w mjson))))
-
-(defn dump-light-model [utt2vec-model-path top-n]
-  (let [u2v-model (load-model utt2vec-model-path)
-        {:keys [wl em]} u2v-model
-        considered (set (->> (dissoc wl "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
-        word-em (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} em)]
-    (-> u2v-model
-        (dissoc :wl :output)
-        (assoc :em word-em)
-        (save-model (str utt2vec-model-path ".top" top-n ".light")))))
 
 
 (defn uniform->cum-uniform [uniform-dist]
@@ -556,7 +531,6 @@
             (.close r)
             (save-model @acc export-path)))))
     :done))
-
 
 
 (defn most-sim-from-utt-list
