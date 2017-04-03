@@ -1,6 +1,7 @@
 (ns nlp.word2vec-test
   (:require [clojure.test :refer :all]
             [clojure.string :refer [split]]
+            [clojure.pprint :refer [pprint]]
             [sai-ai.nlp.word2vec :refer :all]))
 
 (deftest word2ec-test
@@ -57,4 +58,24 @@
                                                                         (float-array (range 1 11))))) %)
                       (range 10))]
         (is (= 10 (count coll)))
-        (is (not (zero? (count (remove #(zero? %) coll)))))))))
+        (is (not (zero? (count (remove #(zero? %) coll))))))))
+  (testing "update-output-params!"
+    (let [minimum-model {:hidden-size 10 :output {:bias {"A" (float-array [10])} :w {"A" (float-array (range 10))}}}
+          word-w-delta-list {"A" (float-array (range 10))}
+          word-bias-delta-list {"A" 1}
+          result (update-output-params! minimum-model word-w-delta-list word-bias-delta-list 0.01)]
+      (is (= [(float 10.01)]
+             (vec (get (get-in result [:output :bias]) "A"))))
+      (is (= (map float [0.0, 1.01, 2.02, 3.03, 4.04, 5.05, 6.06, 7.07, 8.08, 9.09])
+             (vec (get (get-in result [:output :w]) "A"))))))
+  (testing "update-embedding-bias!"
+    (let [minimum-model {:hidden-size 10 :embedding {:bias (float-array (range 10))}}
+          result (update-embedding-bias! minimum-model (float-array (range 10 20)) 0.01)]
+      (is (= (map float [0.1, 1.11, 2.12, 3.13, 4.14, 5.15, 6.16, 7.17, 8.18, 9.19])
+             (vec (get-in result [:embedding :bias]))))))
+  (testing "update-embedding!"
+    (let [minimum-model {:hidden-size 10 :embedding {:w {"A" (float-array (range 10))}}}
+          result (update-embedding! minimum-model ["A" (float-array (range 10))] 0.01)]
+      (is (= (map float [0.0, 1.01, 2.02, 3.03, 4.04, 5.05, 6.06, 7.07, 8.08, 9.09])
+             (vec (get (get-in result [:embedding :w]) "A"))))))
+      )

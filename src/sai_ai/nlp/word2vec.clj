@@ -16,9 +16,6 @@
     (when (< (rand) take-prob)
       word)))
 
-;; (subsampling "A" 0.1 1.0e-5)
-;; (count (remove nil? (take 10000 (repeatedly #(subsampling "A" 0.1 1.0e-5)))))
-
 (defn window [coll offset local-window-size]
   (let [n (inc (* 2 local-window-size))
         ret (object-array n)]
@@ -38,7 +35,6 @@
                  (conj acc (window coll offset local-window-size))))
         acc))))
 
-;; (mapv vec (sg-windows ["A" "B" "C" "D" "E" "F" "G"] 3))
 
 (defn skip-gram-training-pair
   [wl all-word-token words & [option]]
@@ -68,12 +64,6 @@
          (remove empty?)
          vec)))
 
-
-;; (time (skip-gram-training-pair {"A" 1 "B" 20 "C" 30 "common word" 10000 "D" 10 "E" 10} 10071 ["A" "B" "common word" "C" "D" "E"]
-;;                                {:window-size 2}))
-
-;; (skip-gram-training-pair {"A" 1 "B" 20 "C" 30 "common word" 100000 "S" 50 "D" 10} 1000000 [])
-
 (defn uniform->cum-uniform [uniform-dist]
   (->> (sort-by second > uniform-dist)
        (reduce #(let [[acc-dist acc] %1
@@ -102,73 +92,9 @@
             :else
             (recur (inc c) rnd-list acc)))))
 
-;; (uniform-sampling (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) [9 8 3 3 13])
-
 (defn get-negatives [neg-cum negative-num]
   (let [m (second (last neg-cum))]
     (uniform-sampling neg-cum (repeatedly negative-num #(rand (dec m))))))
-
-;; (get-negatives (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) 20)
-
-
-(defn make-sg-file [wl-path target-path export-path & [option]]
-  (let [sg-buf (or (:sg-buf option) 0)
-        interval-ms (or (:interval-ms option) 300000);5 minutes
-        workers (or (:workers option) 1)
-        negative (or (:negative option) 5)
-        limit (with-open [r (reader target-path)] (count (line-seq r)))
-        wl (read-string (slurp wl-path))
-        neg-wl (dissoc wl "<unk>")
-        _(println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
-        wl-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} neg-wl)
-        neg-cum (uniform->cum-uniform wl-unif)
-        _(println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] done"))
-        all-word-token (reduce #(+ %1 (second %2)) 0 neg-wl)
-        done? (atom false)
-        interval-count (atom 0)
-        w (writer export-path)
-        r (reader target-path)]
-    (dotimes [n workers] (go (loop [buf (atom []), negatives (shuffle (get-negatives neg-cum (* negative 100000)))]
-                               (let [line (.readLine r)
-                                     rest-negatives (drop negative negatives)
-                                     next-negatives (if (empty? rest-negatives)
-                                                      (shuffle (get-negatives neg-cum (* negative 100000)))
-                                                      rest-negatives)]
-                                 (cond (nil? line)
-                                       (do
-                                         (reset! done? true)
-                                         (when-not (empty? @buf)
-                                           (.write w (apply str (vec (apply concat @buf)) "\n"))))
-                                       (= (clojure.string/trim line) "")
-                                       (do (swap! interval-count inc) (recur buf next-negatives))
-                                       :else
-                                       (do
-                                         (let [coll (split line #" ")
-                                               sgn (->> (skip-gram-training-pair wl all-word-token coll option)
-                                                        (mapv #(conj (vec %) (vec (take negative negatives))))
-                                                        vec)]
-                                           (when-not (empty? sgn)
-                                             (condp = sg-buf
-                                               0 (->> sgn (map #(.write w (apply str [%] "\n"))) dorun)
-                                               (let [b (swap! buf conj sgn)]
-                                                 (when (>= (count b) sg-buf)
-                                                   (.write w (apply str (vec (apply concat b)) "\n"))
-                                                   (reset! buf [])))))
-                                           (swap! interval-count inc)
-                                           (recur buf next-negatives))))))))
-    (loop [counter 0]
-      (if @done?
-        (do (.close r) (.close w) (println "done"))
-        (do
-          (Thread/sleep interval-ms)
-          (let [c @interval-count]
-            (println (util/progress-format counter limit c interval-ms " lines/s"))
-            (reset! interval-count 0)
-            (recur (+ counter c))))))))
-
-
-;;;
-
 
 (defn init-w2v-model
   [wl hidden-size]
@@ -189,8 +115,6 @@
     (println "done")
     m))
 
-;; (def tiny (init-w2v-model {"A" 1 "B" 1  "C" 1 "D" 1 "E" 1 "F" 1 "G" 1 "<unk>" 0} 10))
-
 (defn hidden-activation [model word]
   (let [hidden-size (:hidden-size model)
         ret (float-array hidden-size)
@@ -201,76 +125,49 @@
     ret))
 
 
-;; (map #(aget (hidden-activation tiny "B") %) (range 10))
-
-;; (def negatives (map str (range 100000 1000000 10000)))
-;; (println (count negatives))
-
 (defn negative-sampling
   [model hidden-activation positives negatives & [option]]
   (let [{:keys [hidden-size vocab-size]} model
         negatives (remove (fn [n] (some #(= % n) positives)) negatives)
-        negative-num (count negatives);(or (:negative-num option) 15)
-        word-num (+ (count positives) negative-num)
         words (concat positives negatives)
         output-w  (->> words (mapv #(get (:w (:output model)) %)))
         word-bias (->> words (map #(get (:bias (:output model)) %)) (map #(aget ^floats % 0)) float-array)
         activations  (-> (default/sum (default/gemv' output-w hidden-activation) word-bias)
                          (activation :sigmoid)
-                          vec)
+                         vec)
         [p n] (split-at (count positives) activations)
         delta (concat (map #(float (- 1 %)) p)
                       (map #(float (- %)) n))]
     (mapv vector words delta)))
 
-;; (negative-sampling tiny (float-array (take 10 (repeat 1))) ["A" "C"] ["A" "B" "C"])
 
 (defn some-hot-bp
-  [model word-value-pairs]
+  "unit-deltas at hidden layer"
+  [model word-delta-pairs]
   (let [hidden-size (:hidden-size model)
-        embeddings (get-in model [:output :w])
-        vecs (map #(get embeddings %) (keys word-value-pairs))
-        mat (float-array (* (count word-value-pairs) hidden-size))
-        _ (doall (map-indexed (fn [i v]
+        output-w (get-in model [:output :w])
+        word-w-list (map #(get output-w %) (keys word-delta-pairs))
+        mat (float-array (* (count word-delta-pairs) hidden-size))
+        _ (doall (map-indexed (fn [i w]
                                 (dotimes [x hidden-size]
-                                  (aset ^floats mat (+ x (* i hidden-size)) (aget ^floats v x))))
-                              vecs))
-        delta (float-array (vals word-value-pairs))]
+                                  (aset ^floats mat (+ x (* i hidden-size)) (aget ^floats w x))))
+                              word-w-list))
+        delta (float-array (vals word-delta-pairs))]
     (default/gemv (default/transpose hidden-size mat) delta)))
 
-;; (map #(aget ^floats (some-hot-bp tiny [["A" 0.5108695] ["C" 0.498649] ["D" -0.50098985] ["<unk>" -0.5097836]]) %) (range 10))
 
 (defn output-param-delta [model word-value-pairs hidden-activation]
-    (let [hidden-size (:hidden-size model)
-          w    (get-in model [:output :w])
-          bias (get-in model [:output :bias])
-          tmp-delta (float-array hidden-size)
-          word-delta (doall (map (fn [ud]
-                                   (dotimes [x hidden-size]
-                                     (aset ^floats tmp-delta x (float (* ud (aget ^floats hidden-activation x)))))
-                                   (aclone tmp-delta))
-;;                             (map #(* ud %) hidden-activation))
-                                 (vals word-value-pairs)))
-          bias-delta (vals word-value-pairs)]
-      (mapv vector (keys word-value-pairs) word-delta bias-delta)))
-
-;; (map #(aget ^floats (second (first (output-param-delta tiny [["A" 0.5108695] ["C" 0.498649] ["D" -0.50098985] ["<unk>" -0.5097836]] (float-array (range 1 11))))) %) (range 10))
-
-
-(defn embedding-param-delta [model target-word hidden-delta];obsolete fixme
-  [target-word hidden-delta])
-;;   (let [hidden-size (:hidden-size model)
-;;         embeddings (get-in model [:embedding :w])
-;;         embedding (get embeddings target-word)
-;;         ret (float-array hidden-size)
-;;         _ (dotimes [x hidden-size]
-;;             (aset ^floats ret x (float (* (aget ^floats embedding x) (aget ^floats hidden-delta x)))))]
-;;     [target-word ret]))
-
-;; (embedding-param-delta tiny "B" (float-array (range 1 101)))
-;; (map #(aget ^floats (second (embedding-param-delta tiny "B" (float-array (range 1 101)))) %) (range 100))
-
-;; (def sample-sgp ["A" ["B" "C"]])
+  (let [hidden-size (:hidden-size model)
+        w    (get-in model [:output :w])
+        bias (get-in model [:output :bias])
+        tmp-delta (float-array hidden-size)
+        word-delta (doall (map (fn [ud]
+                                 (dotimes [x hidden-size]
+                                   (aset ^floats tmp-delta x (float (* ud (aget ^floats hidden-activation x)))))
+                                 (aclone tmp-delta))
+                               (vals word-value-pairs)))
+        bias-delta (vals word-value-pairs)]
+    (mapv vector (keys word-value-pairs) word-delta bias-delta)))
 
 
 (defn back-propagation:negative-sampling [model sg-pair]
@@ -279,128 +176,91 @@
         word-delta (negative-sampling model h positives negatives)
         output-delta (output-param-delta model word-delta h)
         h-unit-delta (some-hot-bp model word-delta)
-        embedding-delta (embedding-param-delta model target-word h-unit-delta)]
+        embedding-delta [target-word h-unit-delta]] ;param's delta always equals unit delta, due to its input value have to be 1
     [output-delta word-delta embedding-delta h-unit-delta]))
 
-;; (back-propagation:negative-sampling tiny ["A" ["B" "C"]])
-;; (map #(aget ^floats (:embedding-bias-delta (back-propagation:negative-sampling tiny sample-sgp @negatives)) %) (float-array (range 100)))
+(defn update-output-params! [model word-w-delta-list word-bias-delta-list learning-rate]
+  (let [hidden-size (:hidden-size model)
+        output (:output model)
+        delta-output (:delta-output model)]
+    (mapv
+      #(let [word (first %1)
+             w    (get (:w output) word)
+             bias (get (:bias output) word)
+             dw   (get (:w delta-output) word)
+             db   (get (:bias delta-output) word)]
+         ;;         (when (not= (first %1) (first %2)) (println "doesn't match word"));FIXME
+         (dotimes [x hidden-size]
+           ;;           (let [[d-acc new-param] (adagrad (aget ^floats w x) (aget ^floats (second %1) x)
+           ;;                                            learning-rate (aget ^floats dw x))]
+           (let [new-param (+ (aget ^floats w x) (* (aget ^floats (second %1) x) learning-rate))]
+             (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
+               ;;               (aset ^floats dw x d-acc)
+               (aset ^floats w x new-param))))
+         ;;         (let [[d-acc new-param] (adagrad (aget ^floats bias 0) (second %2)
+         ;;                                          learning-rate (aget ^floats db 0))]
+         (let [new-param (+ (aget ^floats bias 0) (* (second %2) learning-rate))]
+           (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
+             ;;             (aset ^floats db 0 d-acc)
+             (aset ^floats bias 0 new-param ))))
+      word-w-delta-list word-bias-delta-list)
+    model))
 
 
-;; (defn adagrad [old-param delta learning-rate delta-acc & [min-learning-rate]]
-;;   (let [d (* delta delta)
-;;         delta-acc' (float (+ delta-acc d))
-;;         min-learning-rate (or min-learning-rate 0.0001)
-;;         alpha (max (float min-learning-rate) (* (float learning-rate)  (/ (float 1) (+ (float 1) (float (Math/sqrt delta-acc))))))
-;;         new-param (float (+ old-param (* alpha delta)))]
-;;     [delta-acc' new-param]))
+(defn update-output-params! [model word-w-delta-list word-bias-delta-list learning-rate]
+  (let [hidden-size (:hidden-size model)
+        output (:output model)
+        delta-output (:delta-output model)]
+    (mapv
+      #(let [word (first %1)
+             w    (get (:w output) word)
+             bias (get (:bias output) word)
+             dw   (get (:w delta-output) word)
+             db   (get (:bias delta-output) word)]
+         ;; update w
+         (dotimes [x hidden-size]
+           (let [new-param (+ (aget ^floats w x) (* (aget ^floats (second %1) x) learning-rate))]
+             (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
+               (aset ^floats w x new-param))))
+         ;; update bias
+         (let [new-param (+ (aget ^floats bias 0) (* (second %2) learning-rate))]
+           (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
+             (aset ^floats bias 0 new-param ))))
+      word-w-delta-list word-bias-delta-list)
+    model))
 
-;; (adagrad 0.1 1 0.005 10)
-
-(defn update-embedding-bias [model embedding-bias-delta learning-rate]
+(defn update-embedding-bias! [model embedding-bias-delta learning-rate]
   (let [hidden-size (:hidden-size model)
         model-input-bias (:bias (:embedding model))]
-;;         model-embedding-bias-delta-acc (:bias (:delta-embedding model))]
     (dotimes [x hidden-size]
-;;       (let [[d-acc new-param] (adagrad (aget ^floats model-input-bias x) (aget ^floats delta-acc x)
-;;                                        learning-rate (aget ^floats model-embedding-bias-delta-acc x))]
       (let [new-param (+ (aget ^floats model-input-bias x) (* (aget ^floats embedding-bias-delta x) learning-rate))]
         (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
-;;           (aset ^floats model-embedding-bias-delta-acc x d-acc)
           (aset ^floats model-input-bias x new-param))))
     model))
 
 
-;; (mapv #(aget ^floats (:bias(:embedding (update-embedding-bias {:hidden-size 10 :embedding {:bias (float-array (range 10))}} (float-array (range 10)) 0.01))) %) (range 10))
-
-;; (map #(aget ^floats (update-embedding-bias tiny [(float-array (range 100))(float-array (range 100 200))]) %) (range 100))
-
-(defn update-embedding [model embedding-delta learning-rate]
+(defn update-embedding! [model embedding-delta learning-rate]
   (let [hidden-size (:hidden-size model)
-        embeddings (:w (:embedding model))
-        delta-embedding (:w (:delta-embedding model))
-        embedding (get embeddings (first embedding-delta))
-        dm (get delta-embedding (first embedding-delta))]
+        [target-word delta] embedding-delta
+        embedding-set (:w (:embedding model))
+        embedding (get embedding-set target-word)]
     (dotimes [x hidden-size]
-      ;;                      (let [[d-acc new-param]  (adagrad (aget ^floats embedding x) (aget ^floats (second %) x)
-      ;;                                                       learning-rate  (aget ^floats dm x))]
-      (let [new-param (+ (aget ^floats embedding x) (* (aget ^floats (second embedding-delta) x) learning-rate))]
+      (let [new-param (+ (aget ^floats embedding x) (* (aget ^floats delta x) learning-rate))]
         (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
-          ;;                          (aset ^floats dm x d-acc)
           (aset ^floats embedding x new-param))))
     model))
 
 ;; (update-embedding {:hidden-size 10 :embedding {:w {"A" (float-array (range 10 20))}}} ["A" (float-array (range 10))] 0.01)
 ;; (mapv #(aget ^floats (get (:w (:embedding (update-embedding {:hidden-size 10 :embedding {:w {"A" (float-array (range 10 20))}}} ["A" (float-array (range 10))] 0.01))) "A") %) (range 10))
 
-(defn update-output-params [model word-w-delta-list word-bias-delta-list learning-rate]
-  (let [hidden-size (:hidden-size model)
-        output (:output model)
-        delta-output (:delta-output model)]
-    (mapv
-     #(let [word (first %1)
-            w    (get (:w output) word)
-            bias (get (:bias output) word)
-            dw   (get (:w delta-output) word)
-            db   (get (:bias delta-output) word)]
-;;         (when (not= (first %1) (first %2)) (println "doesn't match word"));FIXME
-        (dotimes [x hidden-size]
-;;           (let [[d-acc new-param] (adagrad (aget ^floats w x) (aget ^floats (second %1) x)
-;;                                            learning-rate (aget ^floats dw x))]
-          (let [new-param (+ (aget ^floats w x) (* (aget ^floats (second %1) x) learning-rate))]
-            (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
-;;               (aset ^floats dw x d-acc)
-              (aset ^floats w x new-param))))
-;;         (let [[d-acc new-param] (adagrad (aget ^floats bias 0) (second %2)
-;;                                          learning-rate (aget ^floats db 0))]
-        (let [new-param (+ (aget ^floats bias 0) (* (second %2) learning-rate))]
-          (when (and (< new-param (float 1.0E4)) (> new-param (max (float -1.0E4))))
-;;             (aset ^floats db 0 d-acc)
-            (aset ^floats bias 0 new-param ))))
-     word-w-delta-list word-bias-delta-list)
-    model))
-
 
 (defn train! [model sg learning-rate & [option]]
   (let [[word-w-delta-list word-bias-delta-list embedding-delta embedding-bias-delta]
         (back-propagation:negative-sampling model sg)]
-    (update-output-params model word-w-delta-list word-bias-delta-list learning-rate)
-    (update-embedding-bias model embedding-bias-delta learning-rate)
-    (update-embedding model embedding-delta learning-rate)))
+    (update-output-params! model word-w-delta-list word-bias-delta-list learning-rate)
+    (update-embedding-bias! model embedding-bias-delta learning-rate)
+    (update-embedding! model embedding-delta learning-rate)))
 
-;; (with-open [r (reader "/Users/k-lab/workspace/dataset/w2v_tiny.txt")]
-;;   [(.readLine r) (.readLine r)])
-
-(defn train-word2vec-by-sgnfile!
-  [w2v-model sgn-path & [option]]
-  (let [interval-ms (or (:interval-ms option) 10000) ;; 10 seconds
-        workers (or (:workers option) 4)
-        initial-learning-rate (or (:learning-rate option) 0.025)
-        min-learning-rate (or (:min-learning-rate option) 0.0001)
-        all-lines-num (with-open [r (reader sgn-path)] (count (line-seq r)))
-        local-counter (atom 0)
-        done? (atom false)]
-    (let [r (reader sgn-path)]
-      (dotimes [w workers]
-        (go-loop [] (if-let [sgns-line (.readLine r)]
-                      (let [progress (/ @local-counter all-lines-num)
-                            learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)]
-                        (->> (clojure.edn/read-string sgns-line)
-                             (mapv #(train! w2v-model % learning-rate option)))
-                        (swap! local-counter inc)
-                        (recur))
-                      (reset! done? true))))
-      (loop [counter 0]
-        (when-not @done?
-          (let [c @local-counter
-                next-counter (+ counter c)]
-            (println (util/progress-format counter all-lines-num c interval-ms "sgline/s"))
-            (reset! local-counter 0)
-            (Thread/sleep interval-ms)
-            (recur next-counter))))
-      (println "done")
-      (.close r))
-    (clojure.pprint/pprint option)
-    :done))
 
 (defn train-word2vec!
   [w2v-model train-path & [option]]
@@ -454,18 +314,6 @@
     (println "Saving model ...")
     (util/save-model model export-path)
     (println "Done")))
-
-(defn resume-train
-  [model-path training-path & [n]]
-  (let [model (util/load-model model-path)
-        n (or n 1)]
-    (loop [n n] (when-not (<= n 0)
-                  (train-word2vec-by-sgnfile! model training-path)
-                  (recur (dec n))))
-    (println "Saving model ...")
-    (util/save-model model model-path)
-    (println "Done")))
-
 
 (defn l2-normalize
   [^floats v]
