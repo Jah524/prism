@@ -359,13 +359,6 @@
      word-w-delta-list word-bias-delta-list)
     model))
 
-;; (map #(aget ^floats (get (:bias (:output tiny)) "A") %) (range 1))
-;; (def tiny (init-w2v-model {"A" 2 "B" 2 "C" 2 "D" 2 "E" 2 "F" 2 "G" 2 "<unk>" 1} 10))
-;; (mapv #(aget ^floats (get (:bias (:output (update-output-params {:hidden-size 10 :output {:w {"A" (float-array (range 10 20))}
-;;                                                                                       :bias {"A" (float-array [0])}}}
-;;                                                              [["A" (float-array (repeat 10 1))]] [["A" 2]] 0.01)))
-;;                           "A")
-;;              %) (range 1))
 
 (defn train! [model sg learning-rate & [option]]
   (let [[word-w-delta-list word-bias-delta-list embedding-delta embedding-bias-delta]
