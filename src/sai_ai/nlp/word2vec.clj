@@ -112,7 +112,7 @@
   (let [_(println "making word list...")
         wl (util/make-wl training-path)
         _(println "done")
-        model (init-model wl size)]
+        model (init-model wl (keys wl) size)]
     (train-word2vec! model training-path option)
     (println "Saving model ...")
     (util/save-model model export-path)

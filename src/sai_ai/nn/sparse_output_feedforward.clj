@@ -128,8 +128,7 @@
     (update-embedding! model embedding-delta learning-rate)))
 
 (defn init-model
-  "devide wl into input-wl and output-set for generalization FIXME"
-  [wl hidden-size]
+  [wl output-type hidden-size]
   (println "Initializing word2vec model ... ")
   (let [wl (assoc wl "<unk>" 0)
         vocab-size (count wl)
@@ -138,8 +137,8 @@
         _ (dotimes [x hidden-size] (aset ^floats w x (float (model-rand))))
         m {:embedding  {:w    (reduce #(assoc %1 %2 (float-array (take hidden-size (repeatedly model-rand)))) {} (keys wl))
                         :bias (float-array (take hidden-size (aclone w)))}
-           :output {:w    (reduce #(assoc %1 %2 (float-array (take hidden-size (repeatedly model-rand)))) {} (keys wl))
-                    :bias (reduce #(assoc %1 %2 (float-array [(model-rand)])) {} (keys wl))}
+           :output {:w    (reduce #(assoc %1 %2 (float-array (take hidden-size (repeatedly model-rand)))) {} output-type)
+                    :bias (reduce #(assoc %1 %2 (float-array [(model-rand)])) {} output-type)}
            :hidden-size hidden-size
            :all-word-token (reduce + (vals wl))
            :vocab-size vocab-size

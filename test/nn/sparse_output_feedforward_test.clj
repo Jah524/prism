@@ -5,12 +5,14 @@
 
 (deftest sparse-output-feedforward-test
   (testing "init-model"
-    (let [model (init-model {"A" 1 "B" 1 "C" 1 "<unk>" 0} 2)]
+    (let [wl {"A" 1 "B" 1 "C" 1 "<unk>" 0}
+          model (init-model wl (keys wl)2)]
       (is (= (count (:w (:embedding model))) 4))
       (is (= (count (:w (:output model)))    4))
       (is (= (count (:bias (:embedding model))) 2))
       (is (= (count (:bias (:output model)))    4))))
-  (let [tiny (init-model {"A" 1 "B" 1  "C" 1 "D" 1 "E" 1 "F" 1 "G" 1 "<unk>" 0} 10)]
+  (let [wl {"A" 1 "B" 1  "C" 1 "D" 1 "E" 1 "F" 1 "G" 1 "<unk>" 0}
+        tiny (init-model wl (keys wl) 10)]
     (testing "hidden-activation"
       (->> (map #(aget (hidden-activation tiny "B") %) (range 10))
            (every? #(not (zero? %)))))
