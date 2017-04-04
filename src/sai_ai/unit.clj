@@ -1,4 +1,4 @@
-(ns unit)
+(ns sai-ai.unit)
 
 (defn sigmoid [x]
   (float (/ 1 (+ 1 (Math/exp (- (float x)))))))

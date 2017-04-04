@@ -1,5 +1,5 @@
 (ns sai-ai.nn.feedforward
-  (:require [unit :refer [activation derivative model-rand]]
+  (:require [sai-ai.unit :refer [activation derivative model-rand]]
             [matrix.default :as default]))
 
 (defn hidden-state-by-sparse

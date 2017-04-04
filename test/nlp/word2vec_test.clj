@@ -17,20 +17,6 @@
       (is (not (true? (->> coll flatten (some #(or (= % "<bos>") (= % "<eos>")))))))
       (is (= 1 (count (ffirst coll))))
       (is (not (zero? (count (second (first coll))))))))
-  (testing "uniform->cum-uniform"
-    (= (uniform->cum-uniform {"A" 2 "B" 3 "C" 1 "D" 7 "E" 2 "F" 15})
-       [["F" 15.0] ["D" 22.0] ["B" 25.0] ["A" 27.0] ["E" 29.0] ["C" 30.0]]))
-  (testing "uniform-sampling"
-    (is (= (uniform-sampling (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) [6])
-           ["D"]))
-    (is (= (uniform-sampling (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) [7])
-           ["B"]))
-    (is (= (uniform-sampling (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) [12])
-           ["C"]))
-    (is (= (uniform-sampling (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) [12 6 2 7])
-           ["D" "D" "B" "C"])))
-  (testing "get-negatives"
-    (is (= 20 (count (get-negatives (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) 20)))))
   (testing "init-w2v-model"
     (let [model (init-w2v-model {"A" 1 "B" 1 "C" 1 "<unk>" 0} 2)]
       (is (= (count (:w (:embedding model))) 4))

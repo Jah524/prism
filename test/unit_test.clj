@@ -1,6 +1,6 @@
 (ns unit-test
   (:require [clojure.test :refer :all]
-            [unit :refer :all]))
+            [sai-ai.unit :refer :all]))
 
 (deftest unit-test
   (testing "model-rand"

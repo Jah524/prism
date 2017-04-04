@@ -1,7 +1,7 @@
 (ns sai-ai.nn.lstm
   (:require
     [matrix.default :refer [transpose sum times outer minus] :as default]
-    [unit :refer [sigmoid tanh activation derivative model-rand]]
+    [sai-ai.unit :refer [sigmoid tanh activation derivative model-rand]]
     [clj-time.format :as f]
     [clj-time.local  :as l]))
 
