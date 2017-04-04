@@ -5,7 +5,9 @@
     [clojure.core.async :refer [go go-loop thread >! <! >!! <!! chan timeout alt! alts! close!]]
     [clj-time.local :as l]
     [clj-time.core  :as t]
-    [taoensso.nippy :refer [freeze-to-out! thaw-from-in!]]))
+    [taoensso.nippy :refer [freeze-to-out! thaw-from-in!]]
+    [matrix.default :refer [sum times dot]]
+    ))
 
 (defn save-model [obj target-path]
   (with-open [w (clojure.java.io/output-stream target-path)]
@@ -66,3 +68,27 @@
                                     (assoc acc "<unk>" (+ v (get acc "<unk>" 0)))))
                   wl
                   @all-wl))))))
+
+
+(defn l2-normalize
+  [^floats v]
+  (let [acc (Math/sqrt (reduce + (times v v)))
+        n (count v)
+        ret (float-array n)]
+    (amap ^floats v i ret (float (/ (aget ^floats v i) acc)))))
+
+(defn l2-normalize!
+  "caution, this function is destructive but is more memory efficiently"
+  [^floats v]
+  (let [acc (Math/sqrt (sum (times v v)))
+        n (count v)]
+    (dotimes [x n] (aset ^floats v x (float (/ (aget ^floats v x) acc))))))
+
+
+(defn similarity
+  ([v1 v2 l2?]
+   (float (if l2?
+            (dot v1 v2)
+            (dot (l2-normalize v1) (l2-normalize v2)))))
+  ([v1 v2]
+   (similarity v1 v2 true)))
