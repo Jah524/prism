@@ -24,7 +24,7 @@
          "0.0"
          (format "%.1f" (float (/ interval-done (/ interval-ms 1000)))))
        " " unit " "
-       (format "(%.2f" (float (* 100 (/ done all))))
+       (format "(%.3f" (float (* 100 (/ done all))))
        "%)"))
 
 (defn make-wl
