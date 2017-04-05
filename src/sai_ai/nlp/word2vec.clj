@@ -8,7 +8,7 @@
             [matrix.default :as default]
             [sai-ai.util :refer [l2-normalize l2-normalize! similarity] :as util]
             [sai-ai.unit :refer [activation model-rand]]
-            [sai-ai.negative-sampling :refer [uniform->cum-uniform uniform-sampling get-negatives]]
+            [sai-ai.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
             [sai-ai.nn.sparse-output-feedforward :refer [init-model train!]]))
 
 
@@ -85,7 +85,7 @@
         done? (atom false)]
     (let [r (reader train-path)]
       (dotimes [w workers]
-        (go (loop [negatives (shuffle (get-negatives neg-cum (* negative 100000)))]
+        (go (loop [negatives (shuffle (samples neg-cum (* negative 100000)))]
               (if-let [train-line (.readLine r)]
                 (let [progress (/ @local-counter all-lines-num)
                       learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
@@ -93,7 +93,7 @@
                       next-negatives (drop (* negative (count sg)) negatives)]
                   (dorun (map-indexed #(train! w2v-model (conj (vec %2) (->> negatives (drop (* negative %1)) (take negative) vec)) learning-rate option) sg))
                   (swap! local-counter inc)
-                  (recur (if (empty? next-negatives)  (shuffle (get-negatives neg-cum (* negative 100000))) next-negatives)))
+                  (recur (if (empty? next-negatives)  (shuffle (samples neg-cum (* negative 100000))) next-negatives)))
                 (reset! done? true)))))
       (loop [counter 0]
         (when-not @done?

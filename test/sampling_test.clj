@@ -1,6 +1,6 @@
-(ns negative-sampling-test
+(ns sampling-test
   (:require [clojure.test :refer :all]
-            [sai-ai.negative-sampling :refer :all]))
+            [sai-ai.sampling :refer :all]))
 
 (deftest negative-sampling-test
   (testing "uniform->cum-uniform"
@@ -16,4 +16,4 @@
     (is (= (uniform-sampling (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) [12 6 2 7])
            ["D" "D" "B" "C"])))
   (testing "get-negatives"
-    (is (= 20 (count (get-negatives (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) 20))))))
+    (is (= 20 (count (samples (into-array [["D" 7] ["B" 10] ["A" 12] ["C" 13]]) 20))))))

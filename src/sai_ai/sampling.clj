@@ -1,4 +1,4 @@
-(ns sai-ai.negative-sampling)
+(ns sai-ai.sampling)
 
 (defn uniform->cum-uniform [uniform-dist]
   (->> (sort-by second > uniform-dist)
@@ -28,7 +28,7 @@
             :else
             (recur (inc c) rnd-list acc)))))
 
-(defn get-negatives [neg-cum-dist negative-num]
-  (let [m (second (last neg-cum-dist))]
-    (uniform-sampling neg-cum-dist (repeatedly negative-num #(rand (dec m))))))
+(defn samples [cum-dist sample-num]
+  (let [m (second (last cum-dist))]
+    (uniform-sampling cum-dist (repeatedly sample-num #(rand (dec m))))))
 

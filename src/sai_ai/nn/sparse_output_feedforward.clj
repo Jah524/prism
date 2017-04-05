@@ -7,8 +7,7 @@
             [clojure.data.json :as json]
             [matrix.default :as default]
             [sai-ai.util :refer [l2-normalize similarity] :as util]
-            [sai-ai.unit :refer [activation model-rand]]
-            [sai-ai.negative-sampling :refer [uniform->cum-uniform uniform-sampling get-negatives]]))
+            [sai-ai.unit :refer [activation model-rand]]))
 
 
 (defn hidden-activation [model word]

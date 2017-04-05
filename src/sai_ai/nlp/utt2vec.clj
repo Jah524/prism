@@ -5,7 +5,7 @@
     [clojure.core.async :refer [go]]
     [sai-ai.nn.sparse-output-lstm :refer [lstm-activation init-model train!]]
     [sai-ai.util :refer [load-model save-model make-wl progress-format l2-normalize similarity]]
-    [sai-ai.negative-sampling :refer [uniform->cum-uniform get-negatives]]))
+    [sai-ai.sampling :refer [uniform->cum-uniform samples]]))
 
 
 (defn train-utt2vec!
@@ -26,7 +26,7 @@
         done-workers (atom 0)]
     (with-open [r (reader train-path)]
       (dotimes [w workers]
-        (go (loop [negatives (shuffle (get-negatives neg-cum (* negative 100000)))]
+        (go (loop [negatives (shuffle (samples neg-cum (* negative 100000)))]
               (if-let [line (.readLine r)]
                 (let [progress (/ @local-counter all-lines-num)
                       learning-rate initial-learning-rate;(max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
@@ -55,7 +55,7 @@
                                         )))
                        dorun)
                   (swap! local-counter inc)
-                  (recur (if (empty? next-negatives)  (shuffle (get-negatives neg-cum (* negative 100000))) next-negatives)))
+                  (recur (if (empty? next-negatives)  (shuffle (samples neg-cum (* negative 100000))) next-negatives)))
                 (swap! done-workers inc)))))
       (loop [counter 0]
         (if-not (= @done-workers workers)
