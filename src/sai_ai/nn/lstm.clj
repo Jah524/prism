@@ -88,18 +88,6 @@
     (vec (concat ps ns))))
 
 
-
-(defn lstm-delta-zeros [model]
-  (->> (:unit-nums model)
-       butlast
-       (mapv (fn[x]
-               {:block-delta       (float-array x)
-                :input-gate-delta  (float-array x)
-                :forget-gate-delta (float-array x)
-                :output-gate-delta (float-array x)
-                :cell-state-delta  (float-array x)}))))
-
-
 (defn output-param-delta
   [item-delta-pairs hidden-size hidden-activation]
   (->> item-delta-pairs
@@ -186,8 +174,19 @@
                                        :forget-gate-w-delta forget-gate-w-delta :output-gate-w-delta output-gate-w-delta))))]
     param-delta))
 
+(defn lstm-delta-zeros
+  [unit-num]
+  {:block-delta       (float-array unit-num)
+   :input-gate-delta  (float-array unit-num)
+   :forget-gate-delta (float-array unit-num)
+   :output-gate-delta (float-array unit-num)
+   :cell-state-delta  (float-array unit-num)})
+
+(defn gate-zeros
+  [unit-num]
+  {:forget-gate (float-array unit-num)})
+
 (defn bptt
-  "[{:neg [] :pos []}, {:neg [] :pos []}]"
   [model x-seq output-items-seq & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [output hidden]} model
@@ -195,7 +194,6 @@
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden
         model-output-seq (sequential-output model x-seq (->> output-items-seq (map (fn [{:keys [pos neg]}] (concat pos neg)))) option)
-        ;;         _(pprint model-output-seq)
         output-w (:w output)
         ]
     ;looping latest to old
@@ -203,12 +201,8 @@
            propagated-hidden-to-hidden-delta nil,
            output-seq (reverse model-output-seq)
            x-seq (reverse x-seq)
-           self-delta:t+1 {:block-delta       (float-array unit-num)
-                           :input-gate-delta  (float-array unit-num)
-                           :forget-gate-delta (float-array unit-num)
-                           :output-gate-delta (float-array unit-num)
-                           :cell-state-delta  (float-array unit-num)}
-           lstm-state:t+1 {:forget-gate (float-array unit-num)}
+           self-delta:t+1 (lstm-delta-zeros unit-num)
+           lstm-state:t+1 (gate-zeros unit-num)
            output-acc nil
            hidden-acc nil]
       (cond
@@ -217,12 +211,8 @@
                nil
                (rest output-seq)
                (rest x-seq)
-               {:block-delta       (float-array unit-num)
-                :input-gate-delta  (float-array unit-num)
-                :forget-gate-delta (float-array unit-num)
-                :output-gate-delta (float-array unit-num)
-                :cell-state-delta  (float-array unit-num)}
-               {:forget-gate (float-array unit-num)}
+               (lstm-delta-zeros unit-num)
+               (gate-zeros unit-num)
                nil
                nil)
         (first output-seq)

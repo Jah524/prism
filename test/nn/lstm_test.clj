@@ -298,11 +298,11 @@
 
 
   (testing "lstm-delta-zeros"
-    (let [result (lstm-delta-zeros sample-w-network)]
-      (is (= (mapv #(count (:block-delta %))       result) [3 10]))
-      (is (= (mapv #(count (:input-gate-delta %))  result) [3 10]))
-      (is (= (mapv #(count (:forget-gate-delta %)) result) [3 10]))
-      (is (= (mapv #(count (:output-gate-delta %)) result) [3 10]))))
+    (let [result (lstm-delta-zeros (:unit-num (:hidden sample-w-network)))]
+      (is (= (count (:block-delta result))  10))
+      (is (= (count (:input-gate-delta result)) 10))
+      (is (= (count (:forget-gate-delta result)) 10))
+      (is (= (count (:output-gate-delta result)) 10))))
 
 
   (testing "bptt"
