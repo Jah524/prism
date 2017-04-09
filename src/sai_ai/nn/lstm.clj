@@ -187,9 +187,10 @@
 
 (defn prediction-error
   [hidden-size activation predictions & option]
-  (->> predictions
-       (map (fn [[item expect-value]]
-              [item (float (- expect-value (get activation item)))]))))
+  (when-not (= :skip predictions)
+    (->> predictions
+         (map (fn [[item expect-value]]
+                [item (float (- expect-value (get activation item)))])))))
 
 (defn bptt
   [model x-seq output-items-seq & [option]]
@@ -202,7 +203,7 @@
                          :binary-classification
                          (->> output-items-seq (map (fn [{:keys [pos neg]}] (concat pos neg))))
                          :prediction
-                         (map keys output-items-seq))
+                         (map #(if (= % :skip) (concat nil nil) (keys %)) output-items-seq))
         model-output-seq (sequential-output model x-seq sparse-outputs option)
         output-w (:w output)
         ]

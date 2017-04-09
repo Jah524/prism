@@ -389,7 +389,7 @@
   (testing "bptt with sparse prediction"
     (let [result (bptt sample-w-network-prediction
                        [{"natural" (float 1)} {"processing" (float 1)}]
-                       [{"prediction" 10} {"prediction" 20}])
+                       [:skip {"prediction" 20}])
           hd (:hidden-delta result)
           o  (:output-delta result)
           it (:sparses-delta hd)]
