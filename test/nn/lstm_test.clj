@@ -8,6 +8,8 @@
 (def sample-w-network
   {:model-type :nil
    :unit-nums [3 10 3]
+   :input-type :dense
+   :output-type :binary-classification
    :hidden {:unit-type :lstm
             :unit-num 10
             :layer-type :hidden
@@ -40,6 +42,7 @@
 (def sample-w-network-sparse
   {:model-type :nil
    :input-type :sparse
+   :output-type :binary-classification
    :unit-nums [3 10 3]
    :hidden {:sparses {"natural" {:block-w (float-array (take 10 (repeat 0.1)))
                                  :input-gate-w  (float-array (take 10 (repeat 0.1)))
@@ -303,7 +306,6 @@
       (is (= (count (:input-gate-delta result)) 10))
       (is (= (count (:forget-gate-delta result)) 10))
       (is (= (count (:output-gate-delta result)) 10))))
-
 
   (testing "bptt"
     (let [result (bptt sample-w-network

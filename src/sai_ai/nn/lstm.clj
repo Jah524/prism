@@ -78,16 +78,6 @@
 
 ;;;;    Back Propagation Through Time    ;;;;
 
-
-(defn negative-sampling
-  [hidden-size activation positives negatives & [option]]
-  (let [negatives (remove (fn [n] (some #(= % n) positives)) negatives)
-        ;;         output (:output (:activation (last model-output-seq)))
-        ps (map (fn [p] [p (float (- 1 (get activation p)))]) positives)
-        ns (map (fn [n] [n (float (- (get activation n)))]) negatives)]
-    (vec (concat ps ns))))
-
-
 (defn output-param-delta
   [item-delta-pairs hidden-size hidden-activation]
   (->> item-delta-pairs
@@ -186,6 +176,20 @@
   [unit-num]
   {:forget-gate (float-array unit-num)})
 
+
+(defn binary-classification-error
+  [hidden-size activation positives negatives & [option]]
+  (let [negatives (remove (fn [n] (some #(= % n) positives)) negatives)
+        ps (map (fn [p] [p (float (- 1 (get activation p)))]) positives)
+        ns (map (fn [n] [n (float (- (get activation n)))]) negatives)]
+    (vec (concat ps ns))))
+
+(defn prediction-error
+  [hidden-size activation positives & option]
+  (->> positives
+       (map (fn [[item expect-value]]
+              (float (- expect-value (get activation item)))))))
+
 (defn bptt
   [model x-seq output-items-seq & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
@@ -217,7 +221,9 @@
                nil)
         (first output-seq)
         (let [{:keys [pos neg]} (first output-items-seq)
-              output-delta (negative-sampling unit-num (:output (:activation (first output-seq))) pos neg)
+              output-delta (condp = (:output-type model)
+                             :binary-classification
+                             (binary-classification-error unit-num (:output (:activation (first output-seq))) pos neg))
               output-param-delta (output-param-delta output-delta unit-num (:hidden (:activation (first output-seq))))
               propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
                                                   (->> output-delta
@@ -232,9 +238,7 @@
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
-                                            propagated-output-to-hidden-delta
-                                            :else ;no hidden-to-hidden, and skip propagation
-                                            (float-array unit-num))
+                                            propagated-output-to-hidden-delta)
               ;;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
               cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
