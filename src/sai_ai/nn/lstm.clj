@@ -41,10 +41,11 @@
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
 
 (defn output-activation
-  [output-layer input-list sparse-outputs & [lstm-option]]
-  (let [{:keys [w bias activation]} output-layer
-        activation-function (condp = activation :sigmoid sigmoid :negative-sampling sigmoid :linear identity)]
-    (if (= activation :softmax)
+  [model input-list sparse-outputs & [lstm-option]]
+  (let [{:keys [output-type output]} model
+        {:keys [w bias activation]} output
+        activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
+    (if (= output-type :multi-class-classification)
       :FIXME
       (reduce (fn [acc s]
                 (assoc acc s (activation-function (+ (reduce + (times (get w s) input-list)) (aget ^floats (get bias s) 0)))))
@@ -54,7 +55,7 @@
 (defn lstm-model-output
   [model x-input sparse-outputs previous-hidden-output previous-cell-state & [lstm-option]]
   (let [{:keys [activation state]} (lstm-activation model x-input previous-hidden-output previous-cell-state lstm-option)
-        output (if (= :skip sparse-outputs) :skipped (output-activation (:output model) activation sparse-outputs lstm-option))]
+        output (if (= :skip sparse-outputs) :skipped (output-activation model activation sparse-outputs lstm-option))]
     {:activation {:input x-input :hidden activation :output output}
      :state  {:input x-input :hidden state}}))
 
@@ -185,10 +186,10 @@
     (vec (concat ps ns))))
 
 (defn prediction-error
-  [hidden-size activation positives & option]
-  (->> positives
+  [hidden-size activation predictions & option]
+  (->> predictions
        (map (fn [[item expect-value]]
-              (float (- expect-value (get activation item)))))))
+              [item (float (- expect-value (get activation item)))]))))
 
 (defn bptt
   [model x-seq output-items-seq & [option]]
@@ -197,7 +198,12 @@
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden
-        model-output-seq (sequential-output model x-seq (->> output-items-seq (map (fn [{:keys [pos neg]}] (concat pos neg)))) option)
+        sparse-outputs (condp = (:output-type model)
+                         :binary-classification
+                         (->> output-items-seq (map (fn [{:keys [pos neg]}] (concat pos neg))))
+                         :prediction
+                         (map keys output-items-seq))
+        model-output-seq (sequential-output model x-seq sparse-outputs option)
         output-w (:w output)
         ]
     ;looping latest to old
@@ -220,10 +226,12 @@
                nil
                nil)
         (first output-seq)
-        (let [{:keys [pos neg]} (first output-items-seq)
+        (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
               output-delta (condp = (:output-type model)
                              :binary-classification
-                             (binary-classification-error unit-num (:output (:activation (first output-seq))) pos neg))
+                             (binary-classification-error unit-num (:output (:activation (first output-seq))) pos neg)
+                             :prediction
+                             (prediction-error unit-num  (:output (:activation (first output-seq))) (first output-items-seq)))
               output-param-delta (output-param-delta output-delta unit-num (:hidden (:activation (first output-seq))))
               propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
                                                   (->> output-delta
@@ -232,14 +240,14 @@
                                                                     v (float-array (repeat unit-num delta))]
                                                                 (times w v))))
                                                        (apply sum)))
-              ;merge delta hidden-to-hidden + above-to-hidden
+              ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
                                             (sum propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
                                             propagated-output-to-hidden-delta)
-              ;;hidden delta
+              ;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
               cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
               lstm-part-delta (lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
@@ -353,7 +361,7 @@
     it))
 
 (defn init-model
-  [input-items output-items input-type input-size hidden-size]
+  [input-items output-items input-type input-size hidden-size output-type]
   (let [sparse-input? (= input-type :sparse)]
     {:hidden (let [bwr (random-array (* hidden-size hidden-size));for recurrent connection
                    bb  (random-array hidden-size)
@@ -389,6 +397,7 @@
      :output {:w    (reduce #(assoc %1 %2 (random-array hidden-size))   {} output-items)
               :bias (reduce #(assoc %1 %2 (float-array [(model-rand)])) {} output-items)}
      :input-type input-type
+     :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
 
 (defn train!

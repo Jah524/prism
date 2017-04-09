@@ -29,7 +29,7 @@
             :input-gate-peephole  (float-array (take 10 (repeat -0.1)))
             :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
             :output-gate-peephole (float-array (take 10 (repeat -0.1)))}
-   :output {:activation :linear,
+   :output {:activation :sigmoid,
             :layer-type :output,
             :unit-num 3
             :w {"prediction1" (float-array (take 10 (repeat 0.1)))
@@ -69,7 +69,7 @@
             :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
             :output-gate-peephole (float-array (take 10 (repeat -0.1)))
             :peephole #{:input-gate :forget-gate :output-gate}}
-   :output {:activation :linear,
+   :output {:activation :sigmoid,
             :layer-type :output,
             :unit-num 3
             :w {"prediction1" (float-array (take 10 (repeat 0.1)))
@@ -78,6 +78,42 @@
             :bias {"prediction1" (float-array [-1])
                    "prediction2" (float-array [-1])
                    "prediction3" (float-array [-1])}}})
+
+(def sample-w-network-prediction
+  {:model-type :nil
+   :input-type :sparse
+   :output-type :prediction
+   :unit-nums [3 10 1]
+   :hidden {:sparses {"natural" {:block-w (float-array (take 10 (repeat 0.1)))
+                                 :input-gate-w  (float-array (take 10 (repeat 0.1)))
+                                 :forget-gate-w (float-array (take 10 (repeat 0.1)))
+                                 :output-gate-w (float-array (take 10 (repeat 0.1)))}
+                      "language" {:block-w (float-array (take 10 (repeat 0.1)))
+                                  :input-gate-w  (float-array (take 10 (repeat 0.1)))
+                                  :forget-gate-w (float-array (take 10 (repeat 0.1)))
+                                  :output-gate-w (float-array (take 10 (repeat 0.1)))}
+                      "processing" {:block-w (float-array (take 10 (repeat 0.1)))
+                                    :input-gate-w  (float-array (take 10 (repeat 0.1)))
+                                    :forget-gate-w (float-array (take 10 (repeat 0.1)))
+                                    :output-gate-w (float-array (take 10 (repeat 0.1)))}}
+            :unit-num 10
+            :block-wr (float-array (take 100 (repeat 0.1)))
+            :block-bias (float-array (take 10 (repeat -1)))
+            :input-gate-wr  (float-array (take 100 (repeat 0.1)))
+            :input-gate-bias (float-array (take 10 (repeat -1)))
+            :forget-gate-wr (float-array (take 100 (repeat 0.1)))
+            :forget-gate-bias (float-array (take 10 (repeat -1)))
+            :output-gate-wr (float-array (take 100 (repeat 0.1)))
+            :output-gate-bias (float-array (take 10 (repeat -1)))
+            :input-gate-peephole  (float-array (take 10 (repeat -0.1)))
+            :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
+            :output-gate-peephole (float-array (take 10 (repeat -0.1)))
+            :peephole #{:input-gate :forget-gate :output-gate}}
+   :output {:activation :linear,
+            :layer-type :output,
+            :unit-num 3
+            :w {"prediction" (float-array (take 10 (repeat 0.1)))}
+            :bias {"prediction" (float-array [-1])}}})
 
 (deftest lstm-test
   (testing "lstm-activation"
@@ -150,9 +186,9 @@
       (is (= (->> result :activation :hidden vec)
              (take 10 (repeat (float -0.016104385)))))
       (is (= (->> result :activation :output (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
-             {"prediction2" (float -1.0161043857224286)
-              "prediction1" (float -1.0161043857224286)
-              "prediction3" (float -1.0161043857224286)}))))
+             {"prediction2" (float 0.26578692)
+              "prediction1" (float 0.26578692)
+              "prediction3" (float 0.26578692)}))))
 
   (testing "lstm-model-output with sparse input"
     (let [result (lstm-model-output sample-w-network-sparse
@@ -197,9 +233,9 @@
           it2 (vec (:output (:activation (last result2))))]
       (is (not= it1 it2))
       (is (= (->> it1 (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
-             {"prediction2" (float -1.0734694) "prediction1" (float -1.0734694) "prediction3" (float -1.0734694)}))
+             {"prediction2" (float 0.25474387) "prediction1" (float 0.25474387) "prediction3" (float 0.25474387)}))
       (is (= (->> it2 (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
-             {"prediction2" (float -1.0730946) "prediction1" (float -1.0730946) "prediction3" (float -1.0730946)}))))
+             {"prediction2" (float 0.254815) "prediction1" (float 0.254815) "prediction3" (float 0.254815)}))))
 
   (testing "sequential-output in sparse model"
     (let [result1 (sequential-output sample-w-network-sparse
@@ -307,7 +343,7 @@
       (is (= (count (:forget-gate-delta result)) 10))
       (is (= (count (:output-gate-delta result)) 10))))
 
-  (testing "bptt"
+  (testing "bptt with dense binary classification"
     (let [result (bptt sample-w-network
                        [(float-array [0 1 0]) (float-array [2 0 0])]
                        [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
@@ -339,7 +375,7 @@
       ))
 
 
-  (testing "bptt in sparse model"
+  (testing "bptt with sparse model"
     (let [result (bptt sample-w-network-sparse
                        [{"language" (float 1)} {"processing" (float 1)}]
                        [:skip {:pos ["prediction1"] :neg ["prediction3"]}])
@@ -349,6 +385,18 @@
       (is (= (count (:block-w-delta (get it "natural"))) 0))
       (is (= (count (:block-w-delta (get it "language"))) 10))
       (is (= (count (:block-w-delta (get it "processing"))) 10))))
+
+  (testing "bptt with sparse prediction"
+    (let [result (bptt sample-w-network-prediction
+                       [{"natural" (float 1)} {"processing" (float 1)}]
+                       [{"prediction" 10} {"prediction" 20}])
+          hd (:hidden-delta result)
+          o  (:output-delta result)
+          it (:sparses-delta hd)]
+      (is (= (count (:block-w-delta (get it "natural"))) 10))
+      (is (= (count (:block-w-delta (get it "language"))) 0))
+      (is (= (count (:block-w-delta (get it "processing"))) 10))))
+
 
   (testing "update-model! with dense model"
     (let [result (update-model! sample-w-network
@@ -367,32 +415,32 @@
       (is (= (count (:output-gate-wr hd)) 100))
 
       (is (= (vec (:block-w hd))
-             (flatten (take 10 (repeat (map float [0.10281727 0.10157009 0.1]))))))
+             (flatten (take 10 (repeat (map float [0.10043954 0.10024438 0.1]))))))
       (is (= (vec (:block-wr hd))
-             (take 100 (repeat (float 0.09991688)))))
+             (take 100 (repeat (float 0.09998704)))))
       (is (= (vec (:input-gate-w hd))
-             (flatten (take 10 (repeat (map float [0.097347826 0.09835789 0.1]))))))
+             (flatten (take 10 (repeat (map float [0.09958622 0.09974441 0.1]))))))
       (is (= (vec (:input-gate-wr hd))
-             (take 100 (repeat (float 0.10007825)))))
+             (take 100 (repeat (float 0.100012206)))))
       (is (= (vec (:forget-gate-w hd))
              (flatten (take 30 (repeat (map float [0.1]))))))
       (is (= (vec (:forget-gate-wr hd))
              (take 100 (repeat (float 0.1)))))
       (is (= (vec (:output-gate-w hd))
-             (flatten (take 10 (repeat (map float [0.09645641 0.09876285 0.1]))))))
+             (flatten (take 10 (repeat (map float [0.099447146 0.0998076 0.1]))))))
       (is (= (vec (:output-gate-wr hd))
-             (take 100 (repeat (float 0.10010455)))))
+             (take 100 (repeat (float 0.10001631)))))
       ;peephole
       (is (= (vec (:input-gate-peephole hd))
-             (take 10 (repeat (float -0.09972544)))))
+             (take 10 (repeat (float -0.09995717)))))
       (is (= (vec (:forget-gate-peephole hd))
              (take 10 (repeat (float -0.1)))))
       (is (= (vec (:output-gate-peephole hd))
-             (take 10 (repeat (float -0.09963316)))))
+             (take 10 (repeat (float -0.099942766)))))
 
-      (is (= (vec (:input-gate-bias  hd)) (take 10 (repeat (float -1.0029682)))))
+      (is (= (vec (:input-gate-bias  hd)) (take 10 (repeat (float -1.0004625)))))
       (is (= (vec (:forget-gate-bias hd)) (take 10 (repeat (float -1)))))
-      (is (= (vec (:output-gate-bias hd)) (take 10 (repeat (float -1.003009)))))))
+      (is (= (vec (:output-gate-bias hd)) (take 10 (repeat (float -1.0004689)))))))
 
   (testing "update-model! with sparse model"
     (let [result (update-model! sample-w-network-sparse
@@ -412,7 +460,7 @@
       (is (= (count (:output-gate-wr hd)) 100))))
 
   (testing "init-model with dense input"
-    (let [m (init-model nil #{"A" "B" "C"} :dense 3 10)
+    (let [m (init-model nil #{"A" "B" "C"} :dense 3 10 :binary-classification)
           h (:hidden m)]
       (is (= [3 10 3] (:unit-nums m)))
       (is (not= :sparse (:input-type m)))
@@ -436,7 +484,7 @@
       (let [{:strs [A B C]} (:bias (:output m))]
         (is (= 1 (count A) (count B) (count C))))))
   (testing "init-model with sparse input"
-    (let [m (init-model #{"X" "Y" "Z"} #{"A" "B" "C"} :sparse 3 10)
+    (let [m (init-model #{"X" "Y" "Z"} #{"A" "B" "C"} :sparse 3 10 :binary-classification)
           h (:hidden m)]
       (is (= [3 10 3] (:unit-nums m)))
       (is (= :sparse (:input-type m)))
