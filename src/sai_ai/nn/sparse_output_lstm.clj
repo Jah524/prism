@@ -11,7 +11,7 @@
     [sai-ai.unit :refer [derivative tanh sigmoid softmax model-rand]]
     ))
 
-(defn output-activation [model input-list positives negatives & [lstm-option]]
+(defn sparse-output-activation [model input-list positives negatives & [lstm-option]]
   (let [model-layer (:output model)
         {:keys [w bias]} model-layer]
     (reduce (fn [acc word]
@@ -55,7 +55,7 @@
 (defn lstm-model-output
   [model x-input positives negatives previous-hidden-output previous-cell-state & [lstm-option]]
   (let [{:keys [activation state]} (lstm-activation model x-input previous-hidden-output previous-cell-state lstm-option)
-        output (output-activation model activation positives negatives lstm-option)]
+        output (sparse-output-activation model activation positives negatives lstm-option)]
     {:activation [x-input activation output]
      :state  [x-input state nil]}))
 
