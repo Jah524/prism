@@ -189,8 +189,8 @@
   [hidden-size activation predictions & option]
   (when-not (= :skip predictions)
     (->> predictions
-         (map (fn [[item expect-value]]
-                [item (float (- expect-value (get activation item)))])))))
+         (mapv (fn [[item expect-value]]
+                 [item (float (- expect-value (get activation item)))])))))
 
 (defn bptt
   [model x-seq output-items-seq & [option]]
