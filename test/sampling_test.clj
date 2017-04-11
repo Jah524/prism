@@ -1,6 +1,6 @@
 (ns sampling-test
   (:require [clojure.test :refer :all]
-            [sai-ai.sampling :refer :all]))
+            [prism.sampling :refer :all]))
 
 (deftest negative-sampling-test
   (testing "uniform->cum-uniform"
