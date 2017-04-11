@@ -1,14 +1,25 @@
-# prism
+# Prism
 
-A Clojure library designed to ... well, that part is up to you.
+Prism is a handy neural network library for natural language processing in pure Clojure.
+This library get you a distributed representation of a words.
+See demonstration section for more detail.
+This library also includes some basic neural network model (e.g. feedforward, LSTM)
 
 ## Usage
+
+Add following dependency to your `project.clj`.
+
+```
+fixme, wait a moment
+```
+
+## Demonstration
 
 FIXME
 
 ## License
 
-Copyright © 2017 FIXME
+Copyright © 2017
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Distributed under the Eclipse Public License either version 1.0
+
