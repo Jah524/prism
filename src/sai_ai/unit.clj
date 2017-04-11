@@ -27,7 +27,7 @@
       ret)))
 
 (defn derivative [state activate-fn-key]
-  "No need to add derivative of softmax unless use it in hidden layer"
+  "No need to add derivative of softmax"
   (let [n (count state)
         ret (float-array n)
         func (condp = activate-fn-key
@@ -39,3 +39,8 @@
 
 (defn model-rand []
   (float (/ (- (rand 16) 8) 1000)))
+
+(defn random-array [n]
+  (let [it (float-array n)]
+    (dotimes [x n] (aset ^floats it x (model-rand)))
+    it))

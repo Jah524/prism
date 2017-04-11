@@ -1,58 +1,57 @@
 (ns nn.feedforward-test
   (:require [clojure.test :refer :all]
+            [clojure.pprint :refer [pprint]]
             [sai-ai.nn.feedforward :refer :all]))
 
 (def sample-model ;1->3->1
-  {:model-type nil
-   :layers [{:activate-fn :sigmoid,
-             :layer-type :hidden,
-             :unit-num 3
-             :w (float-array [1 1 1])
-             :bias (float-array [1 1 1])}
-            {:activate-fn :linear,
-             :layer-type :output,
-             :unit-num 1
-             :w (float-array [1 1 1])
-             :bias (float-array [1])}]})
+  {:input-type  :dense
+   :output-type :prediction
+   :hidden {:unit-num 3
+            :activation :sigmoid
+            :w (float-array [1 1 1])
+            :bias (float-array [1 1 1])}
+   :output {:unit-num 1
+            :w {"prediction" (float-array (take 3 (repeat 0.1)))}
+            :bias {"prediction" (float-array [1])}}})
 
 
 (def sample-model2 ;3->2->3
-  {:model-type nil
-   ;;    :input-type  :one-hot
-   ;;    :output-type :one-hot
-   :layers [{:activate-fn :sigmoid,
-             :layer-type :hidden,
-             :unit-num 2
-             :w (float-array [0.1 0.1 0.1 0.2 0.2 0.2])
-             :bias (float-array [1 1])}
-            {:activate-fn :linear,
-             :layer-type :output,
-             :unit-num 3
-             :w (float-array [1 1 1 1 1 1])
-             :bias (float-array [1 1 1])}]})
+  {:input-type  :dense
+   :output-type :prediction
+   :hidden {:unit-num 2
+            :activation :sigmoid
+            :w (float-array [0.1 0.1 0.1 0.2 0.2 0.2])
+            :bias (float-array [1 1])}
+   :output {:w {"prediction1" (float-array (take 2 (repeat 1)))
+                "prediction2" (float-array (take 2 (repeat 1)))
+                "prediction3" (float-array (take 2 (repeat 1)))}
+            :bias {"prediction1" (float-array [1])
+                   "prediction2" (float-array [1])
+                   "prediction3" (float-array [1])}}})
 
 (def sample-model2:sparse ;3->2->3
-  {:model-type nil
-   :input-type  :sparse
-   :layers [{:activate-fn :sigmoid,
-             :layer-type :hidden,
-             :unit-num 2
-             :w {"natural" (float-array [0.1 0.2]) "language" (float-array [0.1 0.2]) "processing" (float-array [0.1 0.2])}
-             :bias (float-array [1 1])}
-            {:activate-fn :linear,
-             :layer-type :output,
-             :unit-num 3
-             :w (float-array [1 1 1 1 1 1])
-             :bias (float-array [1 1 1])}]})
-;:w {"natural" (float-array [0.1 0.2]) "language" (float-array [0.1 0.2]) "processing" (float-array [0.1 0.2])}
-;:bias {"natural" (float-array [1]) "language" (float-array [1]) "processing" (float-array [1])}}]})
+  {:input-type  :sparse
+   :output-type :prediction
+   :hidden {:unit-num 2
+            :activation :sigmoid
+            :w {"natural" (float-array [0.1 0.2]) "language" (float-array [0.1 0.2]) "processing" (float-array [0.1 0.2])}
+            :bias (float-array [1 1])}
+   :output {:w {"prediction1" (float-array (take 2 (repeat 1)))
+                "prediction2" (float-array (take 2 (repeat 1)))
+                "prediction3" (float-array (take 2 (repeat 1)))}
+            :bias {"prediction1" (float-array [1])
+                   "prediction2" (float-array [1])
+                   "prediction3" (float-array [1])}}})
 
 (deftest feedforward-test
   (testing "hidden-state-by-sparse"
-    (are [arg expect] (= (vec (hidden-state-by-sparse {"natural"    (float-array [0 1])
-                                                       "language"   (float-array [2 3])
-                                                       "processing" (float-array [4 5])}
-                                                      arg 2)) expect)
+    (are [arg expect] (= (vec (hidden-state-by-sparse
+                                {:hidden {:w {"natural"    (float-array [0 1])
+                                              "language"   (float-array [2 3])
+                                              "processing" (float-array [4 5])}
+                                          :unit-num 2}}
+                                arg 2))
+                         expect)
          {"natural"    1.0} [0.0 1.0]
          {"natural"   -2.0} [0.0 -2.0]
          {"language"   1.0} [2.0 3.0]
@@ -60,128 +59,157 @@
          {"processing" 1.0} [4.0 5.0]
          {"natural" 2 "processing" -1} [-4.0 -3.0]))
 
-  (testing "network-output with gemv"
-    (let [result (network-output sample-model (float-array [2]))]
-      (is (= (vec (:activation (first result))) [2.0]))
-      (is (= (vec (:activation (second result))) (take 3 (repeat (float 0.95257413)))))
-      (is (= (vec (:state (second result))) [3.0 3.0 3.0]))
-      (is (= (vec (:activation (nth result 2))) [(float 3.8577223)]))
-      (is (= (vec (:state (nth result 2))) [(float 3.8577223)]))))
 
-  (testing "network-output with sparse vector"
-    (let [result (network-output sample-model2:sparse {"language" 1})]
-      (is (= (vec (:activation (first result)))  [["language" 1]]))
-      (is (= (vec (:activation (second result))) [(float 0.7502601) (float 0.76852477)]))
-      (is (= (vec (:state (second result))) [(float 1.1) (float 1.2)]))
-      (is (= (vec (:activation (nth result 2))) (take 3 (repeat (float 2.518785)))))
-      (is (= (vec (:state (nth result 2))) (take 3 (repeat (float 2.518785))))))
 
-    (let [a (rest (network-output sample-model2 (float-array [0 1 0])))
-          b (rest (network-output sample-model2:sparse {"language" 1}))]
-      (is (= (vec (:activation a)) (vec (:activation b))))
-      (is (= (vec (:state a)) (vec (:state b))))))
+  (testing "network-output with dense model"
+    (let [result (network-output sample-model (float-array [2]) #{"prediction"})
+          {:keys [activation state]} result
+          {:keys [input hidden output]} activation]
+      (is (= (vec input) [(float 2)]))
+      (is (= (vec hidden) (map float (take 3 (repeat 0.95257413)))))
+      (is (= (vec (:hidden state)) [3.0 3.0 3.0]))
+      (is (= (reduce (fn[acc [k v]](assoc acc k (float v))) {} output) {"prediction" (float 1.2857722491025925)}))))
+
+  (testing "network-output with sparse model"
+    (let [result (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction3"})
+          {:keys [activation state]} result
+          {:keys [input hidden output]} activation]
+      (is (= input {"language" 1}))
+      (is (= (vec hidden) (map float [0.7502601 0.76852477])))
+      (is (= (vec (:hidden state)) (map float [1.1 1.2])))
+      (is (= (reduce (fn [acc [k v]](assoc acc k (float v))) {} output)
+             {"prediction1" (float 2.518785) "prediction3" (float 2.518785)})))
+
+    (let [a (:activation (network-output sample-model2 (float-array [0 1 0]) #{"prediction1" "prediction3"}))
+          b (:activation (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction3"}))]
+      (is (= (:output a) (:output b)))))
+
+
   (testing "param-delta"
     (let [r (param-delta (float-array (range 4)) (float-array (range 4)))]
       (is (= (vec (:w-delta r)) [0.0 0.0 0.0 0.0, 0.0 1.0 2.0 3.0, 0.0 2.0 4.0 6.0, 0.0 3.0 6.0 9.0]))
       (is (= (vec (:bias-delta r)) [0.0 1.0 2.0 3.0]))))
-  ;;   (testing "params-delta:one-hot"
-  ;;     (let [r (params-delta:one-hot (range 1 4 1) 3 5)]
-  ;;     (is (=
-  ;;            (map float [0 0 0 1 0 0 0 0 2 0 0 0 0 3 0]))))
-
 
   (testing "back-propagation with gemv"
-    (let [result (back-propagation sample-model (float-array [2]) (float-array [2]))]
-      (is (= (vec (:w-delta (first  result)))
-             (take 3 (repeat (float -0.16785136)))))
-      (is (= (vec (:bias-delta (first result)))
-             (take 3 (repeat (float -0.08392568)))))
-      (is (= (vec (:w-delta (second result)))
-             (take 3 (repeat (float -1.7696182)))))
-      (is (= (vec (:bias-delta (second result)))
-             [(float -1.8577223)]))))
+    (let [{:keys [output-delta hidden-delta]} (back-propagation sample-model (float-array [2]) {"prediction" 2})
+          {:keys [w-delta bias-delta]} (get output-delta "prediction")]
+      (is (= (vec (:w-delta hidden-delta))
+             (take 3 (repeat (float 0.0064532845)))))
+      (is (= (vec (:bias-delta hidden-delta))
+             (take 3 (repeat (float 0.0032266423)))))
+      (is (= (vec w-delta)
+             (take 3 (repeat (float 1.9051483)))))
+      (is (= (vec bias-delta)
+             [(float 2)]))))
 
   (testing "back-propagation with sparse vector"
-    (let [result (back-propagation sample-model2:sparse {"language" 1} (float-array [1 1 1]))]
-      (is (= (vec (get (:w-delta (first result)) "language"))
-             (map float [-0.85372365 -0.8105502])))
-      ;             (map float [0.0 -1.2284634 0.0 0.0 -1.1663392 0.0])))
-      (is (= (vec (:bias-delta (first result)))
-             (map float [-0.85372365 -0.8105502])))
-      (is (= (vec (:w-delta (second result)))
-             (map float [-1.1394838 -1.1672239 -1.1394838 -1.1672239 -1.1394838 -1.1672239])))
-      (is (= (vec (:bias-delta (second result)))
-             (map float [-1.518785 -1.518785 -1.518785]))))
-    (let [a (back-propagation sample-model2:sparse {"language" 1} (float-array [1 1 1]))
-          b (back-propagation sample-model2 (float-array [0 1 0]) (float-array [1 1 1]))]
-      (is (= (vec (get (:w-delta (first a)) "language"))
-             (let[it (:w-delta (first b))]
-               [(nth it 1) (nth it 4)])))
-      (is (= (vec (:bias-delta (first a)))
-             (vec (:bias-delta (first b)))))
-      (is (= (vec(:w-delta (second a)))
-             (vec (:w-delta (second b)))))
-      (is (= (vec(:bias-delta (second a)))
-             (vec (:bias-delta (second b)))))))
+    (let [{:keys [output-delta hidden-delta]} (back-propagation sample-model2:sparse
+                                                                {"language" 1}
+                                                                {"prediction1" 2 "prediction2" 1 "prediction3" 2})
+          p1 (get output-delta "prediction1")
+          w-delta1    (:w-delta p1)
+          bias-delta1 (:bias-delta p1)
+          p2 (get output-delta "prediction2")
+          w-delta2    (:w-delta p2)
+          bias-delta2 (:bias-delta p2)
+          p3 (get output-delta "prediction3")
+          w-delta3    (:w-delta p3)
+          bias-delta3 (:bias-delta p3)]
+      (is (= (vec (get (:w-delta hidden-delta) "language"))
+             (map float [-0.47898382 -0.45476127])))
+      (is (= (vec (:bias-delta hidden-delta))
+             (map float [-0.47898382 -0.45476127])))
+      (is (= (vec w-delta1)
+             (vec w-delta3)
+             (map float [1.5005202 1.5370495])))
+      (is (= (vec w-delta2) (map float [0.7502601 0.76852477])))
+      (is (= (vec bias-delta1)
+             (vec bias-delta3)
+             (map float [2])))
+      (is (= (vec bias-delta2) (map float [1])))
+      (let [a (back-propagation sample-model2:sparse {"language" 1} {"prediction1" 2 "prediction2" 1 "prediction3" 2})
+            b (back-propagation sample-model2 (float-array [0 1 0]) {"prediction1" 2 "prediction2" 1 "prediction3" 2})]
+        (is (= (vec (get (:w-delta (:hidden-delta a)) "language"))
+               (let [it (:w-delta (:hidden-delta b))]
+                 [(nth it 1) (nth it 4)])))
+        (is (= (vec (:bias-delta (:hidden-delta a)))
+               (vec (:bias-delta (:hidden-delta b)))))
+        (is (= (vec (:w-delta (:output-delta a)))
+               (vec (:w-delta (:output-delta b)))))1
+        (is (= (vec (:bias-delta (:output-delta a)))
+               (vec (:bias-delta (:output-delta b))))))))
 
+  (testing "update-model!"
+    (let [{:keys [hidden output]} (update-model! sample-model
+                                                 {:hidden-delta {:w-delta (float-array [0.1 0.2 0.3])
+                                                                 :bias-delta (float-array [0.1 0.2 0.3])}
+                                                  :output-delta {"prediction" {:w-delta (float-array [2 2 2])
+                                                                               :bias-delta (float-array [2])}}}
+                                                 0.1)]
+      (is (= (:activation hidden) :sigmoid))
+      (is (= (vec (:w hidden)) (map float [1.01 1.02 1.03])))
+      (is (= (vec (:bias hidden)) (map float [1.01 1.02 1.03])))
+      (is (= (reduce (fn [acc [k v]] (assoc acc k (vec v))) {} (:w output))
+             {"prediction" (map float [0.3 0.3 0.3])}))
+      (is (= (reduce (fn [acc [k v]] (assoc acc k (vec v))) {} (:bias output))
+             {"prediction" (map float [1.2])})))
 
-  (testing "update-model"
-    (let [result (:layers (update-model sample-model [{:w-delta (float-array [0.1 0.2 0.3]) :bias-delta (float-array [0.1 0.2 0.3])}
-                                                      {:w-delta (float-array [2 2 2]) :bias-delta (float-array [2])}] 0.1))]
-      (is (= (:layer-type (first result)) :hidden))
-      (is (= (:unit-num (first result)) 3))
-      (is (= (:activate-fn (first result)) :sigmoid))
-      (is (= (vec (:w (first result))) (map float [1.01 1.02 1.03])))
-      (is (= (vec (:bias (first result))) (map float [1.01 1.02 1.03])))
-      (is (= (:layer-type (second result)) :output))
-      (is (= (:unit-num (second result)) 1))
-      (is (= (:activate-fn (second result)) :linear))
-      (is (= (vec (:w (second result))) (map float [1.2 1.2 1.2])))
-      (is (= (vec (:bias (second result))) (map float [1.2]))))
-
-    (let [m (update-model sample-model2:sparse
-                          [{:w-delta {"natural" (float-array [0.1 0.1])
-                                      "language" (float-array [0.1 0.1])
-                                      "processing" (float-array [0.1 0.1])}
-                            :bias-delta (float-array [0.1 0.1])}
-                           {:w-delta (float-array (take 6 (repeat 0.2)))
-                            :bias-delta (float-array (take 3 (repeat 0.2)))}]
-                          0.1)
-          result (:layers m)]
-      (is (= (:input-type m) :sparse))
-      (is (= (:layer-type (first result)) :hidden))
-      (is (= (:unit-num (first result)) 2))
-      (is (= (:activate-fn (first result)) :sigmoid))
-      (is (= (vec (get (:w (first result)) "natural")) (map float [0.11 0.21000001])))
-      (is (= (vec (get (:w (first result)) "language")) (map float [0.11 0.21000001])))
-      (is (= (vec (get (:w (first result)) "processing")) (map float [0.11 0.21000001])))
-      (is (= (vec (:bias (first result))) (map float (take 2 (repeat 1.01)))))
-      (is (= (vec (:w (second result))) (map float (take 6 (repeat 1.02)))))
-      (is (= (vec (:bias (second result))) (map float (take 3 (repeat 1.02)))))))
-
+    (let [{:keys [hidden output]} (update-model! sample-model2:sparse
+                                                 {:hidden-delta {:w-delta {"natural" (float-array [0.1 0.1])
+                                                                           "language" (float-array [0.1 0.1])
+                                                                           "processing" (float-array [0.1 0.1])}
+                                                                 :bias-delta (float-array [0.1 0.1])}
+                                                  :output-delta {"prediction1" {:w-delta (float-array (take 2 (repeat 0.2)))
+                                                                                :bias-delta (float-array [0.2])}
+                                                                 "prediction2" {:w-delta (float-array (take 2 (repeat 0.2)))
+                                                                                :bias-delta (float-array [0.2])}
+                                                                 "prediction3" {:w-delta (float-array (take 2 (repeat 0.2)))
+                                                                                :bias-delta (float-array [0.2])}}}
+                                                 0.1)]
+      (is (= (:activation hidden) :sigmoid))
+      (is (= (vec (get (:w hidden) "natural")) (map float [0.11 0.21000001])))
+      (is (= (vec (get (:w hidden) "language")) (map float [0.11 0.21000001])))
+      (is (= (vec (get (:w hidden) "processing")) (map float [0.11 0.21000001])))
+      (is (= (vec (:bias hidden)) (map float (take 2 (repeat 1.01)))))
+      (is (= (vec (get (:w    output) "prediction1"))
+             (map float (take 2 (repeat 1.02)))))
+      (is (= (vec (get (:bias output) "prediction1"))
+             (map float [1.02])))))
 
   (testing "init-model"
-    (let [model (init-model {:model-type nil
-                             :layers [{:unit-num 1 :layer-type :input}
-                                      {:unit-num 3 :activate-fn :sigmoid :layer-type :hidden}
-                                      {:unit-num 1 :activate-fn :softmax  :layer-type :output}]})]
-      (is (= (count (:layers model)) 2))
-      (is (= (count (:w (first (:layers model)))) 3))
-      (is (= (count (:w (second (:layers model)))) 3))
-      (is (= (count (:bias (first (:layers model)))) 3))
-      (is (= (count (:bias (second (:layers model)))) 1))))
+    (let [{:keys [hidden output input-type output-type]}
+          (init-model {:input-type :dense
+                       :input-items nil
+                       :input-size 1
+                       :hidden-size 3
+                       :output-type :prediction
+                       :output-items #{"prediction"}
+                       :activation :sigmoid})]
+      (is (= input-type :dense))
+      (is (= output-type :prediction))
+      (is (= (:unit-num hidden) 3))
+      (is (= (count (:w hidden)) 3))
+      (is (= (count (:bias hidden)) 3))
+      (is (= (count (get (:w output) "prediction")) 3))
+      (is (= (count (get (:bias output) "prediction")) 1))))
+
   (testing "init-model with sparse"
-    (let [model (init-model {:model-type nil
-                             :input-type :sparse
-                             :layers [{:unit-num 3 :layer-type :input}
-                                      {:unit-num 2 :activate-fn :sigmoid :layer-type :hidden}
-                                      {:unit-num 3 :activate-fn :softmax  :layer-type :output}]}
-                            {"natural" 3 "language" 1 "processing" 1})]
-      (is (= (count (:layers model)) 2))
-      (is (= (count (get (:w (first (:layers model))) "natural")) 2))
-      (is (= (count (get (:w (first (:layers model))) "language")) 2))
-      (is (= (count (get (:w (first (:layers model))) "processing")) 2))
-      (is (= (count (get (:w (first (:layers model))) "?")) 0))
-      (is (= (count (:w (second (:layers model)))) 6))
-      (is (= (count (:bias (first (:layers model)))) 2))
-      (is (= (count (:bias (second (:layers model)))) 3)))))
+    (let [{:keys [hidden output input-type output-type]}
+          (init-model {:input-type :sparse
+                       :input-items #{"natural" "language" "processing"}
+                       :input-size nil
+                       :hidden-size 3
+                       :output-type :binary-classification
+                       :output-items #{"prediction"}
+                       :activation :sigmoid})]
+      (is (= input-type :sparse))
+      (is (= output-type :binary-classification))
+      (is (= (:unit-num hidden) 3))
+
+      (is (= (count (get (:w hidden) "natural")) 2))
+      (is (= (count (get (:w hidden) "language")) 2))
+      (is (= (count (get (:w hidden) "processing")) 2))
+      (is (= (count (get (:w hidden) "?")) 0))
+      (is (= (count (:bias hidden)) 3))
+      (is (= (count (get (:w output) "prediction")) 3))
+      (is (= (count (get (:bias output) "prediction")) 1)))))
