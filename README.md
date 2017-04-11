@@ -1,8 +1,11 @@
 # Prism
 
 Prism is a handy neural network library for natural language processing in pure Clojure.
+
 This library get you a distributed representation of a words.
+
 See demonstration section for more detail.
+
 This library also includes some basic neural network model (e.g. feedforward, LSTM)
 
 ## Usage
