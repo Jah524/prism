@@ -1,4 +1,4 @@
-(ns sai-ai.sampling)
+(ns prism.sampling)
 
 (defn uniform->cum-uniform [uniform-dist]
   (->> (sort-by second > uniform-dist)

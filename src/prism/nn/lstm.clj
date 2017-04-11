@@ -1,8 +1,8 @@
-(ns sai-ai.nn.lstm
+(ns prism.nn.lstm
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :refer [transpose sum times outer minus] :as default]
-    [sai-ai.unit :refer [sigmoid tanh activation derivative model-rand]]))
+    [prism.unit :refer [sigmoid tanh activation derivative model-rand]]))
 
 
 (defn lstm-activation [model x-input recurrent-input-list previous-cell-state & [lstm-option]]

@@ -1,6 +1,6 @@
 (ns examples.lstm.simple-prediction
   (:require
-    [sai-ai.nn.lstm :as lstm]
+    [prism.nn.lstm :as lstm]
     [clojure.pprint :refer [pprint]]
     [clj-time.local  :as l]))
 

@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.test :refer :all]
-    [sai-ai.nn.lstm :refer :all]))
+    [prism.nn.lstm :refer :all]))
 
 
 (def sample-w-network

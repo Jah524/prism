@@ -1,7 +1,7 @@
 (ns examples.lstm.sparse
   (:require
     [clojure.pprint :refer [pprint]]
-    [sai-ai.nn.lstm :as lstm]
+    [prism.nn.lstm :as lstm]
     [clj-time.local  :as l]))
 
 

@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.string :refer [split]]
             [clojure.pprint :refer [pprint]]
-            [sai-ai.nlp.word2vec :refer :all]))
+            [prism.nlp.word2vec :refer :all]))
 
 (deftest word2ec-test
   (testing "subsampling"

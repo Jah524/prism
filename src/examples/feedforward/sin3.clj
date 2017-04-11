@@ -2,7 +2,7 @@
   (:require [clj-time.local  :as l]
             [incanter.core :refer [view]]
             [incanter.charts :refer [function-plot add-function set-stroke-color]]
-            [nn.feedforward :refer [network-output back-propagation update-model init-model]]))
+            [prism.nn.feedforward :refer [network-output back-propagation update-model init-model]]))
 
 
 

@@ -1,9 +1,9 @@
-(ns sai-ai.nn.feedforward
+(ns prism.nn.feedforward
   (:require
     [clojure.pprint :refer [pprint]]
-    [sai-ai.unit :refer [activation derivative model-rand random-array]]
+    [prism.unit :refer [activation derivative model-rand random-array]]
     [matrix.default :refer [transpose sum times outer minus] :as default]
-    [sai-ai.unit :refer [sigmoid tanh activation derivative ]]))
+    [prism.unit :refer [sigmoid tanh activation derivative ]]))
 
 
 (defn hidden-state-by-sparse

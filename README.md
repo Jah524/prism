@@ -1,4 +1,4 @@
-# sai-ai
+# prism
 
 A Clojure library designed to ... well, that part is up to you.
 

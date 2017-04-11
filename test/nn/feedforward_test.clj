@@ -1,7 +1,7 @@
 (ns nn.feedforward-test
   (:require [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]
-            [sai-ai.nn.feedforward :refer :all]))
+            [prism.nn.feedforward :refer :all]))
 
 (def sample-model ;1->3->1
   {:input-type  :dense

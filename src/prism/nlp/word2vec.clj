@@ -1,4 +1,4 @@
-(ns sai-ai.nlp.word2vec
+(ns prism.nlp.word2vec
   (:require [clojure.string :refer [split]]
             [clojure.java.io :refer [reader writer]]
             [clojure.core.async :refer [go go-loop]]
@@ -6,10 +6,10 @@
             [clj-time.core  :as t]
             [clojure.data.json :as json]
             [matrix.default :as default]
-            [sai-ai.util :refer [l2-normalize l2-normalize! similarity] :as util]
-            [sai-ai.unit :refer [activation model-rand]]
-            [sai-ai.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
-            [sai-ai.nn.sparse-output-feedforward :refer [init-model train!]]))
+            [prism.util :refer [l2-normalize l2-normalize! similarity] :as util]
+            [prism.unit :refer [activation model-rand]]
+            [prism.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
+            [prism.nn.sparse-output-feedforward :refer [init-model train!]]))
 
 
 (defn subsampling [word freq t]

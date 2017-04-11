@@ -1,11 +1,11 @@
-(ns sai-ai.nlp.utt2vec
+(ns prism.nlp.utt2vec
   (:require
     [clojure.string :as str]
     [clojure.java.io :refer [reader]]
     [clojure.core.async :refer [go]]
-    [sai-ai.nn.sparse-output-lstm :refer [lstm-activation init-model train!]]
-    [sai-ai.util :refer [load-model save-model make-wl progress-format l2-normalize similarity]]
-    [sai-ai.sampling :refer [uniform->cum-uniform samples]]))
+    [prism.nn.sparse-output-lstm :refer [lstm-activation init-model train!]]
+    [prism.util :refer [load-model save-model make-wl progress-format l2-normalize similarity]]
+    [prism.sampling :refer [uniform->cum-uniform samples]]))
 
 
 (defn train-utt2vec!
