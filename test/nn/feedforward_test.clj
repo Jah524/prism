@@ -50,7 +50,8 @@
                                               "language"   (float-array [2 3])
                                               "processing" (float-array [4 5])}
                                           :unit-num 2}}
-                                arg 2))
+                                arg
+                                (float-array (repeat 2 0))))
                          expect)
          {"natural"    1.0} [0.0 1.0]
          {"natural"   -2.0} [0.0 -2.0]
@@ -201,9 +202,9 @@
       (is (= output-type :binary-classification))
       (is (= (:unit-num hidden) 3))
 
-      (is (= (count (get (:w hidden) "natural")) 2))
-      (is (= (count (get (:w hidden) "language")) 2))
-      (is (= (count (get (:w hidden) "processing")) 2))
+      (is (= (count (get (:w hidden) "natural")) 3))
+      (is (= (count (get (:w hidden) "language")) 3))
+      (is (= (count (get (:w hidden) "processing")) 3))
       (is (= (count (get (:w hidden) "?")) 0))
       (is (= (count (:bias hidden)) 3))
       (is (= (count (get (:w output) "prediction")) 3))

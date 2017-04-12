@@ -7,7 +7,7 @@
 
 
 (defn hidden-state-by-sparse
-  [model sparse-inputs & [option]]
+  [model sparse-inputs bias & [option]]
   (let [{:keys [hidden]} model
         {:keys [w unit-num]} hidden]
     (reduce (fn [acc sparse]
@@ -16,7 +16,7 @@
                     (map? sparse-inputs)
                     (let [[k v] sparse]
                       (default/sum acc (default/times (get w k) (float-array (take unit-num (repeat v))))))))
-            (float-array unit-num)
+            bias
             sparse-inputs)))
 
 
@@ -38,9 +38,9 @@
         {:keys [hidden input-type]} model
         {:keys [w bias unit-num]} hidden
         activation-function (:activation hidden)
-        state (sum bias (if (= :sparse input-type)
-                          (hidden-state-by-sparse model x-input option)
-                          (gemv w x-input)))
+        state (if (= :sparse input-type)
+                (hidden-state-by-sparse model x-input bias option)
+                (sum (gemv w x-input) bias))
         hidden-activation (activation state activation-function)
         output-activation (output-activation model hidden-activation sparse-outputs option)]
     {:activation {:input x-input :hidden hidden-activation :output output-activation}
