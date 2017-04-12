@@ -115,21 +115,24 @@
       (.close r))
     :done))
 
+(defn init-w2v-model
+  [wl hidden-size]
+  (let [wl-set (set (keys wl))]
+    (-> (ff/init-model {:input-type :sparse
+                        :input-items wl-set
+                        :input-size nil
+                        :hidden-size hidden-size
+                        :output-type :binary-classification
+                        :output-items wl-set
+                        :activation :linear})
+        (assoc :wl wl))))
 
 (defn make-word2vec
   [training-path export-path hidden-size & [option]]
   (let [_(println "making word list...")
         wl (util/make-wl training-path option)
         _(println "done")
-        wl-set (set (keys wl))
-        model (-> (ff/init-model {:input-type :sparse
-                                  :input-items wl-set
-                                  :input-size nil
-                                  :hidden-size hidden-size
-                                  :output-type :binary-classification
-                                  :output-items wl-set
-                                  :activation :linear})
-                  (assoc :wl wl))
+        model (init-w2v-model wl hidden-size)
         model-path     (str export-path ".w2v")
         embedding-path (str export-path ".em")]
     (train-word2vec! model training-path option)
