@@ -9,11 +9,11 @@
 (def training-sin3 (map (fn [x] {:x (float-array [x]) :y {"sin-prediction" (Math/sin x)}}) (range -3.0 3.0 0.1)))
 
 
-(defn train-sgd [model training-list learning-rate & [option]]
+(defn train-sgd [model training-list learning-rate]
   (loop [model model, training-list training-list]
     (if-let [training-pair (first training-list)]
       (let [{x :x y :y} training-pair
-            delta-list (ff/back-propagation model x y option)]
+            delta-list (ff/back-propagation model x y)]
         (recur (ff/update-model! model delta-list learning-rate) (rest training-list)))
       model)))
 
@@ -36,7 +36,7 @@
       (if (<= e epoc)
         (let [opt (condp = optimizer
                     :sgd train-sgd)
-              updated-model (opt model (shuffle training-pair-list) learning-rate option)]
+              updated-model (opt model (shuffle training-pair-list) learning-rate)]
           (when (= 0 (rem e loss-interval))
             (let [error (sum-of-squares-error updated-model training-pair-list)]
               (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
