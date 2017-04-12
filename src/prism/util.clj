@@ -28,14 +28,14 @@
        "%)"))
 
 (defn make-wl
-  [input-file & [option]]; {:keys [min-count wl workers wait-ms step] :or {min-count 5 wl {} workers 4 wait-ms 30000 step 1000000}}]
-  (let [min-count (or (:min-count option) 5)
-        wl        (or (:wl option) {})
-        workers   (or (:workers option) 4)
-        wait-ms   (or (:wait-ms  option) 30000)
-        step      (or (:step option) 1000000)
-        all-lines (with-open [r (reader input-file)]
-                    (count (line-seq r)))
+  [input-file & [option]]
+  (let [{:keys [min-count wl workers interval-ms step]
+         :or {min-count 5
+              wl {}
+              workers 4
+              interval-ms 30000 ; 30 seconds
+              step 1000000}} option
+        all-lines (with-open [r (reader input-file)] (count (line-seq r)))
         over-all     (atom 0)
         done-lines   (atom 0)
         done-workers (atom 0)
@@ -60,8 +60,8 @@
           (let [diff @done-lines
                 updated-c (+ c diff)
                 _ (reset! done-lines 0)]
-            (println (progress-format updated-c all-lines diff wait-ms "lines/s"))
-            (Thread/sleep wait-ms)
+            (println (progress-format updated-c all-lines diff interval-ms "lines/s"))
+            (Thread/sleep interval-ms)
             (recur updated-c))
           (reduce (fn [acc [k v]] (if (>= v min-count)
                                     (assoc acc k (+ v (get acc k 0)))
