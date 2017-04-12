@@ -28,7 +28,7 @@ fixme, wait a moment
 (def em (load-model your-save-path.em))
 
 ;; then you can get word embedding
-;; note: word embedding represented as float-array
+;; note: embeddings are represented as float-array
 (word2vec em "word")
 (vec (word2vec em "word"))
 
