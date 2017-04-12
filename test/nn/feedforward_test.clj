@@ -92,41 +92,36 @@
 
   (testing "back-propagation with gemv"
     (let [{:keys [output-delta hidden-delta]} (back-propagation sample-model (float-array [2]) {"prediction" 2})
-          {:keys [w-delta bias-delta]} (get output-delta "prediction")]
-      (is (= (vec (:w-delta hidden-delta))
+          {hidden-w-delta :w-delta hidden-bias-delta :bias-delta} hidden-delta
+          {output-w-delta :w-delta output-bias-delta :bias-delta} (get output-delta "prediction")]
+      (is (= (vec hidden-w-delta)
              (take 3 (repeat (float 0.0064532845)))))
-      (is (= (vec (:bias-delta hidden-delta))
+      (is (= (vec hidden-bias-delta)
              (take 3 (repeat (float 0.0032266423)))))
-      (is (= (vec w-delta)
-             (take 3 (repeat (float 1.9051483)))))
-      (is (= (vec bias-delta)
-             [(float 2)]))))
+      (is (= (vec output-w-delta)
+             (take 3 (repeat (float 0.6803549)))))
+      (is (= (vec output-bias-delta)
+             [(float 0.71422774)]))))
 
   (testing "back-propagation with sparse vector"
     (let [{:keys [output-delta hidden-delta]} (back-propagation sample-model2:sparse
                                                                 {"language" 1}
                                                                 {"prediction1" 2 "prediction2" 1 "prediction3" 2})
-          p1 (get output-delta "prediction1")
-          w-delta1    (:w-delta p1)
-          bias-delta1 (:bias-delta p1)
-          p2 (get output-delta "prediction2")
-          w-delta2    (:w-delta p2)
-          bias-delta2 (:bias-delta p2)
-          p3 (get output-delta "prediction3")
-          w-delta3    (:w-delta p3)
-          bias-delta3 (:bias-delta p3)]
+          {w-delta1 :w-delta bias-delta1 :bias-delta} (get output-delta "prediction1")
+          {w-delta2 :w-delta bias-delta2 :bias-delta} (get output-delta "prediction2")
+          {w-delta3 :w-delta bias-delta3 :bias-delta} (get output-delta "prediction3")]
       (is (= (vec (get (:w-delta hidden-delta) "language"))
              (map float [-0.47898382 -0.45476127])))
       (is (= (vec (:bias-delta hidden-delta))
              (map float [-0.47898382 -0.45476127])))
       (is (= (vec w-delta1)
              (vec w-delta3)
-             (map float [1.5005202 1.5370495])))
-      (is (= (vec w-delta2) (map float [0.7502601 0.76852477])))
+             (map float [-0.3892236 -0.39869902])))
+      (is (= (vec w-delta2) (map float [-1.1394837 -1.1672238])))
       (is (= (vec bias-delta1)
              (vec bias-delta3)
-             (map float [2])))
-      (is (= (vec bias-delta2) (map float [1])))
+             (map float [-0.5187849])))
+      (is (= (vec bias-delta2) (map float [-1.5187849])))
       (let [a (back-propagation sample-model2:sparse {"language" 1} {"prediction1" 2 "prediction2" 1 "prediction3" 2})
             b (back-propagation sample-model2 (float-array [0 1 0]) {"prediction1" 2 "prediction2" 1 "prediction3" 2})]
         (is (= (vec (get (:w-delta (:hidden-delta a)) "language"))
