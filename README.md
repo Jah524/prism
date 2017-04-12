@@ -15,6 +15,19 @@ fixme, wait a moment
 
 ## Demonstration
 
+## Word2vec
+
+```
+(use 'prism.nlp.word2vec)
+
+(make-word2vec your-training-path your-save-path 100 {:workers 4})
+;; above exmaple specifies hidden size as 100 and learn your-training-path with 4 workers
+;; once learning finished, you can see learned model at your-save-path
+
+
+
+```
+
 ### Feed Forward
 
 - sin approximation with 3 hidden units
