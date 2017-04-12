@@ -1,6 +1,6 @@
-(defproject prism "0.1.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
+(defproject jah524/prism "0.1.0"
+  :description "A handy neural network library for natural language processing written in pure Clojure"
+  :url "https://github.com/Jah524/prism"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
