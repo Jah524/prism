@@ -8,11 +8,14 @@
 
 (defn hidden-state-by-sparse
   [model sparse-inputs & [option]]
-  (let [gemv (if-let [it (:gemv option)] it default/gemv)
-        {:keys [hidden]} model
+  (let [{:keys [hidden]} model
         {:keys [w unit-num]} hidden]
-    (reduce (fn [acc [k v]]
-              (default/sum acc (default/times (get w k) (float-array (take unit-num (repeat v))))))
+    (reduce (fn [acc sparse]
+              (cond (set? sparse-inputs)
+                    (default/sum acc (get w sparse))
+                    (map? sparse-inputs)
+                    (let [[k v] sparse]
+                      (default/sum acc (default/times (get w k) (float-array (take unit-num (repeat v))))))))
             (float-array unit-num)
             sparse-inputs)))
 
@@ -61,9 +64,14 @@
    :bias-delta delta-list})
 
 (defn param-delta:sparse [delta sparse-inputs hidden-size]
-  {:w-delta (reduce (fn [acc [k v]] (assoc acc k (default/times delta (float-array (take hidden-size (repeat v))))))
+  {:w-delta (reduce (fn [acc sparse]
+                      (cond (set? sparse-inputs)
+                            (assoc acc sparse delta)
+                            (map? sparse-inputs)
+                            (let [[k v] sparse]
+                              (assoc acc k (default/times delta (float-array (take hidden-size (repeat v))))))))
                     {}
-                    (vec sparse-inputs))
+                    sparse-inputs)
    :bias-delta delta})
 
 (defn back-propagation
@@ -75,7 +83,8 @@
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [output hidden input-type output-type]} model
         {:keys [unit-num]} hidden
-        {:keys [activation state]} (network-output model training-x (keys training-y) option)
+        output-items (if (= :prediction output-type) (keys training-y) (let [{:keys [pos neg]} training-y] (concat pos neg)))
+        {:keys [activation state]} (network-output model training-x output-items option)
         {:keys [pos neg]} training-y   ;used when binary claassification
         output-w (:w output)
         output-delta (condp = (:output-type model)
@@ -141,8 +150,7 @@
   (let [sparse-input? (= input-type :sparse)]
     {:hidden (-> (if (= input-type :sparse)
                    (let [sparses (reduce (fn [acc sparse]
-                                           (assoc acc sparse {:w    (random-array hidden-size)
-                                                              :bias (random-array hidden-size)}))
+                                           (assoc acc sparse (random-array hidden-size)))
                                          {}
                                          input-items)]
                      {:w sparses})

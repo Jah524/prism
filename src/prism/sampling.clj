@@ -1,4 +1,5 @@
-(ns prism.sampling)
+(ns prism.sampling
+  (:require [clojure.pprint :refer [pprint]]))
 
 (defn uniform->cum-uniform [uniform-dist]
   (->> (sort-by second > uniform-dist)

@@ -9,7 +9,7 @@
             [prism.util :refer [l2-normalize l2-normalize! similarity] :as util]
             [prism.unit :refer [activation model-rand]]
             [prism.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
-            [prism.nn.sparse-output-feedforward :refer [init-model train!]]))
+            [prism.nn.feedforward :as ff]))
 
 
 (defn subsampling [word freq t]
@@ -51,7 +51,6 @@
                       target (aget ^objects % local-window-size)
                       target-freq (get wl target)]
                   (when (not (nil? target-freq))
-                    ;;                               (subsampling target (/ target-freq all-word-token) sample))
                     (let [context (object-array (* 2 local-window-size))
                           _ (dotimes [x local-window-size]
                               (aset ^objects context x (aget ^objects % x))
@@ -67,11 +66,12 @@
 
 (defn train-word2vec!
   [w2v-model train-path & [option]]
-  (let [interval-ms (or (:interval-ms option) 60000) ;; 60 seconds
-        workers (or (:workers option) 4)
-        negative (or (:negative option 5))
-        initial-learning-rate (or (:learning-rate option) 0.025)
-        min-learning-rate (or (:min-learning-rate option) 0.0001)
+  (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate]
+         :or {interval-ms 60000　; 60 seconds
+              workers 4
+              negative 5
+              initial-learning-rate 0.025
+              min-learning-rate　0.0001}} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
         wl (:wl w2v-model)
         neg-wl (dissoc wl "<unk>")
@@ -91,9 +91,17 @@
                       learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
                       sg (skip-gram-training-pair wl all-word-token (split train-line #" ") option)
                       next-negatives (drop (* negative (count sg)) negatives)]
-                  (dorun (map-indexed #(train! w2v-model (conj (vec %2) (->> negatives (drop (* negative %1)) (take negative) vec)) learning-rate option) sg))
+                  (dorun (map-indexed (fn [i [target context]]
+                                        (ff/train! w2v-model
+                                                   (set [target])
+                                                   {:pos (set context) :neg (->> negatives (drop (* negative i)) (take negative) vec)}
+                                                   learning-rate
+                                                   option))
+                                      sg))
                   (swap! local-counter inc)
-                  (recur (if (empty? next-negatives)  (shuffle (samples neg-cum (* negative 100000))) next-negatives)))
+                  (recur (if (empty? next-negatives)
+                           (shuffle (samples neg-cum (* negative 100000)))
+                           next-negatives)))
                 (reset! done? true)))))
       (loop [counter 0]
         (when-not @done?
@@ -107,16 +115,30 @@
       (.close r))
     :done))
 
+
 (defn make-word2vec
-  [training-path export-path size & [option]]
+  [training-path export-path hidden-size & [option]]
   (let [_(println "making word list...")
-        wl (util/make-wl training-path)
+        wl (util/make-wl training-path option)
         _(println "done")
-        model (init-model wl (keys wl) size)]
+        wl-set (set (keys wl))
+        model (-> (ff/init-model {:input-type :sparse
+                                  :input-items wl-set
+                                  :input-size nil
+                                  :hidden-size hidden-size
+                                  :output-type :binary-classification
+                                  :output-items wl-set
+                                  :activation :linear})
+                  (assoc :wl wl))
+        model-path     (str export-path ".w2v")
+        embedding-path (str export-path ".em")]
     (train-word2vec! model training-path option)
-    (println "Saving model ...")
-    (util/save-model model export-path)
-    (println "Done")))
+    (println (str "Saving word2vec model as ... " model-path))
+    (util/save-model model model-path)
+    (println (str "Saving embedding as ... " embedding-path))
+    (util/save-model (-> model :hidden :w) embedding-path)
+    (println "Done")
+    model))
 
 (defn save-em
   "top-n = 0 represents all words"
