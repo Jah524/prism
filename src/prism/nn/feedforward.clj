@@ -46,6 +46,21 @@
 
 ;; Back Propagation ;;
 
+
+(defn binary-classification-error
+  [activation positives negatives]
+  (let [negatives (remove (fn [n] (some #(= % n) positives)) negatives)
+        ps (map (fn [p] [p (float (- 1 (get activation p)))]) positives)
+        ns (map (fn [n] [n (float (- (get activation n)))]) negatives)]
+    (vec (concat ps ns))))
+
+(defn prediction-error
+  [activation expectation]
+  (when-not (= :skip expectation)
+    (->> expectation
+         (mapv (fn [[item expect-value]]
+                   [item (float (- expect-value (get activation item)))])))))
+
 (defn output-param-delta
   [item-delta-pairs hidden-size hidden-activation]
   (->> item-delta-pairs
@@ -55,7 +70,6 @@
                {})))
 
 (defn param-delta
-  "for standard-unit at output layer"
   [delta-list bottom-layer-output]
   {:w-delta    (default/outer delta-list bottom-layer-output)
    :bias-delta delta-list})
@@ -66,21 +80,12 @@
                     (vec sparse-inputs))
    :bias-delta delta})
 
-(defn binary-classification-error
-  [hidden-size activation positives negatives & [option]]
-  (let [negatives (remove (fn [n] (some #(= % n) positives)) negatives)
-        ps (map (fn [p] [p (float (- 1 (get activation p)))]) positives)
-        ns (map (fn [n] [n (float (- (get activation n)))]) negatives)]
-    (vec (concat ps ns))))
-
-(defn prediction-error
-  [hidden-size activation predictions & option]
-  (when-not (= :skip predictions)
-    (->> predictions
-         (mapv (fn [[item expect-value]]
-                 [item (float (- expect-value (get activation item)))])))))
-
-(defn back-propagation [model training-x training-y & [option]]
+(defn back-propagation
+  "
+  training-y have to be given like {\"prediction1\" 12 \"prediction2\" 321} when prediction model.
+  In classification model, you put possitive and negative pairs like {:pos #{\"item1\", \"item2\"} :neg #{\"item3\"}}
+  "
+  [model training-x training-y & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [output hidden input-type output-type]} model
         {:keys [unit-num]} hidden
@@ -89,15 +94,15 @@
         output-w (:w output)
         output-delta (condp = (:output-type model)
                        :binary-classification
-                       (binary-classification-error unit-num (:output activation) pos neg)
+                       (binary-classification-error (:output activation) pos neg)
                        :prediction
-                       (prediction-error unit-num  (:output activation) training-y))
-        output-param-delta (output-param-delta training-y unit-num (:hidden activation))
+                       (prediction-error (:output activation) training-y))
+        output-param-delta (output-param-delta output-delta unit-num (:hidden activation))
         propagated-delta (->> output-delta
                               (map (fn [[item delta]]
                                      (let [w (get output-w item)
-                                           v (float-array (repeat unit-num delta))]
-                                       (times w v))))
+                                           d (float-array (repeat unit-num delta))]
+                                       (times w d))))
                               (apply sum))
         hidden-delta (times (derivative (:hidden state) (:activation hidden))
                             propagated-delta)
@@ -167,6 +172,6 @@
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
 
 (defn train!
-  [model x-input positives negatives learning-rate & [option]]
-  (let [param-delta (back-propagation model x-input positives negatives option)]
+  [model x-input training learning-rate & [option]]
+  (let [param-delta (back-propagation model x-input training option)]
     (update-model! model param-delta learning-rate)))
