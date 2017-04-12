@@ -15,7 +15,21 @@ fixme, wait a moment
 
 ## Demonstration
 
-FIXME
+### Feed Forward
+
+- sin approximation with 3 hidden units
+
+`lein run -m  examples.feedforward.sin3`
+
+### LSTM
+
+- with dense input
+
+`lein run -m examples.lstm.simple-prediction`
+
+- with sparse inputs
+
+`lein run -m examples.lstm.sparse`
 
 ## License
 
