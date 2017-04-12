@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :refer [transpose sum times outer minus] :as default]
-    [prism.unit :refer [sigmoid tanh activation derivative model-rand]]))
+    [prism.unit :refer [sigmoid tanh activation derivative model-rand binary-classification-error prediction-error]]))
 
 
 (defn lstm-activation [model x-input recurrent-input-list previous-cell-state & [lstm-option]]
@@ -178,20 +178,6 @@
   {:forget-gate (float-array unit-num)})
 
 
-(defn binary-classification-error
-  [hidden-size activation positives negatives & [option]]
-  (let [negatives (remove (fn [n] (some #(= % n) positives)) negatives)
-        ps (map (fn [p] [p (float (- 1 (get activation p)))]) positives)
-        ns (map (fn [n] [n (float (- (get activation n)))]) negatives)]
-    (vec (concat ps ns))))
-
-(defn prediction-error
-  [hidden-size activation predictions & option]
-  (when-not (= :skip predictions)
-    (->> predictions
-         (mapv (fn [[item expect-value]]
-                 [item (float (- expect-value (get activation item)))])))))
-
 (defn bptt
   [model x-seq output-items-seq & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
@@ -230,9 +216,9 @@
         (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
               output-delta (condp = (:output-type model)
                              :binary-classification
-                             (binary-classification-error unit-num (:output (:activation (first output-seq))) pos neg)
+                             (binary-classification-error (:output (:activation (first output-seq))) pos neg)
                              :prediction
-                             (prediction-error unit-num  (:output (:activation (first output-seq))) (first output-items-seq)))
+                             (prediction-error  (:output (:activation (first output-seq))) (first output-items-seq)))
               output-param-delta (output-param-delta output-delta unit-num (:hidden (:activation (first output-seq))))
               propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
                                                   (->> output-delta
