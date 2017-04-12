@@ -27,7 +27,6 @@
       ret)))
 
 (defn derivative [state activate-fn-key]
-  "No need to add derivative of softmax"
   (let [n (count state)
         ret (float-array n)
         func (condp = activate-fn-key
