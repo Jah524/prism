@@ -4,7 +4,6 @@
     [prism.nn.lstm :as lstm]
     [clj-time.local  :as l]))
 
-
 (defn sum-of-squares-error
   [model training-list]
   (loop [training-list training-list, acc 0]
@@ -72,7 +71,12 @@
 (defn sparse-demo
   "success with 10 lstm units"
   []
-  (let [model (train-with-demo-dataset (lstm/init-model  #{"A" "B" "C" "D"} #{"prediction"} :sparse nil 10 :prediction)
+  (let [model (train-with-demo-dataset (lstm/init-model {:input-items #{"A" "B" "C" "D"}
+                                                         :output-items #{"prediction"}
+                                                         :input-type :sparse
+                                                         :inupt-size nil
+                                                         :hidden-size 10
+                                                         :output-type :prediction})
                                        dataset-sparse
                                        sum-of-squares-error
                                        {:loss-interval 100

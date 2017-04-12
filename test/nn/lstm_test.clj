@@ -460,7 +460,12 @@
       (is (= (count (:output-gate-wr hd)) 100))))
 
   (testing "init-model with dense input"
-    (let [m (init-model nil #{"A" "B" "C"} :dense 3 10 :binary-classification)
+    (let [m (init-model {:input-items  nil
+                         :output-items #{"A" "B" "C"}
+                         :input-type :dense
+                         :input-size 3
+                         :hidden-size 10
+                         :output-type :binary-classification})
           h (:hidden m)]
       (is (= [3 10 3] (:unit-nums m)))
       (is (not= :sparse (:input-type m)))
@@ -484,7 +489,12 @@
       (let [{:strs [A B C]} (:bias (:output m))]
         (is (= 1 (count A) (count B) (count C))))))
   (testing "init-model with sparse input"
-    (let [m (init-model #{"X" "Y" "Z"} #{"A" "B" "C"} :sparse 3 10 :binary-classification)
+    (let [m (init-model {:input-items  #{"X" "Y" "Z"}
+                         :output-items #{"A" "B" "C"}
+                         :input-type :sparse
+                         :input-size nil
+                         :hidden-size 10
+                         :output-type :binary-classification})
           h (:hidden m)]
       (is (= [3 10 3] (:unit-nums m)))
       (is (= :sparse (:input-type m)))

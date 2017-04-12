@@ -348,7 +348,7 @@
     it))
 
 (defn init-model
-  [input-items output-items input-type input-size hidden-size output-type]
+  [{:keys [input-type input-items input-size hidden-size output-type output-items]}]
   (let [sparse-input? (= input-type :sparse)]
     {:hidden (let [bwr (random-array (* hidden-size hidden-size));for recurrent connection
                    bb  (random-array hidden-size)
@@ -388,6 +388,6 @@
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
 
 (defn train!
-  [model x-seq positives negatives learning-rate & [option]]
-  (let [delta-list (bptt model x-seq positives negatives option)]
+  [model x-seq training learning-rate & [option]]
+  (let [delta-list (bptt model x-seq training option)]
     (update-model! model delta-list learning-rate)))

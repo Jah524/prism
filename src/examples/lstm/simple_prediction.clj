@@ -70,7 +70,12 @@
 (defn demo
   "captures demo model with 2 lstm units"
   []
-  (let [model (train-with-demo-dataset (lstm/init-model nil #{"prediction"} :dense 1 2 :prediction)
+  (let [model (train-with-demo-dataset (lstm/init-model {:input-items  nil
+                                                         :output-items #{"prediction"}
+                                                         :input-type :dense
+                                                         :input-size 1
+                                                         :hidden-size 2
+                                                         :output-type :prediction})
                                        dataset
                                        sum-of-squares-error
                                        {:loss-interval 200
