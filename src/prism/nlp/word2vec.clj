@@ -107,7 +107,7 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (util/progress-format counter all-lines-num c interval-ms "line/s"))
+            (println (util/progress-format counter all-lines-num c interval-ms "lines/s"))
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
             (recur next-counter))))
@@ -127,28 +127,12 @@
                         :activation :linear})
         (assoc :wl wl))))
 
-(defn make-word2vec
-  [training-path export-path hidden-size & [option]]
-  (let [_(println "making word list...")
-        wl (util/make-wl training-path option)
-        _(println "done")
-        model (init-w2v-model wl hidden-size)
-        model-path     (str export-path ".w2v")
-        embedding-path (str export-path ".em")]
-    (train-word2vec! model training-path option)
-    (println (str "Saving word2vec model as ... " model-path))
-    (util/save-model model model-path)
-    (println (str "Saving embedding as ... " embedding-path))
-    (util/save-model (-> model :hidden :w) embedding-path)
-    (println "Done")
-    model))
-
-(defn save-em
+(defn save-embedding
   "top-n = 0 represents all words"
-  ([model path] (save-em model path false 0))
+  ([model path] (save-embedding model path false 0))
   ([model path replace? top-n]
-   (let [word-em (:w (:embedding model))
-         wl (:wl model)
+   (let [{:keys [hidden wl]} model
+         word-em (:w hidden)
          considered (set (->> (dissoc wl "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
          word-em (if (or (zero? top-n) (= :all top-n))
                    word-em
@@ -160,25 +144,46 @@
        (let [l2-em (reduce (fn [acc kv] (assoc acc (first kv) (l2-normalize (second kv)))) {} word-em)]
          (util/save-model l2-em path))))))
 
+(defn make-word2vec
+  [training-path export-path hidden-size & [option]]
+  (let [_(println "making word list...")
+        wl (util/make-wl training-path option)
+        _(println "done")
+        model (init-w2v-model wl hidden-size)
+        model-path     (str export-path ".w2v")
+        embedding-path (str export-path ".em")]
+    (train-word2vec! model training-path option)
+    (println (str "Saving word2vec model as " model-path))
+    (util/save-model model model-path)
+    (println (str "Saving embedding as " embedding-path))
+    (save-embedding model embedding-path)
+    (println "Done")
+    model))
+
+
 ;; work on embedding ;;
 
 (defn word2vec [embedding word]
   (get embedding word))
 
-(comment
-  (defn most-sim
-    [em word-or-vec target-word-list & [n]]
-    (let [targets (->> target-word-list
-                       (map (fn [w] {:w w :s (similarity em w word-or-vec)}))
-                       (sort-by :s >))]
-      (->> (if (= word-or-vec (:w (first targets)))
-             (rest targets)
-             targets)
-           (take (or n 1)))))
+(defn most-sim
+  [em reference-word word-list & [n l2?]]
+  (let [reference-em (word2vec em reference-word)
+        targets (->> word-list
+                     (map (fn [w]
+                            {:word w
+                             :similarity (similarity reference-em (word2vec em w) l2?)}))
+                     (sort-by :similarity >))]
+    (->> (if (= reference-word (:word (first targets)))
+           (rest targets)
+           targets)
+         (take (or n 5)))))
 
-  (defn most-sim-in-wl
-    [em word-or-vec wl & [n limit]]
-    (let [limit (if (nil? limit) (count wl) limit)
-          target-word-list (->> wl (sort-by second >) (map first) (take limit))]; sort by frequency
-      (most-sim em word-or-vec target-word-list n)))
-  )
+(defn most-sim-in-model-words
+  [model word-or-vec & [n limit]]
+  (let [{:keys [wl hidden]} model
+        {em :w} hidden
+        limit (if (nil? limit) (count wl) limit)
+        target-word-list (->> wl (sort-by second >) (map first) (take limit))]; sort by frequency
+    (most-sim em word-or-vec target-word-list n false)))
+
