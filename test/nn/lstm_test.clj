@@ -116,6 +116,17 @@
             :bias {"prediction" (float-array [-1])}}})
 
 (deftest lstm-test
+  (testing "partial-state-sparse with set"
+    (let [{:keys [hidden]} sample-w-network-sparse]
+      (is (= (->> (partial-state-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
+             (take 4 (repeat (take 10 (repeat (float 0.1)))))))))
+  (testing "partial-state-sparse with map"
+    (let [{:keys [hidden]} sample-w-network-sparse]
+      (is (= (->> (partial-state-sparse {"language" 1} (:sparses hidden) (:unit-num hidden)) (map vec))
+             (->> (partial-state-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
+             (take 4 (repeat (take 10 (repeat (float 0.1)))))))
+      (is (not= (->> (partial-state-sparse {"language" 2} (:sparses hidden) (:unit-num hidden)) (map vec))
+                (->> (partial-state-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))))))
   (testing "lstm-activation"
     (let [result (lstm-activation sample-w-network
                                   (float-array (take 3 (repeat 2)))
@@ -252,7 +263,7 @@
       (is (= out3 out4 (take 10 (repeat (float -0.07346944)))))))
 
   ;; Back Propagation Through Time ;;
-  (comment
+  (comment ;FIXME
     (testing "output-param-delta"
       (let [result (->> (output-param-delta {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
                         (reduce (fn [acc {:keys [item w-delta bias-delta]}]
@@ -278,6 +289,20 @@
       (is (= (vec (:block-delta result)) [(float 4.3616767)]))
       (is (= (vec (:forget-gate-delta result)) [(float 3.8457663)]))
       (is (= (vec (:input-gate-delta result)) [(float 3.2060409)]))))
+
+  (testing "param-delta-sparse with set"
+    (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]}
+          (-> (param-delta-sparse #{"processing"}
+                                  (float-array (take 10 (repeat 1)))
+                                  (float-array (take 10 (repeat 1)))
+                                  (float-array (take 10 (repeat 1)))
+                                  (float-array (take 10 (repeat 1)))
+                                  (:unit-num (:hidden sample-w-network)))
+              (get "processing"))]
+      (is (= (vec block-w-delta)       (take 10 (repeat (float 1)))))
+      (is (= (vec input-gate-w-delta)  (take 10 (repeat (float 1)))))
+      (is (= (vec forget-gate-w-delta) (take 10 (repeat (float 1)))))
+      (is (= (vec output-gate-w-delta) (take 10 (repeat (float 1)))))))
 
 
   (testing "lstm-param-delta"

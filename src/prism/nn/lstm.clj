@@ -5,6 +5,20 @@
     [prism.unit :refer [sigmoid tanh activation derivative model-rand binary-classification-error prediction-error]]))
 
 
+(defn partial-state-sparse
+  [x-input sparses unit-num]
+  (->> x-input
+       (mapv (fn [sparse]
+               (cond (set? x-input)
+                     (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse)]
+                       [block-w input-gate-w forget-gate-w output-gate-w])
+                     (map? x-input)
+                     (let [[sparse-k v] sparse
+                           {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse-k)
+                           v-arr (float-array (take unit-num (repeat v)))]
+                       [(times block-w v-arr) (times input-gate-w v-arr) (times forget-gate-w v-arr) (times output-gate-w v-arr)]))))
+       (apply mapv sum)))
+
 (defn lstm-activation [model x-input recurrent-input-list previous-cell-state & [lstm-option]]
   (let [gemv (if-let [it (:gemv lstm-option)] it default/gemv)
         lstm-layer (:hidden model)
@@ -14,12 +28,7 @@
                 sparses]} lstm-layer
         [block' input-gate' forget-gate' output-gate']
         (if (= (:input-type model) :sparse)
-          (->> x-input
-               (mapv (fn [[sparse-k v]]
-                       (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse-k)
-                             v-arr (float-array (take unit-num (repeat v)))]
-                         [(times block-w v-arr) (times input-gate-w v-arr) (times forget-gate-w v-arr) (times output-gate-w v-arr)])))
-               (apply mapv sum))
+          (partial-state-sparse x-input sparses unit-num)
           (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} lstm-layer
                 lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
             (mapv #(gemv % x-input) lstm-mat)))
@@ -126,6 +135,24 @@
     {:output-gate-delta output-gate-delta :cell-state-delta cell-state-delta :block-delta block-delta
      :forget-gate-delta forget-gate-delta :input-gate-delta input-gate-delta}))
 
+(defn param-delta-sparse
+  [x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num]
+  (reduce (fn [acc sparse]
+            (cond (set? x-input)
+                  (assoc acc sparse {:block-w-delta block-delta
+                                     :input-gate-w-delta  input-gate-delta
+                                     :forget-gate-w-delta forget-gate-delta
+                                     :output-gate-w-delta output-gate-delta})
+                  (map? x-input)
+                  (let [[sparse-k v] sparse
+                        v-arr (float-array (take unit-num (repeat v)))]
+                    (assoc acc sparse-k {:block-w-delta       (times block-delta v-arr)
+                                         :input-gate-w-delta  (times input-gate-delta v-arr)
+                                         :forget-gate-w-delta (times forget-gate-delta v-arr)
+                                         :output-gate-w-delta (times output-gate-delta v-arr)}))))
+          {}
+          x-input))
+
 (defn lstm-param-delta
   [model lstm-part-delta x-input self-activation:t-1 self-state:t-1]
   (let [{:keys [sparses unit-num]} (:hidden model)
@@ -147,15 +174,7 @@
                   :peephole-input-gate-delta peephole-input-gate :peephole-forget-gate-delta peephole-forget-gate
                   :peephole-output-gate-delta peephole-output-gate}
         param-delta (if sparse?
-                      (let [sparses-delta (reduce (fn [acc [sparse-k v]]
-                                                    (let [v-arr (float-array (take unit-num (repeat v)))]
-                                                      (assoc acc sparse-k {:block-w-delta       (times block-delta v-arr)
-                                                                           :input-gate-w-delta  (times input-gate-delta v-arr)
-                                                                           :forget-gate-w-delta (times forget-gate-delta v-arr)
-                                                                           :output-gate-w-delta (times output-gate-delta v-arr)})))
-                                                  {}
-                                                  x-input)]
-                        (-> template (assoc :sparses-delta sparses-delta)))
+                      (-> template (assoc :sparses-delta (param-delta-sparse x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num)))
                       (let [block-w-delta        (outer block-delta x-input)
                             input-gate-w-delta   (outer input-gate-delta x-input)
                             forget-gate-w-delta  (outer forget-gate-delta x-input)
