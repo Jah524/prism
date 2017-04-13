@@ -23,16 +23,17 @@ Add following dependency to your `project.clj`.
 (use 'prism.nlp.word2vec)
 
 (make-word2vec your-training-path your-save-path 100 {:workers 4})
-;; above exmaple specifies hidden size as 100 and learn your-training-path with 4 workers
+;; above exmaple specifies hidden size as 100 and learn your-training-path with 4 workers.
+;; your-trainig-file assumed to have tokenized lines.
 ;; once learning finished, you can see learned model at your-save-path with .w2v and .em extensions.
-;; you can use your learned model or embedding as following steps
+;; you can use your learned model or embedding as following steps.
 
 (use 'prism.util)
 (def model (load-model your-save-path.w2v))
 (def em (load-model your-save-path.em))
 
-;; then you can get word embedding
-;; note: embeddings are represented as float-array
+;; then you can get word embedding.
+;; note: embeddings are represented as float-array.
 (word2vec em "word")
 (vec (word2vec em "word"))
 
