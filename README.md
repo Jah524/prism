@@ -14,7 +14,7 @@ See  demonstration section for more detail.
 Add following dependency to your `project.clj`.
 
 ```
-fixme, wait a moment
+[jah524/prism "0.1.0"]
 ```
 
 ### Word2vec
