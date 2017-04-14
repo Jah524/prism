@@ -31,5 +31,5 @@
 
 (defn samples [cum-dist sample-num]
   (let [m (second (last cum-dist))]
-    (uniform-sampling cum-dist (repeatedly sample-num #(rand (dec m))))))
+    (shuffle (uniform-sampling cum-dist (repeatedly sample-num #(rand (dec m)))))))
 
