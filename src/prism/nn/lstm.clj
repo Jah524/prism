@@ -375,7 +375,7 @@
                    ib  (random-array hidden-size)
                    ip  (random-array hidden-size)
                    fwr (random-array (* hidden-size hidden-size))
-                   fb  (random-array hidden-size)
+                   fb  (float-array (take hidden-size (repeat (float 1))))
                    fp  (random-array hidden-size)
                    owr (random-array (* hidden-size hidden-size))
                    ob  (random-array hidden-size)
