@@ -50,11 +50,12 @@
         wl-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wl "<unk>"))
         neg-cum (uniform->cum-uniform wl-unif)
 
+        cache-size 100000
         local-counter (atom 0)
         done? (atom false)]
     (with-open [r (reader train-path)]
       (dotimes [w workers]
-        (go (loop [negatives (samples neg-cum (* negative 100000))]
+        (go (loop [negatives (samples neg-cum (* negative cache-size))]
               (if-let [line (.readLine r)]
                 (let [;progress (/ @local-counter all-lines-num)
                        learning-rate initial-learning-rate;(max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
@@ -64,10 +65,19 @@
                        rest-negatives (drop neg-pool-num negatives)
                        {:keys [x y]} (add-negatives rnnlm-pair negative (shuffle (take (* (count (:x rnnlm-pair)) negative)
                                                                                        (cycle neg-pool))))]
-                  (lstm/train! model x y learning-rate option)
+                  (when-not (or (empty? x) (empty? y))
+                    (try
+                      (lstm/train! model x y learning-rate option)
+                      (catch Exception e
+                        (do
+                          ;; debug purpose
+                          (clojure.stacktrace/print-stack-trace e)
+                          (println line)
+                          (pprint x)
+                          (pprint y)))))
                   (swap! local-counter inc)
                   (recur (if (< (count rest-negatives) (* 10 negative))
-                           (samples neg-cum (* negative 100000))
+                           (samples neg-cum (* negative cache-size))
                            rest-negatives)))
                 (reset! done? true)))))
       (loop [counter 0]
