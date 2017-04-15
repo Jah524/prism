@@ -24,7 +24,8 @@
            {:x [#{"A"} #{"B"}] :y [{:pos #{"B"}} {:pos #{"<eos>"}}]}))
     (is (= (tok->rnnlm-pairs sample-wl "A   X B ")
            {:x [#{"A"} #{"<unk>"} #{"B"}]
-            :y [{:pos #{"<unk>"}} {:pos #{"B"}} {:pos #{"<eos>"}}]})))
+            :y [{:pos #{"<unk>"}} {:pos #{"B"}} {:pos #{"<eos>"}}]}))
+    (is (= (tok->rnnlm-pairs sample-wl "") :skip)))
 
   (testing "add-negatives"
     (let [rnnlm-pair (tok->rnnlm-pairs sample-wl "A B X   D <unk>  ")]

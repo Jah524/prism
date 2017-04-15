@@ -14,17 +14,20 @@
 
 (defn tok->rnnlm-pairs
   [wl tok-line]
-  (loop [coll (->> (str/split tok-line #" ")
+  (let [words (->> (str/split tok-line #" ")
                    (remove #(or (re-find #" |　" %) (= "" %)))
-                   (map #(convert-rare-word-to-unk wl %)))
-         x-acc []
-         y-acc []]
-    (if-let [f (first coll)]
-      (let [s (or (second coll) "<eos>")]
-        (recur (rest coll)
-               (conj x-acc (set [f]))
-               (conj y-acc {:pos (set [s])})))
-      {:x x-acc :y y-acc})))
+                   (map #(convert-rare-word-to-unk wl %)))]
+    (if (empty? words)
+      :skip
+      (loop [coll words,
+             x-acc []
+             y-acc []]
+        (if-let [f (first coll)]
+          (let [s (or (second coll) "<eos>")]
+            (recur (rest coll)
+                   (conj x-acc (set [f]))
+                   (conj y-acc {:pos (set [s])})))
+          {:x x-acc :y y-acc})))))
 
 (defn add-negatives
   [rnnlm-pair negative negatives]
@@ -59,26 +62,27 @@
               (if-let [line (.readLine r)]
                 (let [;progress (/ @local-counter all-lines-num)
                        learning-rate initial-learning-rate;(max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
-                       rnnlm-pair (tok->rnnlm-pairs wl line)
-                       neg-pool-num (* negative 10); (count (:x rnnlm-pair)))
-                       neg-pool    (take neg-pool-num negatives)
-                       rest-negatives (drop neg-pool-num negatives)
-                       {:keys [x y]} (add-negatives rnnlm-pair negative (shuffle (take (* (count (:x rnnlm-pair)) negative)
-                                                                                       (cycle neg-pool))))]
-                  (when-not (or (empty? x) (empty? y))
-                    (try
-                      (lstm/train! model x y learning-rate option)
-                      (catch Exception e
-                        (do
-                          ;; debug purpose
-                          (clojure.stacktrace/print-stack-trace e)
-                          (println line)
-                          (pprint x)
-                          (pprint y)))))
+                       rnnlm-pair (tok->rnnlm-pairs wl line)]
                   (swap! local-counter inc)
-                  (recur (if (< (count rest-negatives) (* 10 negative))
-                           (samples neg-cum (* negative cache-size))
-                           rest-negatives)))
+                  (if (= :skip rnnlm-pair)
+                    (recur negatives)
+                    (let [neg-pool-num (* negative 10); (count (:x rnnlm-pair)))
+                          neg-pool    (take neg-pool-num negatives)
+                          rest-negatives (drop neg-pool-num negatives)
+                          {:keys [x y]} (add-negatives rnnlm-pair negative (shuffle (take (* (count (:x rnnlm-pair)) negative)
+                                                                                          (cycle neg-pool))))]
+                      (try
+                        (lstm/train! model x y learning-rate option)
+                        (catch Exception e
+                          (do
+                            ;; debug purpose
+                            (clojure.stacktrace/print-stack-trace e)
+                            (println line)
+                            (pprint x)
+                            (pprint y))))
+                      (recur (if (< (count rest-negatives) (* 10 negative))
+                               (samples neg-cum (* negative cache-size))
+                               rest-negatives)))))
                 (reset! done? true)))))
       (loop [counter 0]
         (when-not @done?
