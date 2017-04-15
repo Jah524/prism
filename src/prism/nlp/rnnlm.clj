@@ -110,14 +110,27 @@
         wl (util/make-wl training-path option)
         _(println "done")
         model (init-rnnlm-model wl hidden-size)
-        model-path     (str export-path ".rnnlm")
-        embedding-path (str export-path ".rnnlm.em")]
+        model-path     (str export-path ".rnnlm")]
     (train-rnnlm! model training-path option)
     (println (str "Saving RNNLM model as " model-path))
     (util/save-model model model-path)
-    (println (str "Saving RNNLM embedding model as " embedding-path))
-;;     (save-embedding model embedding-path)
     (println "Done")
     model))
 
+
+(defn text-vector [model words & [lstm-option]]
+  (let [hidden-size (:unit-num (:hidden model))]
+    (loop [words words,
+           previous-activation (float-array hidden-size),
+           previous-cell-state    (float-array hidden-size)]
+      (if-let [word (first words)]
+        (let [{:keys [activation state]} (lstm/lstm-activation model (set [word]) previous-activation previous-cell-state lstm-option)]
+          (recur (rest words)
+                 activation
+                 (:cell-state state)))
+        previous-activation))))
+
+(defn text-similarity
+  [model words1 words2 l2?]
+  (util/similarity (text-vector model words1) (text-vector model words2) l2?))
 
