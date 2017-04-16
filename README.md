@@ -6,7 +6,7 @@ Prism is a handy neural network library for natural language processing written 
 This library get you a distributed representation of words.
 Now prism is ready to work with following models.
 
-- Word2Vec by skip-gram with negative-sampling.
+- Word2Vec by skip-gram with negative-sampling
 - RNNLM with negative-sampling
 
 This library also includes some basic neural network model (e.g. feedforward, LSTM).
@@ -53,8 +53,10 @@ Add following dependency to your `project.clj`.
 
 (use 'prism.util)
 (def rnnlm (load-model your-save-path.rnnlm))
+
 ;; you can take distributed representation of text or phrase
 (text-vector rnnlm ["word1" "word2" "word3"])
+
 ;; and resume train, model-path represents your-save-path.rnnlm
 (resume-train your-training-path model-path 100 {:workers 4})
 ```
