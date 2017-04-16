@@ -17,7 +17,7 @@ See demonstration section and [examples](/src/examples) for more detail.
 Add following dependency to your `project.clj`.
 
 ```
-[jah524/prism "0.1.0"]
+[jah524/prism "0.2.1"]
 ```
 
 ### Word2Vec
