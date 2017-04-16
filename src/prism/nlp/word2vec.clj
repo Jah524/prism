@@ -85,7 +85,7 @@
         done? (atom false)]
     (let [r (reader train-path)]
       (dotimes [w workers]
-        (go (loop [negatives (shuffle (samples neg-cum (* negative 100000)))]
+        (go (loop [negatives (samples neg-cum (* negative 100000))]
               (if-let [train-line (.readLine r)]
                 (let [progress (/ @local-counter all-lines-num)
                       learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
@@ -100,7 +100,7 @@
                                       sg))
                   (swap! local-counter inc)
                   (recur (if (empty? next-negatives)
-                           (shuffle (samples neg-cum (* negative 100000)))
+                           (samples neg-cum (* negative 100000))
                            next-negatives)))
                 (reset! done? true)))))
       (loop [counter 0]
@@ -151,7 +151,7 @@
         _(println "done")
         model (init-w2v-model wl hidden-size)
         model-path     (str export-path ".w2v")
-        embedding-path (str export-path ".em")]
+        embedding-path (str export-path "w2v.em")]
     (train-word2vec! model training-path option)
     (println (str "Saving word2vec model as " model-path))
     (util/save-model model model-path)
