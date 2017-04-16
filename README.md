@@ -4,7 +4,10 @@
 
 Prism is a handy neural network library for natural language processing written in pure Clojure.
 This library get you a distributed representation of words.
-Now prism is ready to work with word2vec by skip-gram with negative-sampling.
+Now prism is ready to work with following models.
+
+- word2vec by skip-gram with negative-sampling.
+- RNNLM with negative-sampling
 
 This library also includes some basic neural network model (e.g. feedforward, LSTM).
 See demonstration section and [examples](/src/examples) for more detail.
@@ -17,15 +20,15 @@ Add following dependency to your `project.clj`.
 [jah524/prism "0.1.0"]
 ```
 
-### Word2vec
+### Word2Vec
 
 ```
 (use 'prism.nlp.word2vec)
 
-(make-word2vec your-training-path your-save-path 100 {:workers 4})
+(make-word2vec your-training-path model-save-path 100 {:workers 4})
 ;; above exmaple specifies hidden size as 100 and learn your-training-path with 4 workers.
 ;; your-trainig-file should have tokenized lines.
-;; once learning finished, you can see learned model at your-save-path with .w2v and .em extensions.
+;; once learning finished, you can see learned model at model-save-path with .w2v and .em extensions.
 ;; you can use your learned model or embedding as following steps.
 
 (use 'prism.util)
@@ -38,6 +41,22 @@ Add following dependency to your `project.clj`.
 (vec (word2vec em "word"))
 
 ```
+
+### RNNLM
+
+```
+(use 'prism.nlp.word2vec)
+
+(make-rnnlm your-training-path model-save-path 100 {:workers 4}
+;; see Word2Vec section (above) to get to know about these arguments and parameters
+;; RNNLM model has .rnnlm extenstion
+
+(use 'prism.util)
+(def rnnlm (load-model your-save-path.rnnlm))
+;; you can take distributed representation of text or phrase
+(text-vector rnnlm ["word1" "word2" "word3"])
+```
+
 
 ## Demonstration
 
