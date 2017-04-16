@@ -100,7 +100,7 @@
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
             (recur next-counter))))
-      (println "done")))
+      (println "finished learning")))
   model)
 
 
@@ -129,6 +129,13 @@
     (println "Done")
     model))
 
+(defn resume-train
+  [training-path model-path & [option]]
+  (let [model (util/load-model model-path)
+        updated-model (train-rnnlm! model training-path option)]
+    (println (str "Saving RNNLM model as " model-path))
+    (util/save-model updated-model model-path)
+    model))
 
 (defn text-vector [model words & [lstm-option]]
   (let [hidden-size (:unit-num (:hidden model))]
