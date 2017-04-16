@@ -198,25 +198,24 @@
 
 
 (defn bptt
-  [model x-seq output-items-seq & [option]]
+  [model activation output-items-seq & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [output hidden]} model
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden
-        sparse-outputs (condp = (:output-type model)
-                         :binary-classification
-                         (->> output-items-seq (map (fn [{:keys [pos neg]}] (concat pos neg))))
-                         :prediction
-                         (map #(if (= % :skip) (concat nil nil) (keys %)) output-items-seq))
-        model-output-seq (sequential-output model x-seq sparse-outputs option)
+;;         sparse-outputs (condp = (:output-type model)
+;;                          :binary-classification
+;;                          (->> output-items-seq (map (fn [{:keys [pos neg]}] (concat pos neg))))
+;;                          :prediction
+;;                          (map #(if (= % :skip) (concat nil nil) (keys %)) output-items-seq))
+;;         model-output-seq (sequential-output model x-seq sparse-outputs option)
         output-w (:w output)
         ]
     ;looping latest to old
     (loop [output-items-seq (reverse output-items-seq)
            propagated-hidden-to-hidden-delta nil,
-           output-seq (reverse model-output-seq)
-           x-seq (reverse x-seq)
+           output-seq (reverse activation)
            self-delta:t+1 (lstm-delta-zeros unit-num)
            lstm-state:t+1 (gate-zeros unit-num)
            output-acc nil
@@ -226,7 +225,6 @@
         (recur (rest output-items-seq)
                nil
                (rest output-seq)
-               (rest x-seq)
                (lstm-delta-zeros unit-num)
                (gate-zeros unit-num)
                nil
@@ -258,7 +256,7 @@
               cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
               lstm-part-delta (lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                input-gate-peephole forget-gate-peephole output-gate-peephole)
-              x-input (first x-seq)
+              x-input (:input (:activation (first output-seq)))
               self-activation:t-1 (or (:hidden (:activation (second output-seq)))
                                       (float-array unit-num));when first output time (last time of bptt
               self-state:t-1      (or (:hidden (:state      (second output-seq)))
@@ -273,7 +271,6 @@
           (recur (rest output-items-seq)
                  propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
-                 (rest x-seq)
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (if (nil? output-acc)
