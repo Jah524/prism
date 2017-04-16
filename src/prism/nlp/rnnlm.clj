@@ -41,6 +41,7 @@
              (fn [i train]
                (assoc train :neg (->> negatives (drop (* i negative)) (take negative) set))))))))
 
+
 (defn train-rnnlm!
   [model train-path & [option]]
   (let [interval-ms (or (:interval-ms option) 30000) ;; 30 seconds
@@ -52,7 +53,8 @@
         {:keys [wl em input-type]} model
         wl-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wl "<unk>"))
         neg-cum (uniform->cum-uniform wl-unif)
-
+        tmp-error (atom 0)
+        tmp-error-targets (atom 1)
         cache-size 100000
         local-counter (atom 0)
         done? (atom false)]
@@ -72,7 +74,11 @@
                           {:keys [x y]} (add-negatives rnnlm-pair negative (shuffle (take (* (count (:x rnnlm-pair)) negative)
                                                                                           (cycle neg-pool))))]
                       (try
-                        (lstm/train! model x y learning-rate option)
+                        (let [delta-list (lstm/bptt model x y option)
+                              errors (->> delta-list :output-delta vals (map #(Math/abs (aget ^float (:bias-delta %) 0))))]
+                          (swap! tmp-error #(+ %1 (reduce + errors)))
+                          (swap! tmp-error-targets #(+ %1 (count errors)))
+                          (lstm/update-model! model delta-list learning-rate))
                         (catch Exception e
                           (do
                             ;; debug purpose
@@ -88,7 +94,9 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (util/progress-format counter all-lines-num c interval-ms "lines/s"))
+            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", error: " (float (/ @tmp-error @tmp-error-targets))))
+            (reset! tmp-error 0)
+            (reset! tmp-error-targets 1)
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
             (recur next-counter))))
