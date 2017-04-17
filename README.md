@@ -27,7 +27,7 @@ Add following dependency to your `project.clj`.
 
 (make-word2vec your-training-path model-save-path 100 {:workers 4})
 ;; above exmaple specifies hidden size as 100 and learn your-training-path with 4 workers.
-;; your-trainig-file should have tokenized lines.
+;; your-training-file should have tokenized lines.
 ;; once learning finished, you can see learned model at model-save-path with .w2v and .w2v.em extensions.
 ;; you can use your learned embedding as following steps.
 
