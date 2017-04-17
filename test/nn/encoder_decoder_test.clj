@@ -266,6 +266,37 @@
                 :bias-delta [(float -0.5)]
                 :encoder-w-delta (take 5 (repeat (float -0.05)))
                 :previous-input-w-delta (take 3 (repeat (float 0.05)))}))))
+  (testing "decoder-lstm-param-delta"
+    (let [result (decoder-lstm-param-delta decoder-sample-network
+                                           {:block-delta       (float-array (take 10 (repeat 1)))
+                                            :input-gate-delta  (float-array (take 10 (repeat 1)))
+                                            :forget-gate-delta (float-array (take 10 (repeat 1)))
+                                            :output-gate-delta (float-array (take 10 (repeat 1)))}
+                                           (float-array [2 1 -1])
+                                           (float-array (take 10 (repeat (float 0.2))))
+                                           (float-array (take 5 (repeat (float 0.02))))
+                                           {:cell-state (float-array (take 10 (repeat (float -0.1))))})]
+      (is (= (vec (:block-w-delta result))  (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
+      (is (= (vec (:block-wr-delta result)) (take 100 (repeat (float 0.2)))))
+      (is (= (vec (:input-gate-w-delta result)) (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
+      (is (= (vec (:input-gate-wr-delta result))  (take 100 (repeat (float 0.2)))))
+      (is (= (vec (:forget-gate-w-delta result)) (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
+      (is (= (vec (:forget-gate-wr-delta result)) (take 100 (repeat (float 0.2)))))
+      (is (= (vec (:output-gate-w-delta result))  (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
+      (is (= (vec (:output-gate-wr-delta result)) (take 100 (repeat (float 0.2)))))
+      ;; encoder connection
+      (is (= (vec (:block-we-delta result)) (take 50 (repeat (float 0.02)))))
+      (is (= (vec (:input-gate-we-delta result)) (take 50 (repeat (float 0.02)))))
+      (is (= (vec (:forget-gate-we-delta result)) (take 50 (repeat (float 0.02)))))
+      (is (= (vec (:output-gate-we-delta result)) (take 50 (repeat (float 0.02)))))
+      ;; bias and peppholes
+      (is (= (vec (:block-bias-delta result)) (take 10 (repeat (float 1)))))
+      (is (= (vec (:input-gate-bias-delta result)) (take 10 (repeat (float 1)))))
+      (is (= (vec (:forget-gate-bias-delta result)) (take 10 (repeat (float 1)))))
+      (is (= (vec (:output-gate-bias-delta result)) (take 10 (repeat (float 1)))))
+      (is (= (vec (:peephole-input-gate-delta  result)) (take 10 (repeat (float -0.1)))))
+      (is (= (vec (:peephole-forget-gate-delta result)) (take 10 (repeat (float -0.1)))))
+      (is (= (vec (:peephole-output-gate-delta result)) (take 10 (repeat (float -0.1)))))))
   (comment
     (testing "bptt"
       (bptt sample-encoder-decoder

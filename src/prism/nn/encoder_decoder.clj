@@ -114,6 +114,38 @@
                                   :encoder-w-delta (times (float-array (repeat encoder-size delta)) encoder-input)
                                   :previous-input-w-delta (times (float-array (repeat input-size delta)) previous-input)}))
                {})))
+
+(defn decoder-lstm-param-delta
+  [model lstm-part-delta x-input self-activation:t-1 encoder-input self-state:t-1]
+  (let [{:keys [sparses unit-num]} (:hidden model)
+        sparse? (= (:input-type model) :sparse)
+        {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta]
+    {:block-w-delta        (outer block-delta x-input)
+     :input-gate-w-delta   (outer input-gate-delta x-input)
+     :forget-gate-w-delta  (outer forget-gate-delta x-input)
+     :output-gate-w-delta  (outer output-gate-delta x-input)
+     ;; reccurent connection
+     :block-wr-delta       (outer block-delta self-activation:t-1)
+     :input-gate-wr-delta  (outer input-gate-delta self-activation:t-1)
+     :forget-gate-wr-delta (outer forget-gate-delta self-activation:t-1)
+     :output-gate-wr-delta (outer output-gate-delta self-activation:t-1)
+     ;; encoder connection
+     :block-we-delta       (outer block-delta encoder-input)
+     :input-gate-we-delta  (outer input-gate-delta encoder-input)
+     :forget-gate-we-delta (outer forget-gate-delta encoder-input)
+     :output-gate-we-delta (outer output-gate-delta encoder-input)
+     ;; bias and peephole
+     :block-bias-delta       block-delta
+     :input-gate-bias-delta  input-gate-delta
+     :forget-gate-bias-delta forget-gate-delta
+     :output-gate-bias-delta output-gate-delta
+     :peephole-input-gate-delta  (times input-gate-delta  (:cell-state self-state:t-1))
+     :peephole-forget-gate-delta (times forget-gate-delta (:cell-state self-state:t-1))
+     :peephole-output-gate-delta (times output-gate-delta (:cell-state self-state:t-1))
+
+
+     }))
+
 (comment
   (defn decoder-bptt
     [decoder activation output-items-seq & [option]]
