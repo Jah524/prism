@@ -249,17 +249,16 @@
       (is (= out3 out4 (take 10 (repeat (float -0.07346944)))))))
 
   ;; Back Propagation Through Time ;;
-  (comment ;FIXME
-    (testing "output-param-delta"
-      (let [result (->> (output-param-delta {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
-                        (reduce (fn [acc {:keys [item w-delta bias-delta]}]
-                                  (assoc acc item {:w-delta (mapv float w-delta) :bias-delta bias-delta}))
-                                {}))
-            {:strs [A B C]} result]
-        (is (= A {:w-delta (map float [0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5]) :bias-delta (float 0.5)}))
-        (is (= B {:w-delta (take 10 (repeat (float 0))) :bias-delta 0}))
-        (is (= C {:w-delta (map float [-0.0 -0.5 -1.0 -1.5 -2.0 -2.5 -3.0 -3.5 -4.0 -4.5]) :bias-delta (float -0.5)}))))
-    )
+  (testing "output-param-delta"
+    (let [result (->> (output-param-delta {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
+                      (reduce (fn [acc [item {:keys [w-delta bias-delta]}]]
+                                (assoc acc item {:w-delta (mapv float w-delta) :bias-delta (map float bias-delta)}))
+                              {}))
+          {:strs [A B C]} result]
+      (is (= A {:w-delta (map float [0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5]) :bias-delta [(float 0.5)]}))
+      (is (= B {:w-delta (take 10 (repeat (float 0))) :bias-delta [(float 0)]}))
+      (is (= C {:w-delta (map float [-0.0 -0.5 -1.0 -1.5 -2.0 -2.5 -3.0 -3.5 -4.0 -4.5]) :bias-delta [(float -0.5)]}))))
+
   (testing "lstm-part-delta with peephole, assumed 1 lstm unit"
     (let [result (lstm-part-delta 1
                                   (float-array [10])
