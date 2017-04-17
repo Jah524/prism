@@ -203,14 +203,7 @@
         {:keys [output hidden]} model
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
-                unit-num]} hidden
-;;         sparse-outputs (condp = (:output-type model)
-;;                          :binary-classification
-;;                          (->> output-items-seq (map (fn [{:keys [pos neg]}] (concat pos neg))))
-;;                          :prediction
-;;                          (map #(if (= % :skip) (concat nil nil) (keys %)) output-items-seq))
-;;         model-output-seq (sequential-output model x-seq sparse-outputs option)
-        ]
+                unit-num]} hidden]
     ;looping latest to old
     (loop [output-items-seq (reverse output-items-seq)
            propagated-hidden-to-hidden-delta nil,
