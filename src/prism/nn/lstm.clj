@@ -395,6 +395,7 @@
                      {}
                      output-items)
      :input-type input-type
+     :input-size input-size
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
 
