@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :refer [transpose sum times outer minus] :as default]
-    [prism.unit :refer [sigmoid tanh activation derivative model-rand binary-classification-error prediction-error]]))
+    [prism.unit :refer [sigmoid tanh activation derivative model-rand random-array binary-classification-error prediction-error]]))
 
 
 (defn partial-state-sparse
@@ -52,12 +52,12 @@
 (defn output-activation
   [model input-list sparse-outputs & [lstm-option]]
   (let [{:keys [output-type output]} model
-        {:keys [w bias activation]} output
         activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
     (if (= output-type :multi-class-classification)
       :FIXME
       (reduce (fn [acc s]
-                (assoc acc s (activation-function (+ (reduce + (times (get w s) input-list)) (aget ^floats (get bias s) 0)))))
+                (let [{:keys [w bias]} (get output s)]
+                  (assoc acc s (activation-function (+ (reduce + (times w input-list)) (aget ^floats bias 0))))))
               {}
               (vec sparse-outputs)))))
 
@@ -210,7 +210,6 @@
 ;;                          :prediction
 ;;                          (map #(if (= % :skip) (concat nil nil) (keys %)) output-items-seq))
 ;;         model-output-seq (sequential-output model x-seq sparse-outputs option)
-        output-w (:w output)
         ]
     ;looping latest to old
     (loop [output-items-seq (reverse output-items-seq)
@@ -240,7 +239,7 @@
               propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
-                                                              (let [w (get output-w item)
+                                                              (let [w (:w (get output item))
                                                                     v (float-array (repeat unit-num delta))]
                                                                 (times w v))))
                                                        (apply sum)))
@@ -311,8 +310,7 @@
     ;update output connection
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
-                (let [w    (get (:w output) item)
-                      bias (get (:bias output) item)]
+                (let [{:keys [w bias]} (get output item)]
                   (aset ^floats bias 0 (float (+ (aget ^floats bias 0) (* learning-rate (aget ^floats bias-delta 0)))))
                   (dotimes [x unit-num]
                     (aset ^floats w x (float (+ (aget ^floats w x) (* learning-rate (aget ^floats w-delta x)))))))))
@@ -358,11 +356,6 @@
     model))
 
 
-(defn random-array [n]
-  (let [it (float-array n)]
-    (dotimes [x n] (aset ^floats it x (model-rand)))
-    it))
-
 (defn init-model
   [{:keys [input-type input-items input-size hidden-size output-type output-items]}]
   (let [sparse-input? (= input-type :sparse)]
@@ -397,8 +390,10 @@
                        fw  (random-array (* input-size hidden-size))
                        ow  (random-array (* input-size hidden-size))]
                    (-> template (assoc :block-w bw :input-gate-w iw  :forget-gate-w fw :output-gate-w ow)))))
-     :output {:w    (reduce #(assoc %1 %2 (random-array hidden-size))   {} output-items)
-              :bias (reduce #(assoc %1 %2 (float-array [(model-rand)])) {} output-items)}
+     :output (reduce (fn [acc sparse]
+                       (assoc acc sparse {:w (random-array hidden-size) :bias (float-array [(model-rand)])}))
+                     {}
+                     output-items)
      :input-type input-type
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))

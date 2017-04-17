@@ -6,9 +6,7 @@
 
 
 (def sample-w-network
-  {:model-type :nil
-   :unit-nums [3 10 3]
-   :input-type :dense
+  {:input-type :dense
    :output-type :binary-classification
    :hidden {:unit-type :lstm
             :unit-num 10
@@ -29,21 +27,16 @@
             :input-gate-peephole  (float-array (take 10 (repeat -0.1)))
             :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
             :output-gate-peephole (float-array (take 10 (repeat -0.1)))}
-   :output {:activation :sigmoid,
-            :layer-type :output,
-            :unit-num 3
-            :w {"prediction1" (float-array (take 10 (repeat 0.1)))
-                "prediction2" (float-array (take 10 (repeat 0.1)))
-                "prediction3" (float-array (take 10 (repeat 0.1)))}
-            :bias {"prediction1" (float-array [-1])
-                   "prediction2" (float-array [-1])
-                   "prediction3" (float-array [-1])}}})
+   :output {"prediction1" {:w (float-array (take 10 (repeat 0.1)))
+                           :bias (float-array [-1])}
+            "prediction2" {:w (float-array (take 10 (repeat 0.1)))
+                           :bias (float-array [-1])}
+            "prediction3" {:w (float-array (take 10 (repeat 0.1)))
+                           :bias (float-array [-1])}}})
 
 (def sample-w-network-sparse
-  {:model-type :nil
-   :input-type :sparse
+  {:input-type :sparse
    :output-type :binary-classification
-   :unit-nums [3 10 3]
    :hidden {:sparses {"natural" {:block-w (float-array (take 10 (repeat 0.1)))
                                  :input-gate-w  (float-array (take 10 (repeat 0.1)))
                                  :forget-gate-w (float-array (take 10 (repeat 0.1)))
@@ -69,19 +62,15 @@
             :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
             :output-gate-peephole (float-array (take 10 (repeat -0.1)))
             :peephole #{:input-gate :forget-gate :output-gate}}
-   :output {:activation :sigmoid,
-            :layer-type :output,
-            :unit-num 3
-            :w {"prediction1" (float-array (take 10 (repeat 0.1)))
-                "prediction2" (float-array (take 10 (repeat 0.1)))
-                "prediction3" (float-array (take 10 (repeat 0.1)))}
-            :bias {"prediction1" (float-array [-1])
-                   "prediction2" (float-array [-1])
-                   "prediction3" (float-array [-1])}}})
+   :output {"prediction1" {:w (float-array (take 10 (repeat 0.1)))
+                           :bias (float-array [-1])}
+            "prediction2" {:w (float-array (take 10 (repeat 0.1)))
+                           :bias (float-array [-1])}
+            "prediction3" {:w (float-array (take 10 (repeat 0.1)))
+                           :bias (float-array [-1])}}})
 
 (def sample-w-network-prediction
-  {:model-type :nil
-   :input-type :sparse
+  {:input-type :sparse
    :output-type :prediction
    :unit-nums [3 10 1]
    :hidden {:sparses {"natural" {:block-w (float-array (take 10 (repeat 0.1)))
@@ -109,11 +98,8 @@
             :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
             :output-gate-peephole (float-array (take 10 (repeat -0.1)))
             :peephole #{:input-gate :forget-gate :output-gate}}
-   :output {:activation :linear,
-            :layer-type :output,
-            :unit-num 3
-            :w {"prediction" (float-array (take 10 (repeat 0.1)))}
-            :bias {"prediction" (float-array [-1])}}})
+   :output {"prediction" {:w (float-array (take 10 (repeat 0.1)))
+                          :bias  (float-array [-1])}}})
 
 (deftest lstm-test
   (testing "partial-state-sparse with set"
@@ -519,10 +505,11 @@
       (is (= 10  (count (remove zero? (:input-gate-peephole h)))))
       (is (= 10  (count (remove zero? (:forget-gate-peephole h)))))
       (is (= 10  (count (remove zero? (:output-gate-peephole h)))))
-      (let [{:strs [A B C]} (:w (:output m))]
-        (is (= 10 (count A) (count B) (count C))))
-      (let [{:strs [A B C]} (:bias (:output m))]
-        (is (= 1 (count A) (count B) (count C))))))
+      (let [{aw :w abias :bias} (get (:output m) "A")
+            {bw :w bbias :bias} (get (:output m) "B")
+            {cw :w cbias :bias} (get (:output m) "C")]
+        (is (= 10 (count aw) (count bw) (count cw)))
+        (is (= 1 (count abias) (count bbias) (count cbias))))))
   (testing "init-model with sparse input"
     (let [m (init-model {:input-items  #{"X" "Y" "Z"}
                          :output-items #{"A" "B" "C"}
@@ -548,8 +535,11 @@
       (is (= 10 (count (remove zero? (:input-gate-peephole h)))))
       (is (= 10 (count (remove zero? (:forget-gate-peephole h)))))
       (is (= 10 (count (remove zero? (:output-gate-peephole h)))))
-      (let [{:strs [A B C]} (:w (:output m))]
-        (is (= 10 (count A) (count B) (count C))))
-      (let [{:strs [A B C]} (:bias (:output m))]
-        (is (= 1 (count A) (count B) (count C)))))))
+      (let [{aw :w abias :bias} (get (:output m) "A")
+            {bw :w bbias :bias} (get (:output m) "B")
+            {cw :w cbias :bias} (get (:output m) "C")]
+        (is (= 10 (count aw) (count bw) (count cw)))
+        (is (= 1 (count abias) (count bbias) (count cbias))))))
+
+  )
 
