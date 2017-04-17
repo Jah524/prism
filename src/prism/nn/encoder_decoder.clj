@@ -14,7 +14,7 @@
            acc []]
       (if-let [x-input (first x-seq)]
         (let [model-output (lstm/lstm-activation encoder x-input previous-activation previous-cell-state option)
-               {:keys [activation state]} model-output]
+              {:keys [activation state]} model-output]
           (recur (rest x-seq)
                  activation
                  (:cell-state state)
@@ -91,15 +91,121 @@
            previous-cell-state    (float-array hidden-size),
            acc []]
       (if-let [x-list (first x-seq)]
-        (let [model-output (decoder-activation-time-fixed decoder x-list (first output-items-seq) previous-hidden-output encoder-input previous-input previous-cell-state option)
-              {:keys [activation state]} model-output]
+        (let [decoder-output (decoder-activation-time-fixed decoder x-list (first output-items-seq) previous-hidden-output encoder-input previous-input previous-cell-state option)
+              {:keys [activation state]} decoder-output]
           (recur (rest x-seq)
                  (rest output-items-seq)
                  (:hidden activation)
                  x-list
                  (:cell-state (:hidden state))
-                 (cons model-output acc)))
+                 (cons decoder-output acc)))
         (vec (reverse acc))))))
+
+
+;;   BPTT   ;;
+
+
+(defn decoder-output-param-delta
+  [item-delta-pairs decoder-hidden-size hidden-activation encoder-size encoder-input input-size previous-input]
+  (->> item-delta-pairs
+       (reduce (fn [acc [item delta]]
+                 (assoc acc item {:w-delta    (times (float-array (repeat decoder-hidden-size delta)) hidden-activation)
+                                  :bias-delta (float-array [delta])
+                                  :encoder-w-delta (times (float-array (repeat encoder-size delta)) encoder-input)
+                                  :previous-input-w-delta (times (float-array (repeat input-size delta)) previous-input)}))
+               {})))
+(comment
+  (defn decoder-bptt
+    [decoder activation output-items-seq & [option]]
+    (let [gemv (if-let [it (:gemv option)] it default/gemv)
+          {:keys [output hidden]} decoder
+          {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
+                  input-gate-peephole forget-gate-peephole output-gate-peephole
+                  unit-num]} hidden]
+      ;looping latest to old
+      (loop [output-items-seq (reverse output-items-seq)
+             propagated-hidden-to-hidden-delta nil,
+             output-seq (reverse activation)
+             self-delta:t+1 (lstm/lstm-delta-zeros unit-num)
+             lstm-state:t+1 (gate-zeros unit-num)
+             output-acc nil
+             hidden-acc nil]
+        (cond
+          (and (= :skip (first output-items-seq)) (nil? propagated-hidden-to-hidden-delta))
+          (recur (rest output-items-seq)
+                 nil
+                 (rest output-seq)
+                 (lstm-delta-zeros unit-num)
+                 (lstm/gate-zeros unit-num)
+                 nil
+                 nil)
+          (first output-seq)
+          (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
+                output-delta (condp = (:output-type model)
+                               :binary-classification
+                               (binary-classification-error (:output (:activation (first output-seq))) pos neg)
+                               :prediction
+                               (prediction-error  (:output (:activation (first output-seq))) (first output-items-seq)))
+                output-param-delta (output-param-delta output-delta unit-num (:hidden (:activation (first output-seq))))
+                propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
+                                                    (->> output-delta
+                                                         (map (fn [[item delta]]
+                                                                (let [w (:w (get output item))
+                                                                      v (float-array (repeat unit-num delta))]
+                                                                  (times w v))))
+                                                         (apply sum)))
+                ;merging delta: hidden-to-hidden + above-to-hidden
+                summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
+                                              (sum propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                              (= :skip (first output-items-seq))
+                                              propagated-hidden-to-hidden-delta
+                                              (nil? propagated-hidden-to-hidden-delta)
+                                              propagated-output-to-hidden-delta)
+                ;hidden delta
+                lstm-state (:hidden (:state (first output-seq)))
+                cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
+                lstm-part-delta (lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
+                                                 input-gate-peephole forget-gate-peephole output-gate-peephole)
+                x-input (:input (:activation (first output-seq)))
+                self-activation:t-1 (or (:hidden (:activation (second output-seq)))
+                                        (float-array unit-num));when first output time (last time of bptt
+                self-state:t-1      (or (:hidden (:state      (second output-seq)))
+                                        {:cell-state (float-array unit-num)});when first output time (last time of bptt)
+                lstm-param-delta (lstm-param-delta model lstm-part-delta x-input self-activation:t-1 self-state:t-1)
+                {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
+                propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
+                                                                  (gemv (transpose unit-num w) d))
+                                                                [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
+                                                                [block-delta input-gate-delta forget-gate-delta output-gate-delta])
+                                                           (apply sum))]
+            (recur (rest output-items-seq)
+                   propagated-hidden-to-hidden-delta:t-1
+                   (rest output-seq)
+                   lstm-part-delta
+                   (:hidden (:state (first output-seq)))
+                   (if (nil? output-acc)
+                     output-param-delta
+                     (merge-with #(if (map? %1); if sparses
+                                    (merge-with (fn [accw dw]
+                                                  (sum accw dw));w also bias
+                                                %1 %2)
+                                    (sum %1 %2))
+                                 output-acc
+                                 output-param-delta))
+                   (if (nil? hidden-acc)
+                     lstm-param-delta
+                     (merge-with #(if (map? %1); if sparses
+                                    (merge-with (fn [accw dw]
+                                                  (merge-with (fn [acc d]
+                                                                (sum acc d))
+                                                              accw dw))
+                                                %1 %2)
+                                    (sum %1 %2))
+                                 hidden-acc lstm-param-delta))))
+          :else
+          {:output-delta output-acc
+           :hidden-delta hidden-acc}))))
+  )
 
 (defn bptt
   [model encoder-x-seq decoder-x-seq decoder-output-items-seq & [option]]
@@ -107,11 +213,11 @@
         {:keys [encoder decoder]} model
         encoder-activation (encoder-forward encoder encoder-x-seq option)
         decoder-activation (decoder-forward decoder decoder-x-seq (:activation (last encoder-activation)) decoder-output-items-seq)
-;;         _(pprint encoder-activation)
-;;         _(pprint decoder-activation)
-;;         decoder-delta (bptt decoder
+        _(pprint encoder-activation)
+        _(pprint decoder-activation)
+        ;;         decoder-delta (bptt decoder
 
-;;         encode-connection-delta
+        ;;         encode-connection-delta
         ]))
 
 (defn init-encoder-decoder-model
