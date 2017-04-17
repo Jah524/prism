@@ -58,44 +58,79 @@
     {:activation lstm
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
 
-(defn decoder-output-time-fixed
-  [model x-input sparse-outputs previous-hidden-output encoder-input previous-cell-state & [lstm-option]]
-  (let [{:keys [activation state]} (decoder-lstm-activation model x-input previous-hidden-output encoder-input previous-cell-state lstm-option)
-        output (if (= :skip sparse-outputs) :skipped (lstm/output-activation model activation sparse-outputs lstm-option))]
+
+(defn decoder-output-activation
+  [decoder decoder-hidden-list encoder-input previous-input sparse-outputs & [lstm-option]]
+  (let [{:keys [output-type output]} decoder
+        activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
+    (if (= output-type :multi-class-classification)
+      :FIXME
+      (reduce (fn [acc s]
+                (let [{:keys [w bias encoder-w previous-input-w]} (get output s)]
+                  (assoc acc s (activation-function (+ (reduce + (times w decoder-hidden-list)) ;; use areduce fixme
+                                                       (aget ^floats bias 0)
+                                                       (reduce + (times encoder-w encoder-input))
+                                                       (reduce + (times previous-input-w previous-input)))))))
+              {}
+              (vec sparse-outputs)))))
+
+
+(defn decoder-activation-time-fixed
+  [decoder x-input sparse-outputs previous-hidden-output encoder-input previous-input previous-cell-state & [option]]
+  (let [{:keys [activation state]} (decoder-lstm-activation decoder x-input previous-hidden-output encoder-input previous-cell-state option)
+        output (if (= :skip sparse-outputs) :skipped (decoder-output-activation decoder activation encoder-input previous-input sparse-outputs option))]
     {:activation {:input x-input :hidden activation :output output}
      :state  {:input x-input :hidden state}}))
 
-(defn decoder-forward [model x-seq encode-input output-items-seq & [lstm-option]]
-  (let [hidden-size (:unit-num (:hidden model))]
+(defn decoder-forward [decoder x-seq encoder-input output-items-seq & [option]]
+  (let [hidden-size (:unit-num (:hidden decoder))]
     (loop [x-seq x-seq,
            output-items-seq output-items-seq,
            previous-hidden-output (float-array hidden-size),
+           previous-input (float-array (:input-size decoder))
            previous-cell-state    (float-array hidden-size),
            acc []]
       (if-let [x-list (first x-seq)]
-        (let [model-output (decoder-output-time-fixed model x-list (first output-items-seq) previous-hidden-output encode-input previous-cell-state lstm-option)
+        (let [model-output (decoder-activation-time-fixed decoder x-list (first output-items-seq) previous-hidden-output encoder-input previous-input previous-cell-state option)
               {:keys [activation state]} model-output]
           (recur (rest x-seq)
                  (rest output-items-seq)
                  (:hidden activation)
+                 x-list
                  (:cell-state (:hidden state))
                  (cons model-output acc)))
         (vec (reverse acc))))))
 
+(defn bptt
+  [model encoder-x-seq decoder-x-seq decoder-output-items-seq & [option]]
+  (let [gemv (if-let [it (:gemv option)] it default/gemv)
+        {:keys [encoder decoder]} model
+        encoder-activation (encoder-forward encoder encoder-x-seq option)
+        decoder-activation (decoder-forward decoder decoder-x-seq (:activation (last encoder-activation)) decoder-output-items-seq)
+;;         _(pprint encoder-activation)
+;;         _(pprint decoder-activation)
+;;         decoder-delta (bptt decoder
 
+;;         encode-connection-delta
+        ]))
 
 (defn init-encoder-decoder-model
   [{:keys [input-type input-items input-size output-type output-items
-           encoder-hidden-size decoder-hidden-size] :as param}]
+           encoder-hidden-size decoder-hidden-size embedding embedding-size] :as param}]
   (let [encoder (lstm/init-model (-> param
                                      (dissoc :output-items)
                                      (assoc :hidden-size encoder-hidden-size)))
         decoder (lstm/init-model (-> param
                                      (assoc :encoder-size encoder-hidden-size :hidden-size decoder-hidden-size)))
-        d-hidden (assoc (:hidden decoder)
+        {:keys [output hidden]} decoder
+        d-output (reduce (fn [acc [word param]]
+                           (assoc acc word (assoc param :encoder-w (random-array encoder-hidden-size) :previous-input-w (random-array embedding-size))))
+                         {}
+                         output)
+        d-hidden (assoc hidden
                    :block-we       (random-array (* decoder-hidden-size encoder-hidden-size))
                    :input-gate-we  (random-array (* decoder-hidden-size encoder-hidden-size))
                    :forget-gate-we (random-array (* decoder-hidden-size encoder-hidden-size))
                    :output-gate-we (random-array (* decoder-hidden-size encoder-hidden-size)))]
-    {:encoder encoder :decoder (assoc decoder :hidden d-hidden)}))
+    {:encoder encoder :decoder (assoc decoder :hidden d-hidden :output d-output)}))
 

@@ -6,8 +6,40 @@
     [nn.lstm-test   :refer [sample-w-network]]
     [prism.nn.encoder-decoder :refer :all]))
 
+(def encoder-sample-network
+  "assumed 3->5->3 connection"
+  {:input-type :dense
+   :output-type :binary-classification
+   :hidden {:unit-type :lstm
+            :unit-num 5
+            :block-w (float-array (take 15 (repeat 0.1)))
+            :block-wr (float-array (take 25 (repeat 0.1)))
+            :block-bias (float-array (take 5 (repeat -1)))
+            :input-gate-w  (float-array (take 15 (repeat 0.1)))
+            :input-gate-wr  (float-array (take 25 (repeat 0.1)))
+            :input-gate-bias (float-array (take 5 (repeat -1)))
+            :forget-gate-w (float-array (take 15 (repeat 0.1)))
+            :forget-gate-wr (float-array (take 25 (repeat 0.1)))
+            :forget-gate-bias (float-array (take 5 (repeat -1)))
+            :output-gate-w (float-array (take 15 (repeat 0.1)))
+            :output-gate-wr (float-array (take 25 (repeat 0.1)))
+            :output-gate-bias (float-array (take 5 (repeat -1)))
+            :peephole #{:input-gate :forget-gate :output-gate}
+            :input-gate-peephole  (float-array (take 5 (repeat -0.1)))
+            :forget-gate-peephole (float-array (take 5 (repeat -0.1)))
+            :output-gate-peephole (float-array (take 5 (repeat -0.1)))}
+   :output {:activation :sigmoid,
+            :layer-type :output,
+            :unit-num 3
+            :w {"prediction1" (float-array (take 5 (repeat 0.1)))
+                "prediction2" (float-array (take 5 (repeat 0.1)))
+                "prediction3" (float-array (take 5 (repeat 0.1)))}
+            :bias {"prediction1" (float-array [-1])
+                   "prediction2" (float-array [-1])
+                   "prediction3" (float-array [-1])}}})
+
 (def decoder-sample-network
-  "assumed 5 encoder connections"
+  "assumed 10 self hidden, 5 encoder connections and embedding-size is 3"
   (let [h (:hidden sample-w-network)]
     (assoc sample-w-network
       :hidden
@@ -19,7 +51,25 @@
         :forget-gate-we
         (float-array (take 50 (repeat 0.02)))
         :output-gate-we
-        (float-array (take 50 (repeat 0.02)))))))
+        (float-array (take 50 (repeat 0.02))))
+      :output {"prediction1" {:w (float-array (take 10 (repeat 0.1)))
+                              :bias (float-array [-1])
+                              :encoder-w (float-array (take 5 (repeat 0.3)))
+                              :previous-input-w (float-array (take 3 (repeat 0.25)))}
+               "prediction2" {:w (float-array (take 10 (repeat 0.1)))
+                              :bias (float-array [-1])
+                              :encoder-w (float-array (take 5 (repeat 0.3)))
+                              :previous-input-w (float-array (take 3 (repeat 0.25)))}
+               "prediction3" {:w (float-array (take 10 (repeat 0.1)))
+                              :bias (float-array [-1])
+                              :encoder-w (float-array (take 5 (repeat 0.3)))
+                              :previous-input-w (float-array (take 3 (repeat 0.25)))}})))
+
+(def sample-encoder-decoder
+  {:encoder encoder-sample-network
+   :decoder decoder-sample-network})
+
+
 
 (deftest encoder-decoder-test
   (testing "init-encoder-decoder-model"
@@ -29,10 +79,15 @@
                                                                  :input-size 3
                                                                  :encoder-hidden-size 10
                                                                  :decoder-hidden-size 20
-                                                                 :output-type :binary-classification})
-          {eh :hidden} encoder
-          {dh :hidden} decoder]
+                                                                 :output-type :binary-classification
+                                                                 :embedding {"A" (float-array (map float [1 2 3]))
+                                                                             "B" (float-array (map float [1 2 3]))
+                                                                             "C" (float-array (map float [1 2 3]))}
+                                                                 :embedding-size 3})
+          {eh :hidden eis :input-size} encoder
+          {dh :hidden dis :input-size o :output} decoder]
       ;; encoder
+      (is (= eis 3))
       (is (= 30  (count (remove zero? (:block-w eh)))))
       (is (= 100 (count (remove zero? (:block-wr eh)))))
       (is (= 30  (count (remove zero? (:input-gate-w eh)))))
@@ -50,6 +105,7 @@
       (is (= 10  (count (remove zero? (:output-gate-peephole eh)))))
       ;decoder
       ;; encoder connection
+      (is (= dis 3))
       (is (= 200 (count (remove zero? (:block-we dh)))))
       (is (= 200 (count (remove zero? (:input-gate-we dh)))))
       (is (= 200 (count (remove zero? (:forget-gate-we dh)))))
@@ -69,10 +125,16 @@
       (is (= 20  (count (remove zero? (:output-gate-bias dh)))))
       (is (= 20  (count (remove zero? (:input-gate-peephole dh)))))
       (is (= 20  (count (remove zero? (:forget-gate-peephole dh)))))
-      (is (= 20  (count (remove zero? (:output-gate-peephole dh)))))))
+      (is (= 20  (count (remove zero? (:output-gate-peephole dh)))))
+      ;; decoder output
+      (let [{:keys [w bias encoder-w previous-input-w]} (get o "A")]
+        (is (= 20 (count w)))
+        (is (= 1 (count bias)))
+        (is (= 10 (count encoder-w)))
+        (is (= 3 (count previous-input-w))))
 
-  ;;       input-type input-items input-size output-type output-items
-  ;;                                 encoder-hidden-size decoder-hidden-size)
+      ))
+
 
   (testing "decoder-lstm-activation"
     (let [{a1 :activation s1 :state} (decoder-lstm-activation decoder-sample-network
@@ -117,13 +179,43 @@
       (is (= (vec (:forget-gate s)) (take 10 (repeat (float 1.6999998)))))
       (is (= (vec (:output-gate s)) (take 10 (repeat (float 1.6999998)))))))
   (testing "encoder-forward"
-    (let [result (encoder-forward sample-w-network (map float-array [[1 0 0] [1 0 0]]) [:skip #{"prediction1" "prediction2" "prediction3"}])
+    (let [result (encoder-forward sample-w-network (map float-array [[1 0 0] [1 0 0]]))
           {:keys [block input-gate forget-gate output-gate]} (:state (last result))]
       (is (= 2 (count result)))
       (is (= (vec block) (take 10 (repeat (float -0.9590061)))))
       (is (= (vec input-gate) (take 10 (repeat (float -0.93830144)))))
       (is (= (vec forget-gate) (take 10 (repeat (float -0.93830144)))))
       (is (= (vec output-gate) (take 10 (repeat (float -0.93830144)))))))
+
+  (testing "decoder-output-activation"
+    (is (= (decoder-output-activation decoder-sample-network
+                                      (float-array (take 10 (repeat (float 0.05))))
+                                      (float-array (take 5 (repeat (float 0.1))))
+                                      (float-array (map float [0.2 0.2 0.1]))
+                                      #{"prediction1"})
+           {"prediction1" (float 0.33737817)})))
+
+  (testing "decoder-activation-time-fixed"
+    (let [{:keys [activation state]} (decoder-activation-time-fixed decoder-sample-network
+                                                                    (float-array (take 3 (repeat (float 0.3))))
+                                                                    #{"prediction1"}
+                                                                    (float-array (take 10 (repeat (float 0.1))))
+                                                                    (float-array (take 5 (repeat (float 0.1))))
+                                                                    (float-array (map float [0.2 0.2 0.1]))
+                                                                    (float-array (take 10 (repeat (float 0.25)))))
+          {hs :hidden} state]
+      (is (= (vec (:input activation))
+             (take 3 (repeat (float 0.3)))))
+      (is (= (vec (:hidden  activation))
+             (take 10 (repeat (float -0.038238235)))))
+      (is (= (vec (:block hs))
+             (take 10 (repeat (float -0.79999995)))))
+      (is (= (vec (:input-gate hs))
+             (take 10 (repeat (float -0.8249999 )))))
+      (is (= (vec (:forget-gate hs))
+             (take 10 (repeat (float -0.8249999 )))))
+      (is (= (vec (:output-gate hs))
+             (take 10 (repeat (float -0.8249999 )))))))
 
 
   (testing "decorder-forward"
@@ -134,20 +226,23 @@
           it2 (vec (:output (:activation (last (sequential-output sample-w-network
                                                                   (map float-array [[2 0 0] [1 0 0]])
                                                                   [:skip #{"prediction1" "prediction2" "prediction3"}])))))]
-      (is (= it1 it2))
+      (is (not= it1 it2))
       (is (= (->> it1 (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
-             {"prediction2" (float 0.254815) "prediction1" (float 0.254815) "prediction3" (float 0.254815)})))
+             {"prediction2" (float 0.36052307) "prediction1" (float 0.36052307) "prediction3" (float 0.36052307)})))
     (let [result (decoder-forward decoder-sample-network
                                   (map float-array [[2 0 0] [1 0 0]])
-                                  (float-array 5)
+                                  (float-array (take 5 (repeat (float -0.1))))
                                   [:skip #{"prediction1" "prediction2" "prediction3"}])
           {:keys [activation state]} (last result)
           {:keys [hidden output]} activation]
-      (is (= (vec hidden) (take 10 (repeat (float -0.07309456)))))
+      (is (= (vec hidden) (take 10 (repeat (float -0.07243964)))))
       (is (= (->> output vec (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
-             {"prediction2" (float 0.254815) "prediction1" (float 0.254815) "prediction3" (float 0.254815)}))))
-
-
+             {"prediction2" (float 0.326856) "prediction1" (float 0.326856) "prediction3" (float 0.326856)}))))
+  (testing "bptt"
+    (bptt sample-encoder-decoder
+          (map float-array [[2 0 0] [1 0 0]])
+          (map float-array [[2 0 0] [1 0 0]])
+          [:skip #{"prediction1" "prediction2" "prediction3"}]))
 
 
   )
