@@ -10,24 +10,21 @@
 
 
 (defn train-sgd [model training-list learning-rate]
-  (loop [model model, training-list training-list]
+  (loop [model model,
+         training-list training-list,
+         n 0,
+         acc-loss 0]
     (if-let [training-pair (first training-list)]
       (let [{x :x y :y} training-pair
-            delta-list (ff/back-propagation model x y)]
-        (recur (ff/update-model! model delta-list learning-rate) (rest training-list)))
-      model)))
-
-(defn sum-of-squares-error
-  [model training-list]
-  (loop [training-list training-list, acc 0]
-    (let [{training-x :x training-y :y} (first training-list)]
-      (if (and training-x training-y)
-        (let [output (:output (:activation (ff/network-output model training-x (keys training-y))))
-              o (get output "sin-prediction")
-              t (get training-y "sin-prediction")
-              error (* 0.5 (- o t) (- o t))]
-          (recur (rest training-list) (+ error acc)))
-        acc))))
+            forward (ff/network-output model x (keys y))
+            delta-list (ff/back-propagation model forward y)]
+        (let [diff (aget ^floats (-> delta-list :output-delta (get "sin-prediction") :bias-delta) 0)
+              loss (* diff diff 0.5)]
+          (recur (ff/update-model! model delta-list learning-rate)
+                 (rest training-list)
+                 (inc n)
+                 (+ acc-loss loss))))
+      {:loss (/ acc-loss n) :model model})))
 
 (defn train [model training-pair-list & [option]]
   (let [{:keys [optimizer learning-rate epoc loss-interval label label-interval]
@@ -36,12 +33,11 @@
       (if (<= e epoc)
         (let [opt (condp = optimizer
                     :sgd train-sgd)
-              updated-model (opt model (shuffle training-pair-list) learning-rate)]
+              {loss :loss updated-model :model} (opt model (shuffle training-pair-list) learning-rate)]
           (when (= 0 (rem e loss-interval))
-            (let [error (sum-of-squares-error updated-model training-pair-list)]
-              (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
-                            ", optimizer: " (.toUpperCase (name optimizer))
-                            ", learning-rate: " learning-rate ", error: " error))))
+            (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
+                          ", optimizer: " (.toUpperCase (name optimizer))
+                          ", learning-rate: " learning-rate ", loss: " loss)))
           (recur updated-model  (inc e)))
         model))))
 

@@ -23,12 +23,12 @@
 (defn output-activation
   [model input-list sparse-outputs & [option]]
   (let [{:keys [output-type output]} model
-        {:keys [w bias activation]} output
         activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
     (if (= output-type :multi-class-classification)
       :FIXME
       (reduce (fn [acc s]
-                (assoc acc s (activation-function (+ (reduce + (times (get w s) input-list)) (aget ^floats (get bias s) 0)))))
+                (let [{:keys [w bias]} (get output s)]
+                  (assoc acc s (activation-function (+ (reduce + (times w input-list)) (aget ^floats bias 0))))))
               {}
               sparse-outputs))))
 
@@ -79,14 +79,13 @@
   training-y have to be given like {\"prediction1\" 12 \"prediction2\" 321} when prediction model.
   In classification model, you put possitive and negative pairs like {:pos #{\"item1\", \"item2\"} :neg #{\"item3\"}}
   "
-  [model training-x training-y & [option]]
+  [model model-forward training-y & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [output hidden input-type output-type]} model
         {:keys [unit-num]} hidden
-        output-items (if (= :prediction output-type) (keys training-y) (let [{:keys [pos neg]} training-y] (concat pos neg)))
-        {:keys [activation state]} (network-output model training-x output-items option)
+        {:keys [activation state]} model-forward
+        training-x (:input activation)
         {:keys [pos neg]} training-y   ;used when binary claassification
-        output-w (:w output)
         output-delta (condp = (:output-type model)
                        :binary-classification
                        (binary-classification-error (:output activation) pos neg)
@@ -95,7 +94,7 @@
         output-param-delta (output-param-delta output-delta unit-num (:hidden activation))
         propagated-delta (->> output-delta
                               (map (fn [[item delta]]
-                                     (let [w (get output-w item)
+                                     (let [w (:w (get output item))
                                            d (float-array (repeat unit-num delta))]
                                        (times w d))))
                               (apply sum))
@@ -113,17 +112,15 @@
         {:keys [output-delta hidden-delta]} param-delta
         {:keys [unit-num]} hidden]
     ;; update output
-    (let [{:keys [w bias]} output]
-      (->> output-delta
-           (map (fn [[item {:keys [w-delta bias-delta]}]]
-                  (let [item-w    (get w item)
-                        item-bias (get bias item)]
-                    ;update output w
-                    (dotimes [x unit-num]
-                      (aset ^floats item-w x (float (+ (aget ^floats item-w x) (* learning-rate (aget ^floats w-delta x))))))
-                    ;update output bias
-                    (aset ^floats item-bias 0 (float (+ (aget ^floats item-bias 0) (* learning-rate (aget ^floats bias-delta 0))))))))
-           doall))
+    (->> output-delta
+         (map (fn [[item {:keys [w-delta bias-delta]}]]
+                (let [{:keys [w bias]} (get output item)]
+                  ;update output w
+                  (dotimes [x unit-num]
+                    (aset ^floats w x (float (+ (aget ^floats w x) (* learning-rate (aget ^floats w-delta x))))))
+                  ;update output bias
+                  (aset ^floats bias 0 (float (+ (aget ^floats bias 0) (* learning-rate (aget ^floats bias-delta 0))))))))
+         doall)
     ;; update hidden
     (let [{:keys [w bias]} hidden
           {:keys [w-delta bias-delta]} hidden-delta]
@@ -159,8 +156,10 @@
                    :bias (random-array hidden-size)
                    :unit-num hidden-size
                    :activation activation))
-     :output {:w    (reduce #(assoc %1 %2 (random-array hidden-size))   {} output-items)
-              :bias (reduce #(assoc %1 %2 (float-array [(model-rand)])) {} output-items)}
+     :output (reduce (fn [acc sparse]
+                       (assoc acc sparse {:w (random-array hidden-size) :bias (float-array [(model-rand)])}))
+                     {}
+                     output-items)
      :input-type input-type
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
