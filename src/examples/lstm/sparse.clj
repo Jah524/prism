@@ -4,49 +4,35 @@
     [prism.nn.lstm :as lstm]
     [clj-time.local  :as l]))
 
-(defn sum-of-squares-error
-  [model training-list]
-  (loop [training-list training-list, acc 0]
-    (let [{training-x-seq :x training-y-seq :y} (first training-list)
-          training-y-seq-keys (map #(if (= :skip %) :skip (keys %)) training-y-seq)]
-      (if (and training-x-seq training-y-seq)
-        (let [error (->> (mapv #(if (= :skip %2)
-                                  0
-                                  (let [it1 (-> %1 :activation :output vals first)
-                                        it2 (-> %2 vals first)]
-                                    (* 0.5 (- it1 it2) (- it1 it2))))
-                               (lstm/sequential-output model training-x-seq training-y-seq-keys)
-                               training-y-seq)
-                         (reduce +))]
-          (recur (rest training-list) (+ error acc)))
-        acc))))
 
-(defn train-sgd [model training-list learning-rate & [lstm-option]]
-  (loop [model model, training-list training-list]
+(defn train-sgd [model training-list learning-rate]
+  (loop [model model,
+         training-list training-list,
+         n 0,
+         acc-loss 0]
     (if-let [training-pair (first training-list)]
       (let [{x-seq :x y-seq :y} training-pair
+            forward (lstm/sequential-output model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
             delta-list (lstm/bptt model
-                                  x-seq
-                                  y-seq
-                                  lstm-option)]
-        (recur (lstm/update-model! model delta-list learning-rate) (rest training-list)))
-      model)))
+                                  forward
+                                  y-seq)
+            diff (aget ^floats (-> delta-list :output-delta (get "prediction") :bias-delta) 0)
+            loss (* diff diff 0.5)] ; sum-of-squares-error
+        (recur (lstm/update-model! model delta-list learning-rate)
+               (rest training-list)
+               (inc n)
+               (+ acc-loss loss)))
+      {:loss acc-loss :model model})))
 
-(defn train-with-demo-dataset [model training-list loss-fn lstm-option]
-  (let [{:keys [optimizer learning-rate epoc loss-interval label label-interval]
-         :or {optimizer :sgd learning-rate 0.01 epoc 10000 loss-interval 100 label-interval 1000}} lstm-option]
+(defn train-with-demo-dataset [model training-list & [option]]
+  (let [{:keys [optimizer learning-rate epoc loss-interval label label-interval]} option]
     (loop [model model, e 0]
       (if (< e epoc)
-        (let [opt (condp = optimizer :sgd train-sgd),
-              updated-model (opt model (shuffle training-list) learning-rate lstm-option)]
+        (let [{loss :loss updated-model :model} (train-sgd model (shuffle training-list) learning-rate)]
           (when (= 0 (rem e loss-interval))
-            (let [error (loss-fn updated-model training-list)]
-              (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
-
-                            ", optimizer: " (.toUpperCase (name optimizer))
-                            ", learning-rate: " learning-rate ", error: " error))))
-          (when (and label (= 0 (rem e label-interval)))
-            (println label))
+            (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
+                              ", optimizer: SGD"
+                              ", learning-rate: " learning-rate ", loss: " loss)))
           (when (= 0 (rem e 1000))
             (println (apply str "[ Sparse Model ]: "
                             (->> (map #(:unit-num %) (:layers model))
@@ -78,10 +64,9 @@
                                                          :hidden-size 10
                                                          :output-type :prediction})
                                        dataset-sparse
-                                       sum-of-squares-error
                                        {:loss-interval 100
                                         :epoc 2000
-                                        :label "sparse demo"})
+                                        :learning-rate 0.01})
         demo-input1 [{"A" (float 1)}]
         demo-input2 [{"A" (float 1)} {"A" (float 1)}]
         demo-input3 [{"A" (float 1)} {"B" (float 1)} {"C" (float 1)} {"D" (float 1)}]

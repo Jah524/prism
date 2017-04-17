@@ -17,13 +17,13 @@
     (if-let [training-pair (first training-list)]
       (let [{x :x y :y} training-pair
             forward (ff/network-output model x (keys y))
-            delta-list (ff/back-propagation model forward y)]
-        (let [diff (aget ^floats (-> delta-list :output-delta (get "sin-prediction") :bias-delta) 0)
-              loss (* diff diff 0.5)]
-          (recur (ff/update-model! model delta-list learning-rate)
-                 (rest training-list)
-                 (inc n)
-                 (+ acc-loss loss))))
+            delta-list (ff/back-propagation model forward y)
+            diff (aget ^floats (-> delta-list :output-delta (get "sin-prediction") :bias-delta) 0)
+            loss (* diff diff 0.5)] ; sum-of-squares-error
+        (recur (ff/update-model! model delta-list learning-rate)
+               (rest training-list)
+               (inc n)
+               (+ acc-loss loss)))
       {:loss (/ acc-loss n) :model model})))
 
 (defn train [model training-pair-list & [option]]
@@ -50,7 +50,7 @@
                                      :output-items #{"sin-prediction"}
                                      :activation :tanh})
                      training-sin3
-                     {:epoc 10000 :loss-interval 1000 :learning-rate 0.05})]
+                     {:epoc 10000 :loss-interval 1000 :learning-rate 0.01})]
     (-> (function-plot #(Math/sin %) -3 3)
         (add-function #(get (:output (:activation (ff/network-output model (float-array [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
         (add-function #(nth (:hidden (:activation (ff/network-output model (float-array [%]) #{"sin-prediction"}))) 0) -3 3)
