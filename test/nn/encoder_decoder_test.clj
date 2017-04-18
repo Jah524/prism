@@ -343,11 +343,77 @@
       (is (= (vec previous-input-w-delta)
              (map float [1.346288 0.0 0.0])))
 
+      (testing "update-decoder!"
+        (let [result (update-decoder! decoder-sample-network
+                                      (decoder-bptt decoder-sample-network
+                                                    (decoder-forward decoder-sample-network
+                                                                     (map float-array [[2 0 0] [1 0 0]])
+                                                                     encoder-input
+                                                                     [:skip #{"prediction1" "prediction2" "prediction3"}])
+                                                    encoder-input
+                                                    [:skip {:pos ["prediction2"] :neg ["prediction3"]}])
+                                      0.1)
+              {hd :hidden o :output} result]
+          (is (= (count (:block-w hd)) 30))
+          (is (= (count (:block-wr hd)) 100))
+          (is (= (count (:input-gate-w hd)) 30))
+          (is (= (count (:input-gate-wr hd)) 100))
+          (is (= (count (:forget-gate-w hd)) 30))
+          (is (= (count (:forget-gate-wr hd)) 100))
+          (is (= (count (:output-gate-w hd)) 30))
+          (is (= (count (:output-gate-wr hd)) 100))
 
+          (is (= (vec (:block-w hd))
+                 (cons (float 0.10018218) (flatten (take 29 (repeat (float 0.1)))))))
+          (is (= (vec (:input-gate-w hd))
+                 (cons (float 0.099802695) (flatten (take 29 (repeat (float 0.1)))))))
+          (is (= (vec (:forget-gate-w hd))
+                 (flatten (take 30 (repeat (map float [0.1]))))))
+          (is (= (vec (:output-gate-w hd))
+                 (cons (float 0.099836975) (flatten (take 29 (repeat (map float [0.1])))))))
+          ;; reccurent connection
+          (is (= (vec (:block-wr hd))
+                 (take 100 (repeat (float 0.099993005)))))
+          (is (= (vec (:input-gate-wr hd))
+                 (take 100 (repeat (float 0.10000865)))))
+          (is (= (vec (:forget-gate-wr hd))
+                 (take 100 (repeat (float 0.1)))))
+          (is (= (vec (:output-gate-wr hd))
+                 (take 100 (repeat (float 0.10001133)))))
+          ;; encoder connection
+          (is (= (vec (:block-we hd))
+                 (concat (take 5 (repeat (float 0.0199853)))
+                         (take 45 (repeat (float 0.02))))))
+          (is (= (vec (:input-gate-we hd))
+                 (concat (take 5 (repeat (float 0.020016775)))
+                         (take 45 (repeat (float 0.02))))))
+          (is (= (vec (:forget-gate-we hd))
+                 (take 50 (repeat (float 0.02)))))
+          (is (= (vec (:output-gate-we hd))
+                 (concat (take 5 (repeat (float 0.020017201)))
+                         (take 45 (repeat (float 0.02))))))
+          ;peephole
+          (is (= (vec (:input-gate-peephole hd))
+                 (take 10 (repeat (float -0.09997151)))))
+          (is (= (vec (:forget-gate-peephole hd))
+                 (take 10 (repeat (float -0.1)))))
+          (is (= (vec (:output-gate-peephole hd))
+                 (take 10 (repeat (float -0.09996269)))))
+
+          (is (= (vec (:input-gate-bias  hd)) (take 10 (repeat (float -1.0001677)))))
+          (is (= (vec (:forget-gate-bias hd)) (take 10 (repeat (float -1)))))
+          (is (= (vec (:output-gate-bias hd)) (take 10 (repeat (float -1.000172)))))
+          (let [{:keys [w bias encoder-w previous-input-w]} (get o "prediction3")]
+            (is (= (vec w)
+                   (take 10 (repeat (float 0.10236774)))))
+            (is (= (vec bias)
+                   [(float -1.0326856)]))
+            (is (= (vec encoder-w)
+                   (take 5 (repeat (float 0.30326858)))))
+            (is (= (vec previous-input-w)
+                   (map float [0.1846288 0.25 0.25])))))))
 
 
 
       ))
 
-
-)

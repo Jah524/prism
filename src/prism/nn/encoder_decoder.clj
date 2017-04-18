@@ -257,6 +257,68 @@
         ;;         encode-connection-delta
         ]))
 
+
+(defn update-decoder!
+  [decoder param-delta-list learning-rate]
+  (let [{:keys [output hidden input-size encoder-size]} decoder
+        {:keys [output-delta hidden-delta]} param-delta-list
+        {:keys [block-w-delta block-wr-delta block-bias-delta input-gate-w-delta input-gate-wr-delta input-gate-bias-delta
+                forget-gate-w-delta forget-gate-wr-delta forget-gate-bias-delta output-gate-w-delta output-gate-wr-delta output-gate-bias-delta
+                block-we-delta input-gate-we-delta forget-gate-we-delta output-gate-we-delta
+                peephole-input-gate-delta peephole-forget-gate-delta peephole-output-gate-delta sparses-delta]} hidden-delta
+        {:keys [block-w block-wr block-bias input-gate-w input-gate-wr input-gate-bias
+                forget-gate-w forget-gate-wr forget-gate-bias output-gate-w output-gate-wr output-gate-bias
+                block-we input-gate-we forget-gate-we output-gate-we
+                input-gate-peephole forget-gate-peephole output-gate-peephole
+                unit-num sparse? sparses]} hidden]
+    ;update output connection
+    (->> output-delta
+         (map (fn [[item {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta]}]]
+                (let [{:keys [w bias encoder-w previous-input-w]} (get output item)]
+                  (aset ^floats bias 0 (float (+ (aget ^floats bias 0) (* learning-rate (aget ^floats bias-delta 0)))))
+                  (dotimes [x unit-num]
+                    (aset ^floats w x (float (+ (aget ^floats w x) (* learning-rate (aget ^floats w-delta x))))))
+                  ;; encoder connection
+                  (dotimes [x encoder-size]
+                    (aset ^floats encoder-w x (float (+ (aget ^floats encoder-w x) (* learning-rate (aget ^floats encoder-w-delta x))))))
+                  ;; previous decoder input
+                  (dotimes [x input-size]
+                    (aset ^floats previous-input-w x (float (+ (aget ^floats previous-input-w x) (* learning-rate (aget ^floats previous-input-w-delta x)))))))))
+         doall)
+    ;update input connection
+    (dotimes [x input-size]
+      (aset ^floats block-w x (float (+ (aget ^floats block-w x) (* learning-rate (aget ^floats block-w-delta x)))))
+      (aset ^floats input-gate-w x (float (+ (aget ^floats input-gate-w x) (* learning-rate (aget ^floats input-gate-w-delta x)))))
+      (aset ^floats forget-gate-w x (float (+ (aget ^floats forget-gate-w x) (* learning-rate (aget ^floats forget-gate-w-delta x)))))
+      (aset ^floats output-gate-w x (float (+ (aget ^floats output-gate-w x) (* learning-rate (aget ^floats output-gate-w-delta x))))))
+    ;update recurrent connection
+    (dotimes [x (* unit-num unit-num)]
+      (aset ^floats block-wr x (float (+ (aget ^floats block-wr x) (* learning-rate (aget ^floats block-wr-delta x)))))
+      (aset ^floats input-gate-wr x (float (+ (aget ^floats input-gate-wr x) (* learning-rate (aget ^floats input-gate-wr-delta x)))))
+      (aset ^floats forget-gate-wr x (float (+ (aget ^floats forget-gate-wr x) (* learning-rate (aget ^floats forget-gate-wr-delta x)))))
+      (aset ^floats output-gate-wr x (float (+ (aget ^floats output-gate-wr x) (* learning-rate (aget ^floats output-gate-wr-delta x))))))
+    (dotimes [x encoder-size]
+      (aset ^floats block-we x (float (+ (aget ^floats block-we x) (* learning-rate (aget ^floats block-we-delta x)))))
+      (aset ^floats input-gate-we x (float (+ (aget ^floats input-gate-we x) (* learning-rate (aget ^floats input-gate-we-delta x)))))
+      (aset ^floats forget-gate-we x (float (+ (aget ^floats forget-gate-we x) (* learning-rate (aget ^floats forget-gate-we-delta x)))))
+      (aset ^floats output-gate-we x (float (+ (aget ^floats output-gate-we x) (* learning-rate (aget ^floats output-gate-we-delta x))))))
+    ;update lstm bias and peephole
+    (dotimes [x unit-num]
+      ;update bias
+      (aset ^floats block-bias x (float (+ (aget ^floats block-bias x) (* learning-rate (aget ^floats block-bias-delta x)))))
+      (aset ^floats input-gate-bias x (float (+ (aget ^floats input-gate-bias x) (* learning-rate (aget ^floats input-gate-bias-delta x)))))
+      (aset ^floats forget-gate-bias x (float (+ (aget ^floats forget-gate-bias x) (* learning-rate (aget ^floats forget-gate-bias-delta x)))))
+      (aset ^floats output-gate-bias x (float (+ (aget ^floats output-gate-bias x) (* learning-rate (aget ^floats output-gate-bias-delta x)))))
+      ;and peephole
+      (when (aset ^floats input-gate-peephole  x
+                  (float (+ (aget ^floats input-gate-peephole x)  (* learning-rate (aget ^floats peephole-input-gate-delta  x))))))
+      (when (aset ^floats forget-gate-peephole x
+                  (float (+ (aget ^floats forget-gate-peephole x) (* learning-rate (aget ^floats peephole-forget-gate-delta x))))))
+      (when (aset ^floats output-gate-peephole x
+                  (float (+ (aget ^floats output-gate-peephole x) (* learning-rate (aget ^floats peephole-output-gate-delta x)))))))
+    decoder))
+
+
 (defn init-decoder
   [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size] :as param}]
   (let [decoder (lstm/init-model (assoc param
