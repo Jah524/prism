@@ -245,7 +245,7 @@
                                             propagated-output-to-hidden-delta)
               ;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
-              cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
+              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (float-array unit-num))
               lstm-part-delta (lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (:activation (first output-seq)))
