@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :refer [transpose sum times outer minus] :as default]
-    [prism.unit :refer [tanh sigmoid random-array]]
+    [prism.unit :refer [tanh sigmoid random-array binary-classification-error prediction-error]]
     [prism.nn.lstm :as lstm]))
 
 
@@ -146,98 +146,103 @@
 
      }))
 
-(comment
-  (defn decoder-bptt
-    [decoder activation output-items-seq & [option]]
-    (let [gemv (if-let [it (:gemv option)] it default/gemv)
-          {:keys [output hidden]} decoder
-          {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
-                  input-gate-peephole forget-gate-peephole output-gate-peephole
-                  unit-num]} hidden]
-      ;looping latest to old
-      (loop [output-items-seq (reverse output-items-seq)
-             propagated-hidden-to-hidden-delta nil,
-             output-seq (reverse activation)
-             self-delta:t+1 (lstm/lstm-delta-zeros unit-num)
-             lstm-state:t+1 (gate-zeros unit-num)
-             output-acc nil
-             hidden-acc nil]
-        (cond
-          (and (= :skip (first output-items-seq)) (nil? propagated-hidden-to-hidden-delta))
+(defn decoder-bptt
+  [decoder decoder-activation encoder-input output-items-seq & [option]]
+  (let [gemv (if-let [it (:gemv option)] it default/gemv)
+        {:keys [output hidden encoder-size input-size]} decoder
+        {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
+                input-gate-peephole forget-gate-peephole output-gate-peephole
+                unit-num]} hidden]
+    ;looping latest to old
+    (loop [output-items-seq (reverse output-items-seq)
+           propagated-hidden-to-hidden-delta nil,
+           output-seq (reverse decoder-activation)
+           self-delta:t+1 (lstm/lstm-delta-zeros unit-num)
+           lstm-state:t+1 (lstm/gate-zeros unit-num)
+           output-acc nil
+           hidden-acc nil]
+      (cond
+        (and (= :skip (first output-items-seq)) (nil? propagated-hidden-to-hidden-delta))
+        (recur (rest output-items-seq)
+               nil
+               (rest output-seq)
+               (lstm/lstm-delta-zeros unit-num)
+               (lstm/gate-zeros unit-num)
+               nil
+               nil)
+        (first output-seq)
+        (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
+              output-delta (condp = (:output-type decoder)
+                             :binary-classification
+                             (binary-classification-error (:output (:activation (first output-seq))) pos neg)
+                             :prediction
+                             (prediction-error  (:output (:activation (first output-seq))) (first output-items-seq)))
+              previous-decoder-input (if-let [it (:input (:activation (second output-seq)))] it (float-array input-size))
+              output-param-delta (decoder-output-param-delta output-delta
+                                                             unit-num
+                                                             (:hidden (:activation (first output-seq)))
+                                                             encoder-size
+                                                             encoder-input
+                                                             input-size
+                                                             previous-decoder-input)
+              propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
+                                                  (->> output-delta
+                                                       (map (fn [[item delta]]
+                                                              (let [w (:w (get output item))
+                                                                    v (float-array (repeat unit-num delta))]
+                                                                (times w v))))
+                                                       (apply sum)))
+              ;merging delta: hidden-to-hidden + above-to-hidden
+              summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
+                                            (sum propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (= :skip (first output-items-seq))
+                                            propagated-hidden-to-hidden-delta
+                                            (nil? propagated-hidden-to-hidden-delta)
+                                            propagated-output-to-hidden-delta)
+              ;hidden delta
+              lstm-state (:hidden (:state (first output-seq)))
+              cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
+              lstm-part-delta (lstm/lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
+                                                    input-gate-peephole forget-gate-peephole output-gate-peephole)
+              x-input (:input (:activation (first output-seq)))
+              self-activation:t-1 (or (:hidden (:activation (second output-seq)))
+                                      (float-array unit-num));when first output time (last time of bptt
+              self-state:t-1      (or (:hidden (:state      (second output-seq)))
+                                      {:cell-state (float-array unit-num)});when first output time (last time of bptt)
+              lstm-param-delta (decoder-lstm-param-delta decoder lstm-part-delta x-input self-activation:t-1 encoder-input self-state:t-1)
+              {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
+              propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
+                                                                (gemv (transpose unit-num w) d))
+                                                              [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
+                                                              [block-delta input-gate-delta forget-gate-delta output-gate-delta])
+                                                         (apply sum))]
           (recur (rest output-items-seq)
-                 nil
+                 propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
-                 (lstm-delta-zeros unit-num)
-                 (lstm/gate-zeros unit-num)
-                 nil
-                 nil)
-          (first output-seq)
-          (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
-                output-delta (condp = (:output-type model)
-                               :binary-classification
-                               (binary-classification-error (:output (:activation (first output-seq))) pos neg)
-                               :prediction
-                               (prediction-error  (:output (:activation (first output-seq))) (first output-items-seq)))
-                output-param-delta (output-param-delta output-delta unit-num (:hidden (:activation (first output-seq))))
-                propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
-                                                    (->> output-delta
-                                                         (map (fn [[item delta]]
-                                                                (let [w (:w (get output item))
-                                                                      v (float-array (repeat unit-num delta))]
-                                                                  (times w v))))
-                                                         (apply sum)))
-                ;merging delta: hidden-to-hidden + above-to-hidden
-                summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                              (sum propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
-                                              (= :skip (first output-items-seq))
-                                              propagated-hidden-to-hidden-delta
-                                              (nil? propagated-hidden-to-hidden-delta)
-                                              propagated-output-to-hidden-delta)
-                ;hidden delta
-                lstm-state (:hidden (:state (first output-seq)))
-                cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
-                lstm-part-delta (lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
-                                                 input-gate-peephole forget-gate-peephole output-gate-peephole)
-                x-input (:input (:activation (first output-seq)))
-                self-activation:t-1 (or (:hidden (:activation (second output-seq)))
-                                        (float-array unit-num));when first output time (last time of bptt
-                self-state:t-1      (or (:hidden (:state      (second output-seq)))
-                                        {:cell-state (float-array unit-num)});when first output time (last time of bptt)
-                lstm-param-delta (lstm-param-delta model lstm-part-delta x-input self-activation:t-1 self-state:t-1)
-                {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
-                propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
-                                                                  (gemv (transpose unit-num w) d))
-                                                                [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
-                                                                [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                           (apply sum))]
-            (recur (rest output-items-seq)
-                   propagated-hidden-to-hidden-delta:t-1
-                   (rest output-seq)
-                   lstm-part-delta
-                   (:hidden (:state (first output-seq)))
-                   (if (nil? output-acc)
-                     output-param-delta
-                     (merge-with #(if (map? %1); if sparses
-                                    (merge-with (fn [accw dw]
-                                                  (sum accw dw));w also bias
-                                                %1 %2)
-                                    (sum %1 %2))
-                                 output-acc
-                                 output-param-delta))
-                   (if (nil? hidden-acc)
-                     lstm-param-delta
-                     (merge-with #(if (map? %1); if sparses
-                                    (merge-with (fn [accw dw]
-                                                  (merge-with (fn [acc d]
-                                                                (sum acc d))
-                                                              accw dw))
-                                                %1 %2)
-                                    (sum %1 %2))
-                                 hidden-acc lstm-param-delta))))
-          :else
-          {:output-delta output-acc
-           :hidden-delta hidden-acc}))))
-  )
+                 lstm-part-delta
+                 (:hidden (:state (first output-seq)))
+                 (if (nil? output-acc)
+                   output-param-delta
+                   (merge-with #(if (map? %1); if sparses
+                                  (merge-with (fn [accw dw]
+                                                (sum accw dw));w also bias
+                                              %1 %2)
+                                  (sum %1 %2))
+                               output-acc
+                               output-param-delta))
+                 (if (nil? hidden-acc)
+                   lstm-param-delta
+                   (merge-with #(if (map? %1); if sparses
+                                  (merge-with (fn [accw dw]
+                                                (merge-with (fn [acc d]
+                                                              (sum acc d))
+                                                            accw dw))
+                                              %1 %2)
+                                  (sum %1 %2))
+                               hidden-acc lstm-param-delta))))
+        :else
+        {:output-delta output-acc
+         :hidden-delta hidden-acc}))))
 
 (defn bptt
   [model encoder-x-seq decoder-x-seq decoder-output-items-seq & [option]]
@@ -252,14 +257,12 @@
         ;;         encode-connection-delta
         ]))
 
-(defn init-encoder-decoder-model
-  [{:keys [input-type input-items input-size output-type output-items
-           encoder-hidden-size decoder-hidden-size embedding embedding-size] :as param}]
-  (let [encoder (lstm/init-model (-> param
-                                     (dissoc :output-items)
-                                     (assoc :hidden-size encoder-hidden-size)))
-        decoder (lstm/init-model (-> param
-                                     (assoc :encoder-size encoder-hidden-size :hidden-size decoder-hidden-size)))
+(defn init-decoder
+  [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size] :as param}]
+  (let [decoder (lstm/init-model (assoc param
+                                   :encoder-size encoder-hidden-size
+                                   :hidden-size decoder-hidden-size
+                                   :input-type :dense))
         {:keys [output hidden]} decoder
         d-output (reduce (fn [acc [word param]]
                            (assoc acc word (assoc param :encoder-w (random-array encoder-hidden-size) :previous-input-w (random-array embedding-size))))
@@ -270,5 +273,14 @@
                    :input-gate-we  (random-array (* decoder-hidden-size encoder-hidden-size))
                    :forget-gate-we (random-array (* decoder-hidden-size encoder-hidden-size))
                    :output-gate-we (random-array (* decoder-hidden-size encoder-hidden-size)))]
-    {:encoder encoder :decoder (assoc decoder :hidden d-hidden :output d-output)}))
+    (assoc decoder :hidden d-hidden :output d-output :encoder-size encoder-hidden-size)))
+
+(defn init-encoder-decoder-model
+  [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size] :as param}]
+  (let [encoder (lstm/init-model (-> param
+                                     (dissoc :output-items)
+                                     (assoc
+                                       :hidden-size encoder-hidden-size
+                                       :input-type :dense)))]
+    {:encoder encoder :decoder (init-decoder param)}))
 

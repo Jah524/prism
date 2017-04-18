@@ -7,6 +7,7 @@
 
 (def sample-w-network
   {:input-type :dense
+   :input-size 3
    :output-type :binary-classification
    :hidden {:unit-type :lstm
             :unit-num 10

@@ -42,6 +42,7 @@
   "assumed 10 self hidden, 5 encoder connections and embedding-size is 3"
   (let [h (:hidden sample-w-network)]
     (assoc sample-w-network
+      :encoder-size 5
       :hidden
       (assoc h
         :block-we
@@ -85,7 +86,7 @@
                                                                              "C" (float-array (map float [1 2 3]))}
                                                                  :embedding-size 3})
           {eh :hidden eis :input-size} encoder
-          {dh :hidden dis :input-size o :output} decoder]
+          {dh :hidden dis :input-size o :output es :encoder-size} decoder]
       ;; encoder
       (is (= eis 3))
       (is (= 30  (count (remove zero? (:block-w eh)))))
@@ -104,8 +105,9 @@
       (is (= 10  (count (remove zero? (:forget-gate-peephole eh)))))
       (is (= 10  (count (remove zero? (:output-gate-peephole eh)))))
       ;decoder
-      ;; encoder connection
+      (is (= es 10))
       (is (= dis 3))
+      ;; encoder connection
       (is (= 200 (count (remove zero? (:block-we dh)))))
       (is (= 200 (count (remove zero? (:input-gate-we dh)))))
       (is (= 200 (count (remove zero? (:forget-gate-we dh)))))
@@ -217,7 +219,6 @@
       (is (= (vec (:output-gate hs))
              (take 10 (repeat (float -0.8249999 )))))))
 
-
   (testing "decorder-forward"
     (let [it1 (vec (:output (:activation (last (decoder-forward decoder-sample-network
                                                                 (map float-array [[2 0 0] [1 0 0]])
@@ -297,13 +298,56 @@
       (is (= (vec (:peephole-input-gate-delta  result)) (take 10 (repeat (float -0.1)))))
       (is (= (vec (:peephole-forget-gate-delta result)) (take 10 (repeat (float -0.1)))))
       (is (= (vec (:peephole-output-gate-delta result)) (take 10 (repeat (float -0.1)))))))
-  (comment
-    (testing "bptt"
-      (bptt sample-encoder-decoder
-            (map float-array [[2 0 0] [1 0 0]])
-            (map float-array [[2 0 0] [1 0 0]])
-            [:skip #{"prediction1" "prediction2" "prediction3"}]))
+  (testing "decoder-bptt"
+    (let [encoder-input (float-array (take 5 (repeat (float -0.1))))
+          {hd :hidden-delta od :output-delta} (decoder-bptt decoder-sample-network
+                                                            (decoder-forward decoder-sample-network
+                                                                             (map float-array [[2 0 0] [1 0 0]])
+                                                                             encoder-input
+                                                                             [:skip #{"prediction1" "prediction2" "prediction3"}])
+                                                            encoder-input
+                                                            [:skip {:pos ["prediction2"] :neg ["prediction3"]}])
+          {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta]} (get od "prediction2")]
+      (is (= (count (:block-w-delta                 hd)) 30))
+      (is (= (count (remove zero? (:block-w-delta   hd))) 10))
+      (is (= (count (remove zero? (:block-wr-delta  hd))) 100))
+      (is (= (count (:input-gate-w-delta            hd)) 30))
+      (is (= (count (remove zero? (:input-gate-w-delta   hd))) 10))
+      (is (= (count (remove zero? (:input-gate-wr-delta  hd))) 100))
+      (is (= (count (:forget-gate-w-delta           hd)) 30))
+      (is (= (count (remove zero? (:forget-gate-w-delta   hd))) 0))
+      (is (= (count (:forget-gate-wr-delta          hd)) 100))
+      (is (= (count (remove zero? (:forget-gate-wr-delta  hd))) 0))
+      (is (= (count (:output-gate-w-delta           hd)) 30))
+      (is (= (count (remove zero? (:output-gate-w-delta   hd))) 10))
+      (is (= (count (remove zero? (:output-gate-wr-delta  hd))) 100))
+      ;; encoder-connection
+      (is (= (count (remove zero? (:block-we-delta  hd))) 50))
+      (is (= (count (remove zero? (:input-gate-we-delta  hd))) 50))
+      (is (= (count (:forget-gate-we-delta          hd)) 50))
+      (is (= (count (remove zero? (:output-gate-we-delta  hd))) 50))
+      ;; bias and peepholes
+      (is (= (count (:block-bias-delta           hd)) 10))
+      (is (= (count (:input-gate-bias-delta      hd)) 10))
+      (is (= (count (:forget-gate-bias-delta     hd)) 10))
+      (is (= (count (:output-gate-bias-delta     hd)) 10))
+      (is (= (count (:peephole-input-gate-delta  hd)) 10))
+      (is (= (count (:peephole-forget-gate-delta hd)) 10))
+      (is (= (count (:peephole-output-gate-delta hd)) 10))
+      ;; output
+      (is (= (vec w-delta)
+             (take 10 (repeat (float -0.048762307)))))
+      (is (= (vec bias-delta) [(float 0.673144)]))
+      (is (= (vec encoder-w-delta)
+             (take 5 (repeat (float -0.0673144)))))
+      (is (= (vec previous-input-w-delta)
+             (map float [1.346288 0.0 0.0])))
 
 
-    )
-  )
+
+
+
+      ))
+
+
+)
