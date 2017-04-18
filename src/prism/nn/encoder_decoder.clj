@@ -18,7 +18,7 @@
           (recur (rest x-seq)
                  activation
                  (:cell-state state)
-                 (cons model-output acc)))
+                 (cons {:input x-input :hidden model-output} acc)))
         (vec (reverse acc))))))
 
 
@@ -101,6 +101,14 @@
                  (cons decoder-output acc)))
         (vec (reverse acc))))))
 
+(defn encoder-decoder-forward
+  [encoder-decoder-model encoder-x-seq decoder-x-seq decoder-output-items-seq & [option]]
+  (let [gemv (if-let [it (:gemv option)] it default/gemv)
+        {:keys [encoder decoder]} encoder-decoder-model
+        encoder-activation (encoder-forward encoder encoder-x-seq option)
+        decoder-activation (decoder-forward decoder decoder-x-seq (:activation (:hidden (last encoder-activation))) decoder-output-items-seq option)]
+    {:encoder encoder-activation :decoder decoder-activation}))
+
 
 ;;   BPTT   ;;
 
@@ -141,16 +149,63 @@
      :output-gate-bias-delta output-gate-delta
      :peephole-input-gate-delta  (times input-gate-delta  (:cell-state self-state:t-1))
      :peephole-forget-gate-delta (times forget-gate-delta (:cell-state self-state:t-1))
-     :peephole-output-gate-delta (times output-gate-delta (:cell-state self-state:t-1))
+     :peephole-output-gate-delta (times output-gate-delta (:cell-state self-state:t-1))}))
 
 
-     }))
+
+(defn encoder-bptt
+  [encoder encoder-activation propagated-delta-from-decoder & [option]]
+  (let [gemv (if-let [it (:gemv option)] it default/gemv)
+        {:keys [output hidden]} encoder
+        {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
+                input-gate-peephole forget-gate-peephole output-gate-peephole
+                unit-num]} hidden]
+    ;looping latest to old
+    (loop [propagated-hidden-to-hidden-delta propagated-delta-from-decoder,
+           output-seq (reverse encoder-activation)
+           self-delta:t+1 (lstm/lstm-delta-zeros unit-num)
+           lstm-state:t+1 (lstm/gate-zeros unit-num)
+           hidden-acc nil]
+      (if (first output-seq)
+        (let [lstm-state (:state (:hidden (first output-seq)))
+              cell-state:t-1 (or (:cell-state (:state (:hidden (second output-seq)))) (float-array unit-num))
+              lstm-part-delta (lstm/lstm-part-delta unit-num propagated-hidden-to-hidden-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
+                                                    input-gate-peephole forget-gate-peephole output-gate-peephole)
+              x-input (:input (first output-seq))
+              self-activation:t-1 (or (:activation (:hidden (second output-seq)))
+                                      (float-array unit-num));when first output time (last time of bptt
+              self-state:t-1      (or (:state (:hidden (second output-seq)))
+                                      {:cell-state (float-array unit-num)});when first output time (last time of bptt)
+              lstm-param-delta (lstm/lstm-param-delta encoder lstm-part-delta x-input self-activation:t-1 self-state:t-1)
+              {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
+              propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
+                                                                (gemv (transpose unit-num w) d))
+                                                              [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
+                                                              [block-delta input-gate-delta forget-gate-delta output-gate-delta])
+                                                         (apply sum))]
+          (recur propagated-hidden-to-hidden-delta:t-1
+                 (rest output-seq)
+                 lstm-part-delta
+                 (:state (:hidden (first output-seq)))
+                 (if (nil? hidden-acc)
+                   lstm-param-delta
+                   (merge-with #(if (map? %1); if sparses
+                                  (merge-with (fn [accw dw]
+                                                (merge-with (fn [acc d]
+                                                              (sum acc d))
+                                                            accw dw))
+                                              %1 %2)
+                                  (sum %1 %2))
+                               hidden-acc lstm-param-delta))))
+        {:hidden-delta hidden-acc}))))
+
 
 (defn decoder-bptt
   [decoder decoder-activation encoder-input output-items-seq & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [output hidden encoder-size input-size]} decoder
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
+                block-we input-gate-we forget-gate-we output-gate-we
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden]
     ;looping latest to old
@@ -160,7 +215,8 @@
            self-delta:t+1 (lstm/lstm-delta-zeros unit-num)
            lstm-state:t+1 (lstm/gate-zeros unit-num)
            output-acc nil
-           hidden-acc nil]
+           hidden-acc nil
+           encoder-delta (float-array encoder-size)]
       (cond
         (and (= :skip (first output-items-seq)) (nil? propagated-hidden-to-hidden-delta))
         (recur (rest output-items-seq)
@@ -169,7 +225,8 @@
                (lstm/lstm-delta-zeros unit-num)
                (lstm/gate-zeros unit-num)
                nil
-               nil)
+               nil
+               encoder-delta)
         (first output-seq)
         (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
               output-delta (condp = (:output-type decoder)
@@ -201,7 +258,7 @@
                                             propagated-output-to-hidden-delta)
               ;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
-              cell-state:t-1 (or (:cell-state (second (:state (second output-seq)))) (float-array unit-num))
+              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (float-array unit-num))
               lstm-part-delta (lstm/lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                     input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (:activation (first output-seq)))
@@ -215,7 +272,12 @@
                                                                 (gemv (transpose unit-num w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                         (apply sum))]
+                                                         (apply sum))
+              propagation-to-encoder (->> (map (fn [w d]
+                                                 (gemv (transpose unit-num w) d))
+                                               [block-we    input-gate-we    forget-gate-we    output-gate-we]
+                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
+                                          (apply sum))]
           (recur (rest output-items-seq)
                  propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
@@ -239,23 +301,22 @@
                                                             accw dw))
                                               %1 %2)
                                   (sum %1 %2))
-                               hidden-acc lstm-param-delta))))
+                               hidden-acc lstm-param-delta))
+                 (sum encoder-delta propagation-to-encoder)))
         :else
         {:output-delta output-acc
-         :hidden-delta hidden-acc}))))
+         :hidden-delta hidden-acc
+         :encoder-delta encoder-delta}))))
 
-(defn bptt
-  [model encoder-x-seq decoder-x-seq decoder-output-items-seq & [option]]
+
+(defn encoder-decoder-bptt
+  [encoder-decoder-model encoder-decoder-forward decoder-output-items-seq & [option]]
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
-        {:keys [encoder decoder]} model
-        encoder-activation (encoder-forward encoder encoder-x-seq option)
-        decoder-activation (decoder-forward decoder decoder-x-seq (:activation (last encoder-activation)) decoder-output-items-seq)
-        _(pprint encoder-activation)
-        _(pprint decoder-activation)
-        ;;         decoder-delta (bptt decoder
-
-        ;;         encode-connection-delta
-        ]))
+        {:keys [encoder decoder]} encoder-decoder-model
+        {encoder-activation :encoder decoder-activation :decoder} encoder-decoder-forward
+        decoder-param-delta (decoder-bptt decoder decoder-activation  (:activation (last encoder-activation)) decoder-output-items-seq option)
+        encoder-param-delta (encoder-bptt encoder encoder-activation (take (count encoder-activation) (repeat :skip)))]
+    {:encoder-param-delta encoder-param-delta :decoder-param-delta decoder-param-delta}))
 
 
 (defn update-decoder!
@@ -318,6 +379,8 @@
                   (float (+ (aget ^floats output-gate-peephole x) (* learning-rate (aget ^floats peephole-output-gate-delta x)))))))
     decoder))
 
+
+(defn update-encoder-decoder! [])
 
 (defn init-decoder
   [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size] :as param}]
