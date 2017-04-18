@@ -44,7 +44,7 @@ Add following dependency to your `project.clj`.
 ### RNNLM
 
 ```
-(use 'prism.nlp.word2vec)
+(use 'prism.nlp.rnnlm)
 
 (make-rnnlm your-training-path model-save-path 100 {:workers 4}
 ;; see Word2Vec section (above) to get to know about these arguments and parameters
