@@ -103,8 +103,9 @@
         hidden-param-delta (if (= :sparse input-type)
                              (param-delta:sparse hidden-delta training-x unit-num)
                              (param-delta hidden-delta training-x))]
-    {:output-delta output-param-delta
-     :hidden-delta hidden-param-delta}))
+    {:param-loss {:output-delta output-param-delta
+                  :hidden-delta hidden-param-delta}
+     :loss output-delta}))
 
 
 (defn update-model! [model param-delta learning-rate]

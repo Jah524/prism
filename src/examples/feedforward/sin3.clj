@@ -17,26 +17,23 @@
     (if-let [training-pair (first training-list)]
       (let [{x :x y :y} training-pair
             forward (ff/network-output model x (keys y))
-            delta-list (ff/back-propagation model forward y)
-            diff (aget ^floats (-> delta-list :output-delta (get "sin-prediction") :bias-delta) 0)
+            {:keys [param-loss loss]} (ff/back-propagation model forward y)
+            diff (get loss "sin-prediction")
             loss (* diff diff 0.5)] ; sum-of-squares-error
-        (recur (ff/update-model! model delta-list learning-rate)
+        (recur (ff/update-model! model param-loss learning-rate)
                (rest training-list)
                (inc n)
                (+ acc-loss loss)))
       {:loss (/ acc-loss n) :model model})))
 
 (defn train [model training-pair-list & [option]]
-  (let [{:keys [optimizer learning-rate epoc loss-interval label label-interval]
-         :or {optimizer :sgd learning-rate 0.1 epoc 10000 loss-interval 1000}} option]
+  (let [{:keys [learning-rate epoc loss-interval label label-interval]
+         :or {learning-rate 0.1 epoc 10000 loss-interval 1000}} option]
     (loop [model model, e 0]
       (if (<= e epoc)
-        (let [opt (condp = optimizer
-                    :sgd train-sgd)
-              {loss :loss updated-model :model} (opt model (shuffle training-pair-list) learning-rate)]
+        (let [{loss :loss updated-model :model} (train-sgd model (shuffle training-pair-list) learning-rate)]
           (when (= 0 (rem e loss-interval))
             (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
-                          ", optimizer: " (.toUpperCase (name optimizer))
                           ", learning-rate: " learning-rate ", loss: " loss)))
           (recur updated-model  (inc e)))
         model))))

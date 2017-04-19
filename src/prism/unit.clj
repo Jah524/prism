@@ -49,11 +49,12 @@
   (let [negatives (remove (fn [n] (some #(= % n) positives)) negatives)
         ps (map (fn [p] [p (float (- 1 (get activation p)))]) positives)
         ns (map (fn [n] [n (float (- (get activation n)))]) negatives)]
-    (vec (concat ps ns))))
+    (reduce (fn [acc [k v]] (assoc acc k v)) {} (concat ps ns))))
 
 (defn prediction-error
   [activation expectation]
   (when-not (= :skip expectation)
     (->> expectation
-         (mapv (fn [[item expect-value]]
-                 [item (float (- expect-value (get activation item)))])))))
+         (reduce (fn [acc [item expect-value]]
+                   (assoc acc item (float (- expect-value (get activation item)))))
+                 {}))))
