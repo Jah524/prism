@@ -114,6 +114,7 @@
           {w-delta1 :w-delta bias-delta1 :bias-delta} (get output-delta "prediction1")
           {w-delta2 :w-delta bias-delta2 :bias-delta} (get output-delta "prediction2")
           {w-delta3 :w-delta bias-delta3 :bias-delta} (get output-delta "prediction3")]
+      (is (= loss {"prediction1" (float -0.5187849), "prediction2" (float -1.5187849), "prediction3" (float -0.5187849)}))
       (is (= (vec (get (:w-delta hidden-delta) "language"))
              (map float [-0.47898382 -0.45476127])))
       (is (= (vec (:bias-delta hidden-delta))
