@@ -53,8 +53,7 @@
         {:keys [wl em input-type]} model
         wl-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wl "<unk>"))
         neg-cum (uniform->cum-uniform wl-unif)
-        tmp-error (atom 0)
-        tmp-error-targets (atom 1)
+        tmp-loss (atom 0)
         cache-size 100000
         local-counter (atom 0)
         done? (atom false)]
@@ -74,18 +73,23 @@
                           {:keys [x y]} (add-negatives rnnlm-pair negative (shuffle (take (* (count (:x rnnlm-pair)) negative)
                                                                                           (cycle neg-pool))))]
                       (try
-                        (let [delta-list (lstm/bptt model x y option)
-                              errors (->> delta-list :output-delta vals (map #(Math/abs (aget ^float (:bias-delta %) 0))))]
-                          (swap! tmp-error #(+ %1 (reduce + errors)))
-                          (swap! tmp-error-targets #(+ %1 (count errors)))
-                          (lstm/update-model! model delta-list learning-rate))
+                        (let [forward (lstm/sequential-output model x (map #(apply clojure.set/union (vals %)) y))
+                              {:keys [param-loss loss]} (lstm/bptt model forward y option)
+                              loss-seq (->> loss
+                                            (map #(/ (->> % ; by 1 target and some negatives
+                                                          (map (fn [[_ v]] (Math/abs v)))
+                                                          (reduce +))
+                                                     (inc negative))))];; loss per output-item
+                          (swap! tmp-loss #(+ %1 (/ (reduce + loss-seq) (count loss-seq))));; loss per word in line
+                          (lstm/update-model! model param-loss learning-rate))
                         (catch Exception e
                           (do
                             ;; debug purpose
                             (clojure.stacktrace/print-stack-trace e)
                             (println line)
                             (pprint x)
-                            (pprint y))))
+                            (pprint y)
+                            (Thread/sleep 60000))))
                       (recur (if (< (count rest-negatives) (* 10 negative))
                                (samples neg-cum (* negative cache-size))
                                rest-negatives)))))
@@ -94,9 +98,8 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", error: " (float (/ @tmp-error @tmp-error-targets))))
-            (reset! tmp-error 0)
-            (reset! tmp-error-targets 1)
+            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float @tmp-loss)))
+            (reset! tmp-loss 0)
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
             (recur next-counter))))
