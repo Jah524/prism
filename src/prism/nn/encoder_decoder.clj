@@ -162,9 +162,9 @@
                 unit-num]} hidden]
     ;looping latest to old
     (loop [propagated-hidden-to-hidden-delta propagated-delta-from-decoder,
-           output-seq (reverse encoder-activation)
-           self-delta:t+1 (lstm/lstm-delta-zeros unit-num)
-           lstm-state:t+1 (lstm/gate-zeros unit-num)
+           output-seq (reverse encoder-activation),
+           self-delta:t+1 (lstm/lstm-delta-zeros unit-num),
+           lstm-state:t+1 (lstm/gate-zeros unit-num),
            hidden-acc nil]
       (if (first output-seq)
         (let [lstm-state (:state (:hidden (first output-seq)))
@@ -209,13 +209,14 @@
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden]
     ;looping latest to old
-    (loop [output-items-seq (reverse output-items-seq)
+    (loop [output-items-seq (reverse output-items-seq),
            propagated-hidden-to-hidden-delta nil,
-           output-seq (reverse decoder-activation)
-           self-delta:t+1 (lstm/lstm-delta-zeros unit-num)
-           lstm-state:t+1 (lstm/gate-zeros unit-num)
-           output-acc nil
-           hidden-acc nil
+           output-seq (reverse decoder-activation),
+           self-delta:t+1 (lstm/lstm-delta-zeros unit-num),
+           lstm-state:t+1 (lstm/gate-zeros unit-num),
+           output-loss [],
+           output-acc nil,
+           hidden-acc nil,
            encoder-delta (float-array encoder-size)]
       (cond
         (and (= :skip (first output-items-seq)) (nil? propagated-hidden-to-hidden-delta))
@@ -224,6 +225,7 @@
                (rest output-seq)
                (lstm/lstm-delta-zeros unit-num)
                (lstm/gate-zeros unit-num)
+               output-loss
                nil
                nil
                encoder-delta)
@@ -283,6 +285,7 @@
                  (rest output-seq)
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
+                 (cons output-delta output-loss)
                  (if (nil? output-acc)
                    output-param-delta
                    (merge-with #(if (map? %1); if sparses
@@ -304,9 +307,10 @@
                                hidden-acc lstm-param-delta))
                  (sum encoder-delta propagation-to-encoder)))
         :else
-        {:output-delta output-acc
-         :hidden-delta hidden-acc
-         :encoder-delta encoder-delta}))))
+        {:param-loss {:output-delta output-acc
+                      :hidden-delta hidden-acc
+                      :encoder-delta encoder-delta}
+         :loss output-loss}))))
 
 
 (defn encoder-decoder-bptt
@@ -314,9 +318,10 @@
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [encoder decoder]} encoder-decoder-model
         {encoder-activation :encoder decoder-activation :decoder} encoder-decoder-forward
-        decoder-param-delta (decoder-bptt decoder decoder-activation  (:activation (:hidden (last encoder-activation))) decoder-output-items-seq option)
+        {loss :loss decoder-param-delta :param-loss} (decoder-bptt decoder decoder-activation  (:activation (:hidden (last encoder-activation))) decoder-output-items-seq option)
         encoder-param-delta (encoder-bptt encoder encoder-activation (:encoder-delta decoder-param-delta) option)]
-    {:encoder-param-delta encoder-param-delta :decoder-param-delta decoder-param-delta}))
+    {:loss loss
+     :param-loss {:encoder-param-delta encoder-param-delta :decoder-param-delta decoder-param-delta}}))
 
 
 (defn update-decoder!

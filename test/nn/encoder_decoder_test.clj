@@ -345,15 +345,16 @@
       (is (= (count (remove zero? (:peephole-output-gate-delta hd))) 5))))
   (testing "decoder-bptt"
     (let [encoder-input (float-array (take 5 (repeat (float -0.1))))
-          {hd :hidden-delta od :output-delta ed :encoder-delta}
-          (decoder-bptt decoder-sample-network
-                        (decoder-forward decoder-sample-network
-                                         (map float-array [[2 0 0] [1 0 0]])
-                                         encoder-input
-                                         [:skip #{"prediction1" "prediction2" "prediction3"}])
-                        encoder-input
-                        [:skip {:pos ["prediction2"] :neg ["prediction3"]}])
+          {:keys [loss param-loss]} (decoder-bptt decoder-sample-network
+                                                  (decoder-forward decoder-sample-network
+                                                                   (map float-array [[2 0 0] [1 0 0]])
+                                                                   encoder-input
+                                                                   [:skip #{"prediction1" "prediction2" "prediction3"}])
+                                                  encoder-input
+                                                  [:skip {:pos ["prediction2"] :neg ["prediction3"]}])
+          {hd :hidden-delta od :output-delta ed :encoder-delta} param-loss
           {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta]} (get od "prediction2")]
+      (is (= loss [{} {"prediction2" (float 0.673144), "prediction3" (float -0.326856)}]))
       (is (= (count (:block-w-delta                 hd)) 30))
       (is (= (count (remove zero? (:block-w-delta   hd))) 10))
       (is (= (count (remove zero? (:block-wr-delta  hd))) 100))
@@ -393,26 +394,26 @@
              (take 5 (repeat (float -4.5863548E-4)))))))
 
   (testing "encoder-decoder-bptt"
-    (let [{:keys [encoder-param-delta decoder-param-delta]}
-          (encoder-decoder-bptt sample-encoder-decoder
-                                (encoder-decoder-forward sample-encoder-decoder
-                                                         (map float-array [[2 0 0] [0 -1 1]])
-                                                         (map float-array [[-1 1 -1] [2 -1 1]])
-                                                         [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
-                                [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}])]
+    (let [{:keys [loss param-loss]} (encoder-decoder-bptt sample-encoder-decoder
+                                                          (encoder-decoder-forward sample-encoder-decoder
+                                                                                   (map float-array [[2 0 0] [0 -1 1]])
+                                                                                   (map float-array [[-1 1 -1] [2 -1 1]])
+                                                                                   [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
+                                                          [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}])
+          {:keys [encoder-param-delta decoder-param-delta]} param-loss]
       (is (not (nil? encoder-param-delta)))
       (is (not (nil? decoder-param-delta)))))
 
   (testing "update-decoder!"
     (let [encoder-input (float-array (take 5 (repeat (float -0.1))))
           result (update-decoder! decoder-sample-network
-                                  (decoder-bptt decoder-sample-network
-                                                (decoder-forward decoder-sample-network
-                                                                 (map float-array [[2 0 0] [1 0 0]])
-                                                                 encoder-input
-                                                                 [:skip #{"prediction1" "prediction2" "prediction3"}])
-                                                encoder-input
-                                                [:skip {:pos ["prediction2"] :neg ["prediction3"]}])
+                                  (:param-loss (decoder-bptt decoder-sample-network
+                                                             (decoder-forward decoder-sample-network
+                                                                              (map float-array [[2 0 0] [1 0 0]])
+                                                                              encoder-input
+                                                                              [:skip #{"prediction1" "prediction2" "prediction3"}])
+                                                             encoder-input
+                                                             [:skip {:pos ["prediction2"] :neg ["prediction3"]}]))
                                   0.1)
           {hd :hidden o :output} result]
       (is (= (count (:block-w hd)) 30))
@@ -477,12 +478,12 @@
   (testing "update-encoder-decoder!"
     (let [encoder-input (float-array (take 5 (repeat (float -0.1))))]
       (update-encoder-decoder! sample-encoder-decoder
-                               (encoder-decoder-bptt sample-encoder-decoder
-                                                     (encoder-decoder-forward sample-encoder-decoder
-                                                                              (map float-array [[2 0 0] [0 -1 1]])
-                                                                              (map float-array [[-1 1 -1] [2 -1 1]])
-                                                                              [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
-                                                     [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}])
+                               (:param-loss (encoder-decoder-bptt sample-encoder-decoder
+                                                                  (encoder-decoder-forward sample-encoder-decoder
+                                                                                           (map float-array [[2 0 0] [0 -1 1]])
+                                                                                           (map float-array [[-1 1 -1] [2 -1 1]])
+                                                                                           [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
+                                                                  [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}]))
                                0.01)
       (let [{:keys [encoder decoder]} sample-encoder-decoder
             {eh :hidden __ :output} encoder
@@ -525,9 +526,5 @@
           (is (= 1 (count bias)))
           (is (= 5 (count encoder-w)))
           (is (= 3 (count previous-input-w))))))))
-
-
-
-
 
 
