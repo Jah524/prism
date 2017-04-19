@@ -1,15 +1,17 @@
 (ns prism.nlp.word2vec
-  (:require [clojure.string :refer [split]]
-            [clojure.java.io :refer [reader writer]]
-            [clojure.core.async :refer [go go-loop]]
-            [clj-time.local :as l]
-            [clj-time.core  :as t]
-            [clojure.data.json :as json]
-            [matrix.default :as default]
-            [prism.util :refer [l2-normalize l2-normalize! similarity] :as util]
-            [prism.unit :refer [activation model-rand]]
-            [prism.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
-            [prism.nn.feedforward :as ff]))
+  (:require
+    [clojure.pprint :refer [pprint]]
+    [clojure.string :refer [split]]
+    [clojure.java.io :refer [reader writer]]
+    [clojure.core.async :refer [go go-loop]]
+    [clj-time.local :as l]
+    [clj-time.core  :as t]
+    [clojure.data.json :as json]
+    [matrix.default :as default]
+    [prism.util :refer [l2-normalize l2-normalize! similarity] :as util]
+    [prism.unit :refer [activation model-rand]]
+    [prism.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
+    [prism.nn.feedforward :as ff]))
 
 
 (defn subsampling [word freq t]
@@ -92,11 +94,21 @@
                       sg (skip-gram-training-pair wl all-word-token (split train-line #" ") option)
                       next-negatives (drop (* negative (count sg)) negatives)]
                   (dorun (map-indexed (fn [i [target context]]
-                                        (ff/train! w2v-model
-                                                   (set [target])
-                                                   {:pos (set context) :neg (->> negatives (drop (* negative i)) (take negative) vec)}
-                                                   learning-rate
-                                                   option))
+                                        (let [positive-items (set context)
+                                              negative-items (->> negatives (drop (* negative i)) (take negative) set)
+                                              all-items (clojure.set/union positive-items negative-items)]
+                                          (try
+                                            (let [forward (ff/network-output w2v-model (set [target]) all-items option)
+                                                  param-delta (ff/back-propagation w2v-model forward {:pos positive-items :neg negative-items} option)]
+                                              (ff/update-model! w2v-model param-delta learning-rate))
+                                            (catch Exception e
+                                              (do
+                                                ;; debug purpose
+                                                (clojure.stacktrace/print-stack-trace e)
+                                                (println train-line)
+                                                (pprint target)
+                                                (pprint all-items)
+                                                (Thread/sleep 60000))))))
                                       sg))
                   (swap! local-counter inc)
                   (recur (if (empty? next-negatives)

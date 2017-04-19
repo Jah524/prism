@@ -163,8 +163,3 @@
      :input-type input-type
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
-
-(defn train!
-  [model x-input training learning-rate & [option]]
-  (let [param-delta (back-propagation model x-input training option)]
-    (update-model! model param-delta learning-rate)))
