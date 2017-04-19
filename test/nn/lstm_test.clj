@@ -355,13 +355,14 @@
       (is (= (count (:output-gate-delta result)) 10))))
 
   (testing "bptt with dense binary classification"
-    (let [result (bptt sample-w-network
-                       (sequential-output sample-w-network
-                                          [(float-array [0 1 0]) (float-array [2 0 0])]
-                                          [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
-                       [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
-          hd (:hidden-delta result)
-          od (:output-delta result)]
+    (let [{:keys [param-loss loss]} (bptt sample-w-network
+                                          (sequential-output sample-w-network
+                                                             [(float-array [0 1 0]) (float-array [2 0 0])]
+                                                             [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
+                                          [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
+          {hd :hidden-delta od :output-delta} param-loss]
+      (is (= (count loss) 2))
+      (is (= loss [{"prediction1" (float 0.74250054) "prediction3" (float -0.25749943)} {"prediction2" (float 0.746551) "prediction3" (float -0.25344902)}]))
       (is (= (count (:block-w-delta                 hd)) 30))
       (is (= (count (remove zero? (:block-w-delta   hd))) 20))
       (is (= (count (remove zero? (:block-wr-delta  hd))) 100))
@@ -389,27 +390,29 @@
 
 
   (testing "bptt with sparse model"
-    (let [result (bptt sample-w-network-sparse
-                       (sequential-output sample-w-network-sparse
-                                          [{"language" (float 1)} {"processing" (float 1)}]
-                                          [:skip ["prediction1" "prediction3"]])
-                       [:skip {:pos ["prediction1"] :neg ["prediction3"]}])
-          hd (:hidden-delta result)
-          od (:output-delta result)
+    (let [{:keys [param-loss loss]} (bptt sample-w-network-sparse
+                                          (sequential-output sample-w-network-sparse
+                                                             [{"language" (float 1)} {"processing" (float 1)}]
+                                                             [:skip ["prediction1" "prediction3"]])
+                                          [:skip {:pos ["prediction1"] :neg ["prediction3"]}])
+          {hd :hidden-delta od :output-delta} param-loss
           it (:sparses-delta hd)]
+      (is (= (count loss) 2))
+      (is (= loss [{} {"prediction1" (float 0.7452561) "prediction3" (float -0.25474387)}]))
       (is (= (count (:block-w-delta (get it "natural"))) 0))
       (is (= (count (:block-w-delta (get it "language"))) 10))
       (is (= (count (:block-w-delta (get it "processing"))) 10))))
 
   (testing "bptt with sparse prediction"
-    (let [result (bptt sample-w-network-prediction
-                       (sequential-output sample-w-network-prediction
-                                          [{"natural" (float 1)} {"processing" (float 1)}]
-                                          [:skip ["prediction"]])
-                       [:skip {"prediction" 20}])
-          hd (:hidden-delta result)
-          o  (:output-delta result)
+    (let [{:keys [param-loss loss]} (bptt sample-w-network-prediction
+                                          (sequential-output sample-w-network-prediction
+                                                             [{"natural" (float 1)} {"processing" (float 1)}]
+                                                             [:skip ["prediction"]])
+                                          [:skip {"prediction" 20}])
+          {hd :hidden-delta o :output-delta} param-loss
           it (:sparses-delta hd)]
+      (is (= (count loss) 2))
+      (is (= loss [{} {"prediction" (float 21.07347)}]))
       (is (= (count (:block-w-delta (get it "natural"))) 10))
       (is (= (count (:block-w-delta (get it "language"))) 0))
       (is (= (count (:block-w-delta (get it "processing"))) 10))))
@@ -417,11 +420,11 @@
 
   (testing "update-model! with dense model"
     (let [result (update-model! sample-w-network
-                                (bptt sample-w-network
-                                      (sequential-output sample-w-network
-                                                         [(float-array [0 1 0]) (float-array [2 0 0])]
-                                                         [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
-                                      [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
+                                (:param-loss (bptt sample-w-network
+                                                   (sequential-output sample-w-network
+                                                                      [(float-array [0 1 0]) (float-array [2 0 0])]
+                                                                      [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
+                                                   [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}]))
                                 0.1)
           hd (:hidden result)]
       (is (= (count (:block-w hd)) 30))
@@ -463,11 +466,11 @@
 
   (testing "update-model! with sparse model"
     (let [result (update-model! sample-w-network-sparse
-                                (bptt sample-w-network-sparse
-                                      (sequential-output sample-w-network-sparse
-                                                         [{"language" (float 1)} {"processing" (float 1)}]
-                                                         [:skip ["prediction1" "prediction3"]])
-                                      [:skip {:pos ["prediction1"] :neg ["prediction3"]}])
+                                (:param-loss(bptt sample-w-network-sparse
+                                                  (sequential-output sample-w-network-sparse
+                                                                     [{"language" (float 1)} {"processing" (float 1)}]
+                                                                     [:skip ["prediction1" "prediction3"]])
+                                                  [:skip {:pos ["prediction1"] :neg ["prediction3"]}]))
                                 0.1)
           hd (:hidden result)
           sparses (:sparses hd)]

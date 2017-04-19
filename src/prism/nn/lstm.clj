@@ -205,12 +205,13 @@
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden]
     ;looping latest to old
-    (loop [output-items-seq (reverse output-items-seq)
+    (loop [output-items-seq (reverse output-items-seq),
            propagated-hidden-to-hidden-delta nil,
-           output-seq (reverse activation)
-           self-delta:t+1 (lstm-delta-zeros unit-num)
-           lstm-state:t+1 (gate-zeros unit-num)
-           output-acc nil
+           output-seq (reverse activation),
+           self-delta:t+1 (lstm-delta-zeros unit-num),
+           lstm-state:t+1 (gate-zeros unit-num),
+           output-loss [],
+           output-acc nil,
            hidden-acc nil]
       (cond
         (and (= :skip (first output-items-seq)) (nil? propagated-hidden-to-hidden-delta))
@@ -219,6 +220,7 @@
                (rest output-seq)
                (lstm-delta-zeros unit-num)
                (gate-zeros unit-num)
+               output-loss
                nil
                nil)
         (first output-seq)
@@ -265,6 +267,7 @@
                  (rest output-seq)
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
+                 (cons output-delta output-loss)
                  (if (nil? output-acc)
                    output-param-delta
                    (merge-with #(if (map? %1); if sparses
@@ -285,8 +288,9 @@
                                   (sum %1 %2))
                                hidden-acc lstm-param-delta))))
         :else
-        {:output-delta output-acc
-         :hidden-delta hidden-acc}))))
+        {:param-loss  {:output-delta output-acc
+                       :hidden-delta hidden-acc}
+         :loss output-loss}))))
 
 
 (defn update-model!

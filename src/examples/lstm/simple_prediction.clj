@@ -12,12 +12,12 @@
     (if-let [training-pair (first training-list)]
       (let [{x-seq :x y-seq :y} training-pair
             forward (lstm/sequential-output model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
-            delta-list (lstm/bptt model
-                                  forward
-                                  y-seq)
-            diff (aget ^floats (-> delta-list :output-delta (get "prediction") :bias-delta) 0)
+            {:keys [loss param-loss]} (lstm/bptt model
+                                                 forward
+                                                 y-seq)
+            diff (get (last loss) "prediction") ; last time loss
             loss (* diff diff 0.5)] ; sum-of-squares-error
-        (recur (lstm/update-model! model delta-list learning-rate)
+        (recur (lstm/update-model! model param-loss learning-rate)
                (rest training-list)
                (inc n)
                (+ acc-loss loss)))

@@ -53,7 +53,8 @@
 
 (defn prediction-error
   [activation expectation]
-  (when-not (= :skip expectation)
+  (if (= :skip expectation)
+    {}
     (->> expectation
          (reduce (fn [acc [item expect-value]]
                    (assoc acc item (float (- expect-value (get activation item)))))
