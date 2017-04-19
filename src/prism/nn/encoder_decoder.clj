@@ -314,8 +314,8 @@
   (let [gemv (if-let [it (:gemv option)] it default/gemv)
         {:keys [encoder decoder]} encoder-decoder-model
         {encoder-activation :encoder decoder-activation :decoder} encoder-decoder-forward
-        decoder-param-delta (decoder-bptt decoder decoder-activation  (:activation (last encoder-activation)) decoder-output-items-seq option)
-        encoder-param-delta (encoder-bptt encoder encoder-activation (take (count encoder-activation) (repeat :skip)))]
+        decoder-param-delta (decoder-bptt decoder decoder-activation  (:activation (:hidden (last encoder-activation))) decoder-output-items-seq option)
+        encoder-param-delta (encoder-bptt encoder encoder-activation (:encoder-delta decoder-param-delta) option)]
     {:encoder-param-delta encoder-param-delta :decoder-param-delta decoder-param-delta}))
 
 
@@ -380,7 +380,14 @@
     decoder))
 
 
-(defn update-encoder-decoder! [])
+(defn update-encoder-decoder!
+  [encoder-decoder-model encoder-decoder-param-delta learning-rate]
+  (let[{:keys [encoder decoder]} encoder-decoder-model
+       {:keys [encoder-param-delta decoder-param-delta]} encoder-decoder-param-delta]
+    (lstm/update-model! encoder encoder-param-delta learning-rate)
+    (update-decoder!    decoder decoder-param-delta learning-rate)
+    encoder-decoder-model))
+
 
 (defn init-decoder
   [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size] :as param}]

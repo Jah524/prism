@@ -391,18 +391,18 @@
       ;; encoder-delta
       (is (= (vec ed)
              (take 5 (repeat (float -4.5863548E-4)))))))
-  (comment
-    (testing "encoder-decoder-bptt"
-      (let [{:keys [encoder-param-delta decoder-param-delta]}
-            (encoder-decoder-bptt sample-encoder-decoder
-                                  (encoder-decoder-forward sample-encoder-decoder
-                                                           (map float-array [[2 0 0] [0 -1 1]])
-                                                           (map float-array [[-1 1 -1] [2 -1 1]])
-                                                           [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
-                                  [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}])]
-        (pprint encoder-param-delta)
-        (is (= :fixme encoder-param-delta))))
-    )
+
+  (testing "encoder-decoder-bptt"
+    (let [{:keys [encoder-param-delta decoder-param-delta]}
+          (encoder-decoder-bptt sample-encoder-decoder
+                                (encoder-decoder-forward sample-encoder-decoder
+                                                         (map float-array [[2 0 0] [0 -1 1]])
+                                                         (map float-array [[-1 1 -1] [2 -1 1]])
+                                                         [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
+                                [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}])]
+      (is (not (nil? encoder-param-delta)))
+      (is (not (nil? decoder-param-delta)))))
+
   (testing "update-decoder!"
     (let [encoder-input (float-array (take 5 (repeat (float -0.1))))
           result (update-decoder! decoder-sample-network
@@ -473,4 +473,61 @@
         (is (= (vec encoder-w)
                (take 5 (repeat (float 0.30326858)))))
         (is (= (vec previous-input-w)
-               (map float [0.1846288 0.25 0.25])))))))
+               (map float [0.1846288 0.25 0.25]))))))
+  (testing "update-encoder-decoder!"
+    (let [encoder-input (float-array (take 5 (repeat (float -0.1))))]
+      (update-encoder-decoder! sample-encoder-decoder
+                               (encoder-decoder-bptt sample-encoder-decoder
+                                                     (encoder-decoder-forward sample-encoder-decoder
+                                                                              (map float-array [[2 0 0] [0 -1 1]])
+                                                                              (map float-array [[-1 1 -1] [2 -1 1]])
+                                                                              [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
+                                                     [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}])
+                               0.01)
+      (let [{:keys [encoder decoder]} sample-encoder-decoder
+            {eh :hidden __ :output} encoder
+            {dh :hidden do :output} decoder]
+        ;; encoder
+        (is (= (count (:block-w eh)) 15))
+        (is (= (count (:block-wr eh)) 25))
+        (is (= (count (:input-gate-w eh)) 15))
+        (is (= (count (:input-gate-wr eh)) 25))
+        (is (= (count (:forget-gate-w eh)) 15))
+        (is (= (count (:forget-gate-wr eh)) 25))
+        (is (= (count (:output-gate-w eh)) 15))
+        (is (= (count (:output-gate-wr eh)) 25))
+
+        ;; Caution! decoder's parameter already have updated by above test.
+        (is (= (count (:block-w dh)) 30))
+        (is (= (count (:block-wr dh)) 100))
+        (is (= (count (:input-gate-w dh)) 30))
+        (is (= (count (:input-gate-wr dh)) 100))
+        (is (= (count (:forget-gate-w dh)) 30))
+        (is (= (count (:forget-gate-wr dh)) 100))
+        (is (= (count (:output-gate-w dh)) 30))
+        (is (= (count (:output-gate-wr dh)) 100))
+        ;; encoder connection
+        (is (= (vec (:block-we dh))
+               (concat (take 5 (repeat (float 0.019982642)))
+                       (take 45 (repeat (float 0.02))))))
+        (is (= (vec (:input-gate-we dh))
+               (concat (take 5 (repeat (float 0.020020049)))
+                       (take 45 (repeat (float 0.02))))))
+        (is (= (vec (:forget-gate-we dh))
+               (concat (take 5 (repeat (float 0.020004272)))
+                       (take 45 (repeat (float 0.02))))))
+        (is (= (vec (:output-gate-we dh))
+               (concat (take 5 (repeat (float 0.020020423)))
+                       (take 45 (repeat (float 0.02))))))
+        ;; decoder output
+        (let [{:keys [w bias encoder-w previous-input-w]} (get do "prediction1")]
+          (is (= 10 (count w)))
+          (is (= 1 (count bias)))
+          (is (= 5 (count encoder-w)))
+          (is (= 3 (count previous-input-w))))))))
+
+
+
+
+
+
