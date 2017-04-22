@@ -9,14 +9,14 @@
     [prism.sampling :refer [uniform->cum-uniform samples]]))
 
 (defn convert-rare-word-to-unk
-  [wl word]
-  (if (get wl word) word "<unk>"))
+  [wc word]
+  (if (get wc word) word "<unk>"))
 
 (defn tok->rnnlm-pairs
-  [wl tok-line]
+  [wc tok-line]
   (let [words (->> (str/split tok-line #" ")
                    (remove #(or (re-find #" |　" %) (= "" %)))
-                   (map #(convert-rare-word-to-unk wl %)))]
+                   (map #(convert-rare-word-to-unk wc %)))]
     (if (empty? words)
       :skip
       (loop [coll words,
@@ -50,9 +50,9 @@
         initial-learning-rate (or (:learning-rate option) 0.05)
         min-learning-rate (or (:min-learning-rate option) 0.001)
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
-        {:keys [wl em input-type]} model
-        wl-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wl "<unk>"))
-        neg-cum (uniform->cum-uniform wl-unif)
+        {:keys [wc em input-type]} model
+        wc-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wc "<unk>"))
+        neg-cum (uniform->cum-uniform wc-unif)
         tmp-loss (atom 0)
         cache-size 100000
         local-counter (atom 0)
@@ -63,7 +63,7 @@
               (if-let [line (.readLine r)]
                 (let [;progress (/ @local-counter all-lines-num)
                        learning-rate initial-learning-rate;(max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
-                       rnnlm-pair (tok->rnnlm-pairs wl line)]
+                       rnnlm-pair (tok->rnnlm-pairs wc line)]
                   (swap! local-counter inc)
                   (if (= :skip rnnlm-pair)
                     (recur negatives)
@@ -108,23 +108,23 @@
 
 
 (defn init-rnnlm-model
-  [wl hidden-size]
-  (let [wl-set (conj (set (keys wl)) "<eos>")]
+  [wc hidden-size]
+  (let [wc-set (conj (set (keys wc)) "<eos>")]
     (-> (lstm/init-model {:input-type :sparse
-                          :input-items wl-set
+                          :input-items wc-set
                           :input-size nil
                           :hidden-size hidden-size
                           :output-type :binary-classification
-                          :output-items wl-set
+                          :output-items wc-set
                           :activation :linear})
-        (assoc :wl wl))))
+        (assoc :wc wc))))
 
 (defn make-rnnlm
   [training-path export-path hidden-size & [option]]
   (let [_(println "making word list...")
-        wl (util/make-wl training-path option)
+        wc (util/make-wc training-path option)
         _(println "done")
-        model (init-rnnlm-model wl hidden-size)
+        model (init-rnnlm-model wc hidden-size)
         model-path     (str export-path ".rnnlm")]
     (train-rnnlm! model training-path option)
     (println (str "Saving RNNLM model as " model-path))

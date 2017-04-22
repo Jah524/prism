@@ -18,11 +18,11 @@
       (is (= 1 (count (ffirst coll))))
       (is (not (zero? (count (second (first coll))))))))
   (testing "init-w2v-model"
-    (let [{:keys [hidden wl input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10)
+    (let [{:keys [hidden wc input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10)
           {:keys [unit-num]} hidden]
       (is (= unit-num 10))
       (is (= input-type :sparse))
       (is (= output-type :binary-classification))
-      (is (= (count (keys wl)) 3)))))
+      (is (= (count (keys wc)) 3)))))
 
 

@@ -27,11 +27,11 @@
        (format "(%.3f" (float (* 100 (/ done all))))
        "%)"))
 
-(defn make-wl
+(defn make-wc
   [input-file & [option]]
-  (let [{:keys [min-count wl workers interval-ms step]
+  (let [{:keys [min-count wc workers interval-ms step]
          :or {min-count 5
-              wl {}
+              wc {}
               workers 4
               interval-ms 30000 ; 30 seconds
               step 1000000}} option
@@ -39,21 +39,21 @@
         over-all     (atom 0)
         done-lines   (atom 0)
         done-workers (atom 0)
-        all-wl (atom {})]
+        all-wc (atom {})]
     (with-open [r (reader input-file)]
       (dotimes [w workers]
-        (go-loop [local-wl {} local-counnter step]
+        (go-loop [local-wc {} local-counnter step]
                  (if-let [line (.readLine r)]
                    (let [word-freq (frequencies (remove #(or (= "<eos>" %) (= "" %) (= " " %) (= "　" %)) (str/split line #" ")))
-                         updated-wl (merge-with + local-wl word-freq)]
+                         updated-wc (merge-with + local-wc word-freq)]
                      (swap! done-lines inc)
                      (if (zero? local-counnter)
                        (do
-                         (reset! all-wl (merge-with + @all-wl updated-wl))
+                         (reset! all-wc (merge-with + @all-wc updated-wc))
                          (recur {} step))
-                       (recur updated-wl (dec step))))
+                       (recur updated-wc (dec step))))
                    (do
-                     (reset! all-wl (merge-with + @all-wl local-wl))
+                     (reset! all-wc (merge-with + @all-wc local-wc))
                      (swap! done-workers inc)))))
       (loop [c 0]
         (if-not (= @done-workers workers)
@@ -66,8 +66,8 @@
           (reduce (fn [acc [k v]] (if (>= v min-count)
                                     (assoc acc k (+ v (get acc k 0)))
                                     (assoc acc "<unk>" (+ v (get acc "<unk>" 0)))))
-                  wl
-                  @all-wl))))))
+                  wc
+                  @all-wc))))))
 
 
 (defn l2-normalize

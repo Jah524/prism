@@ -39,19 +39,19 @@
         acc))))
 
 (defn skip-gram-training-pair
-  [wl all-word-token words & [option]]
+  [wc all-word-token words & [option]]
   (let [sample (or (:sample option) 1.0e-3)
         window-size (or (:window-size option) 5)
         words (->> words
                    (remove #(= % ""))
-                   (keep #(when-let [target-freq (get wl %)]
+                   (keep #(when-let [target-freq (get wc %)]
                             (subsampling % (/ target-freq all-word-token) sample)))
                    (into-array String))
         windows (sg-windows words window-size)]
     (->> windows
          (keep #(let [local-window-size (quot (dec (count %)) 2)
                       target (aget ^objects % local-window-size)
-                      target-freq (get wl target)]
+                      target-freq (get wc target)]
                   (when (not (nil? target-freq))
                     (let [context (object-array (* 2 local-window-size))
                           _ (dotimes [x local-window-size]
@@ -75,13 +75,13 @@
               initial-learning-rate 0.025
               min-learning-rate　0.0001}} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
-        wl (:wl w2v-model)
-        neg-wl (dissoc wl "<unk>")
+        wc (:wc w2v-model)
+        neg-wc (dissoc wc "<unk>")
         _(println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
-        wl-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} neg-wl)
-        neg-cum (uniform->cum-uniform wl-unif)
+        wc-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} neg-wc)
+        neg-cum (uniform->cum-uniform wc-unif)
         _(println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] done"))
-        all-word-token (reduce #(+ %1 (second %2)) 0 neg-wl)
+        all-word-token (reduce #(+ %1 (second %2)) 0 neg-wc)
 
         local-counter (atom 0)
         done? (atom false)]
@@ -91,7 +91,7 @@
               (if-let [train-line (.readLine r)]
                 (let [progress (/ @local-counter all-lines-num)
                       learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
-                      sg (skip-gram-training-pair wl all-word-token (split train-line #" ") option)
+                      sg (skip-gram-training-pair wc all-word-token (split train-line #" ") option)
                       next-negatives (drop (* negative (count sg)) negatives)]
                   (dorun (map-indexed (fn [i [target context]]
                                         (let [positive-items (set context)
@@ -128,24 +128,24 @@
     :done))
 
 (defn init-w2v-model
-  [wl hidden-size]
-  (let [wl-set (set (keys wl))]
+  [wc hidden-size]
+  (let [wc-set (set (keys wc))]
     (-> (ff/init-model {:input-type :sparse
-                        :input-items wl-set
+                        :input-items wc-set
                         :input-size nil
                         :hidden-size hidden-size
                         :output-type :binary-classification
-                        :output-items wl-set
+                        :output-items wc-set
                         :activation :linear})
-        (assoc :wl wl))))
+        (assoc :wc wc))))
 
 (defn save-embedding
   "top-n = 0 represents all words"
   ([model path] (save-embedding model path false 0))
   ([model path replace? top-n]
-   (let [{:keys [hidden wl]} model
+   (let [{:keys [hidden wc]} model
          word-em (:w hidden)
-         considered (set (->> (dissoc wl "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
+         considered (set (->> (dissoc wc "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
          word-em (if (or (zero? top-n) (= :all top-n))
                    word-em
                    (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} word-em))]
@@ -159,9 +159,9 @@
 (defn make-word2vec
   [training-path export-path hidden-size & [option]]
   (let [_(println "making word list...")
-        wl (util/make-wl training-path option)
+        wc (util/make-wc training-path option)
         _(println "done")
-        model (init-w2v-model wl hidden-size)
+        model (init-w2v-model wc hidden-size)
         model-path     (str export-path ".w2v")
         embedding-path (str export-path "w2v.em")]
     (train-word2vec! model training-path option)
@@ -193,9 +193,9 @@
 
 (defn most-sim-in-model-words
   [model word-or-vec & [n limit]]
-  (let [{:keys [wl hidden]} model
+  (let [{:keys [wc hidden]} model
         {em :w} hidden
-        limit (if (nil? limit) (count wl) limit)
-        target-word-list (->> wl (sort-by second >) (map first) (take limit))]; sort by frequency
+        limit (if (nil? limit) (count wc) limit)
+        target-word-list (->> wc (sort-by second >) (map first) (take limit))]; sort by frequency
     (most-sim em word-or-vec target-word-list n false)))
 
