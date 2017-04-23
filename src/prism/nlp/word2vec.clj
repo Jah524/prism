@@ -82,7 +82,7 @@
         neg-cum (uniform->cum-uniform wc-unif)
         _(println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] done"))
         all-word-token (reduce #(+ %1 (second %2)) 0 neg-wc)
-
+        tmp-loss (atom 0)
         local-counter (atom 0)
         done? (atom false)]
     (let [r (reader train-path)]
@@ -99,8 +99,10 @@
                                               all-items (clojure.set/union positive-items negative-items)]
                                           (try
                                             (let [forward (ff/network-output w2v-model (set [target]) all-items option)
-                                                  param-delta (ff/back-propagation w2v-model forward {:pos positive-items :neg negative-items} option)]
-                                              (ff/update-model! w2v-model param-delta learning-rate))
+                                                  {:keys [param-loss loss]} (ff/back-propagation w2v-model forward {:pos positive-items :neg negative-items} option)
+                                                  loss-sum (->> loss (map (fn [[_ v]] (Math/abs v))) (reduce +))]
+                                              (swap! tmp-loss #(+ %1 loss-sum))
+                                              (ff/update-model! w2v-model param-loss learning-rate))
                                             (catch Exception e
                                               (do
                                                 ;; debug purpose
@@ -119,7 +121,8 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (util/progress-format counter all-lines-num c interval-ms "lines/s"))
+            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float @tmp-loss)))
+            (reset! tmp-loss 0)
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
             (recur next-counter))))
