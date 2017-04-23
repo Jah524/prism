@@ -74,7 +74,9 @@
               negative 5
               initial-learning-rate 0.025
               min-learning-rate　0.0001}} option
+        _(println "counting lines ...")
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
+        _(println (str all-lines-num " lines considered"))
         wc (:wc w2v-model)
         neg-wc (dissoc wc "<unk>")
         _(println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
