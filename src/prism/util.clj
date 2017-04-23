@@ -33,7 +33,7 @@
          :or {min-count 5
               wc {}
               workers 4
-              interval-ms 30000 ; 30 seconds
+              interval-ms 60000 ; 1 minute
               step 1000000}} option
         all-lines (with-open [r (reader input-file)] (count (line-seq r)))
         over-all     (atom 0)
