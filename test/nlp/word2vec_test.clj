@@ -33,8 +33,5 @@
         d (aclone (get-in w2v [:hidden :w "d"]))
         X (aclone (get-in w2v [:hidden :w "X"]))]
     (testing "train-word2vec!"
-      (dotimes [_ 5] (train-word2vec! w2v target-tok {:min-learning-rate 0.025 :nagetaive 3 :workers 1 :interval-ms 2000 :sample 0.1}))
-      (is (not= (vec D) (vec (get-in w2v [:hidden :w "D"])))))
-    (testing "learned word embedding"
-      (is (< (similarity A D false) (similarity D d false)))
-      (is (< (similarity A D false) (similarity X d false))))))
+      (train-word2vec! w2v target-tok {:min-learning-rate 0.025 :nagetaive 3 :workers 1 :interval-ms 1000 :sample 0.1})
+      (is (not= (vec D) (vec (get-in w2v [:hidden :w "D"])))))))
