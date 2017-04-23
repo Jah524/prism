@@ -17,7 +17,7 @@ See demonstration section and [examples](/src/examples) for more detail.
 Add following dependency to your `project.clj`,
 
 ```
-[jah524/prism "0.3.0"]
+[jah524/prism "0.3.1"]
 ```
 
 and you can find how to do with prism at [project wiki](https://github.com/Jah524/prism/wiki)
