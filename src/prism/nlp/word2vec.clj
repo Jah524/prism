@@ -175,6 +175,19 @@
     (println "Done")
     model))
 
+(defn resume-train
+  "model-path will get path of your trained model without file extensions"
+  [training-path model-path & [option]]
+  (let [model (util/load-model model-path)
+        model-path     (str model-path ".w2v")
+        embedding-path (str model-path "w2v.em")]
+    (train-word2vec! model training-path option)
+    (println (str "Saving word2vec model as " model-path))
+    (util/save-model model model-path)
+    (println (str "Saving embedding as " embedding-path))
+    (save-embedding model embedding-path)
+    (println "Done")
+    model))
 
 ;; work on embedding ;;
 
