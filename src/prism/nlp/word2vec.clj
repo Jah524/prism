@@ -68,8 +68,10 @@
 
 (defn train-word2vec!
   [w2v-model train-path & [option]]
-  (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate]
+  (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate
+                snapshot-interval]
          :or {interval-ms 60000　; 60 seconds
+              snapshot-interval 60 ; 1 hour
               workers 4
               negative 5
               initial-learning-rate 0.025
@@ -166,7 +168,9 @@
   (let [_(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
+        _(println "initializing model ...")
         model (init-w2v-model wc hidden-size)
+        _(println "done")
         model-path     (str export-path ".w2v")
         embedding-path (str export-path "w2v.em")]
     (train-word2vec! model training-path option)
