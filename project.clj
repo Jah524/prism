@@ -3,6 +3,7 @@
   :url "https://github.com/Jah524/prism"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :jvm-opts ["-Xmx15G" "-Xms4096m" "-server"]
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [clj-time "0.13.0"]
                  [com.taoensso/nippy "2.13.0"]
