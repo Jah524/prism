@@ -1,6 +1,6 @@
 # Prism
 
-[![Build Status](https://travis-ci.org/Jah524/Prism.svg?branch=master)](https://travis-ci.org/Jah524/Prism)
+[![Build Status](https://travis-ci.org/Jah524/prism.svg?branch=master)](https://travis-ci.org/Jah524/prism)
 
 Prism is a handy neural network library for natural language processing written in pure Clojure.
 This library get you a distributed representation of words.
