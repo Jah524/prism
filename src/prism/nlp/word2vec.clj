@@ -67,7 +67,7 @@
 
 
 (defn train-word2vec!
-  [w2v-model train-path & [option]]
+  [w2v-model train-path option]
   (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate
                 snapshot-interval]
          :or {interval-ms 60000　; 60 seconds
@@ -102,8 +102,8 @@
                                               negative-items (->> negatives (drop (* negative i)) (take negative) set)
                                               all-items (clojure.set/union positive-items negative-items)]
                                           (try
-                                            (let [forward (ff/network-output w2v-model (set [target]) all-items option)
-                                                  {:keys [param-loss loss]} (ff/back-propagation w2v-model forward {:pos positive-items :neg negative-items} option)
+                                            (let [forward (ff/network-output w2v-model (set [target]) all-items)
+                                                  {:keys [param-loss loss]} (ff/back-propagation w2v-model forward {:pos positive-items :neg negative-items})
                                                   loss-sum (->> loss (map (fn [[_ v]] (Math/abs v))) (reduce +))]
                                               (swap! tmp-loss #(+ %1 loss-sum))
                                               (ff/update-model! w2v-model param-loss learning-rate))
@@ -135,7 +135,7 @@
     :done))
 
 (defn init-w2v-model
-  [wc hidden-size]
+  [wc hidden-size {:keys [matrix-kit] :or {matrix-kit default/default-matrix-kit}}]
   (let [wc-set (set (keys wc))]
     (-> (ff/init-model {:input-type :sparse
                         :input-items wc-set
@@ -143,7 +143,8 @@
                         :hidden-size hidden-size
                         :output-type :binary-classification
                         :output-items wc-set
-                        :activation :linear})
+                        :activation :linear
+                        :matrix-kit matrix-kit})
         (assoc :wc wc))))
 
 (defn save-embedding
@@ -164,13 +165,11 @@
          (util/save-model l2-em path))))))
 
 (defn make-word2vec
-  [training-path export-path hidden-size & [option]]
+  [training-path export-path hidden-size option]
   (let [_(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
-        _(println "initializing model ...")
-        model (init-w2v-model wc hidden-size)
-        _(println "done")
+        model (init-w2v-model wc hidden-size option)
         model-path     (str export-path ".w2v")
         embedding-path (str export-path ".w2v.em")]
     (train-word2vec! model training-path option)
