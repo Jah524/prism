@@ -22,6 +22,10 @@
   ([v1 v2 & more]
    (reduce #(minus %1 %2) (minus v1 v2) more)))
 
+(defn scal
+  [a v]
+  (float-array (map #(* a %) v)))
+
 (defn times
   ([v1 v2]
    (when-not (= (count v1) (count v2)) (throw (Exception. "vectors must be same length")))

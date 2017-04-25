@@ -4,6 +4,9 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :jvm-opts ["-Xmx15G" "-Xms4096m" "-server"]
+  :test-selectors {:default (complement :native)
+                   :native :native
+                   :all     (constantly true)}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [uncomplicate/neanderthal "0.9.0"]
                  [clj-time "0.13.0"]
