@@ -139,9 +139,7 @@
                       (rewrite-vector! learning-rate word-w v))))
              dorun)
         ;; update hidden w
-        (if (= type :native)
-          (rewrite-matrix! learning-rate w w-delta)
-          (rewrite-vector! learning-rate w w-delta)))
+        (rewrite-matrix! learning-rate w w-delta))
       ;; update hidden bias
       (rewrite-vector! learning-rate bias bias-delta)))
   model)
@@ -161,9 +159,7 @@
                                          {}
                                          input-items)]
                      {:w sparses})
-                   {:w (if (= type :native)
-                         (init-matrix input-size hidden-size)
-                         (init-matrix (* input-size hidden-size)))})
+                   {:w (init-matrix input-size hidden-size)})
                  (assoc
                    :bias (init-vector hidden-size)
                    :unit-num hidden-size
@@ -176,3 +172,22 @@
      :input-type input-type
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
+
+(defn convert-model-matrix-kit
+  [model new-matrix-kit]
+  (let [{:keys [hidden output input-type unit-nums]} model
+        [input-num hidden-num] unit-nums
+        {:keys [make-vector make-matrix]} new-matrix-kit]
+    (assoc model
+      :hidden (let [{:keys [w bias]} hidden]
+                (-> hidden
+                    (assoc
+                      :w (if (= input-type :sparse)
+                           (reduce (fn [acc [word em]] (assoc acc word (make-vector (seq em)))) {} w)
+                           (make-matrix input-num hidden-num (apply concat (seq w))))
+                      :bias (make-vector (seq bias)))))
+      :output (reduce (fn [acc [item {:keys [w bias]}]]
+                        (assoc acc item {:w (make-vector (seq w)) :bias (make-vector (seq bias))}))
+                      {}
+                      output))
+    model))

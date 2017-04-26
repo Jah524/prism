@@ -45,11 +45,13 @@
   [^floats v1 ^floats v2]
   (let [a (alength v1)
         b (alength v2)
-        ret (float-array (* a b))]
+        mat (object-array a)]
     (dotimes [x a]
-      (dotimes [y b]
-        (aset ^floats ret (+ (* x b) y) (float (* (aget ^floats v1 x) (aget ^floats v2 y))))))
-    ret))
+      (let [tmp (float-array b)]
+        (dotimes [y b]
+          (aset ^floats tmp y (float (* (aget ^floats v1 x) (aget ^floats v2 y)))))
+        (aset ^objects mat x tmp)))
+    mat))
 
 (defn transpose
   [^Integer row-size ^floats matrix]
@@ -61,22 +63,27 @@
     ret-mat))
 
 (defn gemv
-  [^floats matrix ^floats v]
-  (let [row-n (alength v)
-        col-n (quot (alength matrix) (alength v))
-        tmp-v (float-array row-n)
-        ret-v (float-array col-n)]
-    (dotimes [col-index col-n];for a col
-      (dotimes [row-index row-n];for a row
-        (aset ^floats tmp-v row-index (float (* (aget ^floats matrix (+ (* col-index row-n) row-index)) (aget ^floats v row-index)))))
-      (aset ^floats ret-v col-index (float (areduce tmp-v i ret (float 0) (+ ret (aget ^floats tmp-v i))))))
-    ret-v))
+  [^objects matrix ^floats v]
+  (let [mn (alength matrix)
+        vn (alength v)
+        tmp (float-array vn)
+        ret (float-array mn)]
+    (dotimes [x mn]
+      (dotimes [y vn]
+        (aset ^floats tmp y (float (* (aget ^floats (aget ^objects matrix x) y) (aget ^floats v y)))))
+      (aset ^floats ret x (float (areduce tmp i ret (float 0) (+ ret (aget ^floats tmp i))))))
+    ret))
 
 (defn rewrite-vector!
   [alpha ^floats v! ^floats v2]
   (when-not (= (alength v!) (alength v2)) (throw (Exception. "vectors must be same length")))
   (dotimes [x (alength v!)]
     (aset ^floats v! x (float (+ (aget ^floats v! x) (* alpha (aget ^floats v2 x)))))))
+
+(defn rewrite-matrix!
+  [alpha ^objects matrix! ^objects m2]
+  (dotimes [x (alength matrix!)]
+    (rewrite-vector! alpha (aget ^objects matrix! x) (aget ^objects m2 x))))
 
 (defn sigmoid [x] (float (/ 1 (+ 1 (Math/exp (-  (float x)))))))
 
@@ -105,12 +112,25 @@
    :scal scal
    :dot dot
    :outer outer
-   :transpose transpose
+;;    :transpose transpose
    :gemv gemv
    :init-vector random-array
-   :init-matrix random-array
+   :init-matrix (fn [input-num hidden-num]
+                  (let [mat (object-array hidden-num)]
+                    (dotimes [x hidden-num]
+                      (aset ^objects mat x (random-array input-num)))
+                    mat))
    :make-vector float-array
+   :make-matrix (fn [input-num hidden-num v]
+                  (let [mat (object-array hidden-num)]
+                    (dotimes [x hidden-num]
+                      (let [tmp (float-array input-num)]
+                        (dotimes [y input-num]
+                          (aset ^floats tmp y (float (nth v y))))
+                        (aset ^objects mat tmp)))
+                    mat))
    :rewrite-vector! rewrite-vector!
+   :rewrite-matrix! rewrite-matrix!
    :sigmoid sigmoid
    :sigmoid-derivative (fn [x] (let [s (sigmoid x)] (float (* s (- 1 s)))))
    :tanh tanh

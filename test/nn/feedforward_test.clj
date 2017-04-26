@@ -10,7 +10,7 @@
    :output-type :prediction
    :hidden {:unit-num 3
             :activation :sigmoid
-            :w (float-array [1 1 1])
+            :w (object-array [(float-array [1]) (float-array [1]) (float-array [1])])
             :bias (float-array [1 1 1])}
    :output {"prediction" {:w (float-array (take 3 (repeat 0.1)))
                           :bias (float-array [1])}}})
@@ -22,7 +22,7 @@
    :output-type :prediction
    :hidden {:unit-num 2
             :activation :sigmoid
-            :w (float-array [0.1 0.1 0.1 0.2 0.2 0.2])
+            :w (object-array [(float-array [0.1 0.1 0.1]) (float-array [0.2 0.2 0.2])])
             :bias (float-array [1 1])}
    :output {"prediction1" {:w (float-array (take 2 (repeat 1)))
                            :bias (float-array [1])}
@@ -91,7 +91,7 @@
 
   (testing "param-delta"
     (let [r (param-delta {:matrix-kit default-matrix-kit} (float-array (range 4)) (float-array (range 4)))]
-      (is (= (vec (:w-delta r)) [0.0 0.0 0.0 0.0, 0.0 1.0 2.0 3.0, 0.0 2.0 4.0 6.0, 0.0 3.0 6.0 9.0]))
+      (is (= (map vec (:w-delta r)) [[0.0 0.0 0.0 0.0], [0.0 1.0 2.0 3.0], [0.0 2.0 4.0 6.0], [0.0 3.0 6.0 9.0]]))
       (is (= (vec (:bias-delta r)) [0.0 1.0 2.0 3.0]))))
 
   (testing "back-propagation with dense"
@@ -102,8 +102,8 @@
           {hidden-w-delta :w-delta hidden-bias-delta :bias-delta} hidden-delta
           {output-w-delta :w-delta output-bias-delta :bias-delta} (get output-delta "prediction")]
       (is (= loss {"prediction" (float 0.71422774)}))
-      (is (= (vec hidden-w-delta)
-             (take 3 (repeat (float 0.0064532845)))))
+      (is (= (map vec hidden-w-delta)
+             (take 3 (repeat [(float 0.0064532845)]))))
       (is (= (vec hidden-bias-delta)
              (take 3 (repeat (float 0.0032266423)))))
       (is (= (vec output-w-delta)
@@ -140,7 +140,7 @@
                                              {"prediction1" 2 "prediction2" 1 "prediction3" 2}))]
         (is (= (vec (get (:w-delta (:hidden-delta a)) "language"))
                (let [it (:w-delta (:hidden-delta b))]
-                 [(nth it 1) (nth it 4)])))
+                 [(aget ^floats it 0 1) (aget ^floats it 1 1)])))
         (is (= (vec (:bias-delta (:hidden-delta a)))
                (vec (:bias-delta (:hidden-delta b)))))
         (is (= (vec (:w-delta (:output-delta a)))
@@ -150,13 +150,13 @@
 
   (testing "update-model!"
     (let [{:keys [hidden output]} (update-model! sample-model
-                                                 {:hidden-delta {:w-delta (float-array [0.1 0.2 0.3])
+                                                 {:hidden-delta {:w-delta (object-array [(float-array [0.1]) (float-array [0.2]) (float-array [0.3])])
                                                                  :bias-delta (float-array [0.1 0.2 0.3])}
                                                   :output-delta {"prediction" {:w-delta (float-array [2 2 2])
                                                                                :bias-delta (float-array [2])}}}
                                                  0.1)]
       (is (= (:activation hidden) :sigmoid))
-      (is (= (vec (:w hidden)) (map float [1.01 1.02 1.03])))
+      (is (= (map vec (:w hidden)) (->> [1.01 1.02 1.03] (map float) (map (fn[x] [x])))))
       (is (= (vec (:bias hidden)) (map float [1.01 1.02 1.03])))
       (let [{:keys [w bias]} (get output "prediction")]
         (is (= (vec w) (map float [0.3 0.3 0.3])))

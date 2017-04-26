@@ -88,11 +88,12 @@
    :scal scal
    :dot dot
    :outer outer
-   :transpose transpose
+;;    :transpose transpose
    :gemv gemv
    :init-vector (fn [n] (dv (take n (repeatedly model-rand))))
-   :init-matrix (fn [bottom-num hidden-num] (dge hidden-num bottom-num (vec (take (* bottom-num hidden-num) (repeatedly model-rand)))))
+   :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (vec (take (* input-num hidden-num) (repeatedly model-rand)))))
    :make-vector dv
+   :make-matrix (fn [input-num hidden-num v] (dge hidden-num input-num v))
    :rewrite-vector! rewrite-vector!
    :rewrite-matrix! rewrite-matrix!
    :sigmoid (fn ^double [^double x] (/ 1 (+ 1 (Math/exp (-  x)))))

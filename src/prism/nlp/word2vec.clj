@@ -146,6 +146,8 @@
                         :matrix-kit matrix-kit})
         (assoc :wc wc))))
 
+
+
 (defn save-embedding
   "top-n = 0 represents all words"
   ([model path] (save-embedding model path false 0))
