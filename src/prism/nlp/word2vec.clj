@@ -104,7 +104,7 @@
                                             (let [forward (ff/network-output w2v-model (set [target]) all-items)
                                                   {:keys [param-loss loss]} (ff/back-propagation w2v-model forward {:pos positive-items :neg negative-items})
                                                   loss-sum (->> loss (map (fn [[_ v]] (Math/abs v))) (reduce +))]
-                                              (swap! tmp-loss #(+ %1 loss-sum))
+                                              (swap! tmp-loss #(+ %1 (/ loss-sum (count loss))))
                                               (ff/update-model! w2v-model param-loss learning-rate))
                                             (catch Exception e
                                               (do
@@ -124,7 +124,7 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float @tmp-loss)))
+            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", acc-loss: " (float @tmp-loss)))
             (reset! tmp-loss 0)
             (reset! local-counter 0)
             (Thread/sleep interval-ms)
@@ -173,7 +173,7 @@
         embedding-path (str export-path ".w2v.em")]
     (train-word2vec! model training-path option)
     (println (str "Saving word2vec model as " model-path))
-    (util/save-model model model-path)
+    (util/save-model (dissoc model :matrix-kit) model-path)
     (println (str "Saving embedding as " embedding-path))
     (save-embedding model embedding-path)
     (println "Done")

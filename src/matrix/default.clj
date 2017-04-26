@@ -23,7 +23,7 @@
    (reduce #(minus %1 %2) (minus v1 v2) more)))
 
 (defn scal
-  [^double a ^floats v]
+  [a ^floats v]
   (float-array (map #(* a %) v)))
 
 (defn times
@@ -73,25 +73,21 @@
     ret-v))
 
 (defn rewrite-vector!
-  [^double alpha ^floats v! ^floats v2]
+  [alpha ^floats v! ^floats v2]
+  (when-not (= (alength v!) (alength v2)) (throw (Exception. "vectors must be same length")))
   (dotimes [x (alength v!)]
     (aset ^floats v! x (float (+ (aget ^floats v! x) (* alpha (aget ^floats v2 x)))))))
 
-(defn sigmoid
-  [^double x]
-  (float (/ 1 (+ 1 (Math/exp (-  x))))))
+(defn sigmoid [x] (float (/ 1 (+ 1 (Math/exp (-  (float x)))))))
 
-(defn tanh
-  [^double x]
-  (float (Math/tanh x)))
-
+(defn tanh [x] (float (Math/tanh (float x))))
 
 (defn alter-vec
   "f should take unboxed value and return unboxed value to work faster"
   [^floats v f]
   (let [tmp (aclone v)]
     (dotimes [i (alength tmp)]
-      (aset ^floats tmp i (f (aget ^floats v i))))
+      (aset ^floats tmp i (float (f (aget ^floats v i)))))
     tmp))
 
 (defn model-rand [] (float (/ (- (rand 16) 8) 1000)))
@@ -119,4 +115,5 @@
    :sigmoid-derivative (fn [x] (let [s (sigmoid x)] (float (* s (- 1 s)))))
    :tanh tanh
    :tanh-derivative (fn [x] (let [it (Math/tanh x)] (float (- 1 (* it it)))))
+   :linear-derivative-vector (fn [v] (float-array (take (alength v) (repeat 1))))
    :alter-vec alter-vec})

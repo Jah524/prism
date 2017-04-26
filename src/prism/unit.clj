@@ -22,10 +22,10 @@
         (alter-vec state f)))))
 
 (defn derivative [state activate-fn-key matrix-kit]
-  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative]} matrix-kit]
+  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative linear-derivative-vector]} matrix-kit]
     (cond
       (= activate-fn-key :linear)
-      state
+      (linear-derivative-vector state)
       :else
       (let [f (condp = activate-fn-key
                    :sigmoid sigmoid-derivative

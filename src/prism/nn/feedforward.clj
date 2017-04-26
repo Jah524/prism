@@ -137,13 +137,11 @@
                     (let [word-w (get w k)]
                       ;; update hidden w
                       (rewrite-vector! learning-rate word-w v))))
-             doall)
+             dorun)
         ;; update hidden w
         (if (= type :native)
           (rewrite-matrix! learning-rate w w-delta)
           (rewrite-vector! learning-rate w w-delta)))
-;;         (dotimes [x (count w)]
-;;           (aset ^floats w x (float (+ (aget ^floats w x) (* learning-rate (aget ^floats w-delta x)))))))
       ;; update hidden bias
       (rewrite-vector! learning-rate bias bias-delta)))
   model)
@@ -156,6 +154,7 @@
         {:keys [type init-vector init-matrix]} matrix-kit]
     (println (str "initializing model as " (if (= type :native) "native-array" "float-array") " ..."))
     {:matrix-kit matrix-kit
+     :weight-type type
      :hidden (-> (if (= input-type :sparse)
                    (let [sparses (reduce (fn [acc sparse]
                                            (assoc acc sparse (init-vector hidden-size)))
