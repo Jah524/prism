@@ -3,7 +3,8 @@
             [clojure.string :refer [split]]
             [clojure.pprint :refer [pprint]]
             [prism.util :refer [make-wc similarity]]
-            [prism.nlp.word2vec :refer :all]))
+            [prism.nlp.word2vec :refer :all]
+            [matrix.default :refer [default-matrix-kit]]))
 
 (deftest word2ec-test
   (testing "subsampling"
@@ -19,7 +20,7 @@
       (is (= 1 (count (ffirst coll))))
       (is (not (zero? (count (second (first coll))))))))
   (testing "init-w2v-model"
-    (let [{:keys [hidden wc input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10)
+    (let [{:keys [hidden wc input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10 default-matrix-kit)
           {:keys [unit-num]} hidden]
       (is (= unit-num 10))
       (is (= input-type :sparse))
@@ -27,7 +28,7 @@
       (is (= (count (keys wc)) 3))))
   (let [target-tok "test/nlp/example.tok"
         wc (make-wc target-tok {:interval-ms 1000 :workers 1 :min-count 1})
-        w2v (init-w2v-model wc 10)
+        w2v (init-w2v-model wc 10 default-matrix-kit)
         A (aclone (get-in w2v [:hidden :w "A"]))
         D (aclone (get-in w2v [:hidden :w "D"]))
         d (aclone (get-in w2v [:hidden :w "d"]))
