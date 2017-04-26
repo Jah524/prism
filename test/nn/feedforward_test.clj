@@ -1,10 +1,12 @@
 (ns nn.feedforward-test
   (:require [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]
+            [matrix.default :refer [default-matrix-kit]]
             [prism.nn.feedforward :refer :all]))
 
 (def sample-model ;1->3->1
-  {:input-type  :dense
+  {:matrix-kit default-matrix-kit
+   :input-type  :dense
    :output-type :prediction
    :hidden {:unit-num 3
             :activation :sigmoid
@@ -15,7 +17,8 @@
 
 
 (def sample-model2 ;3->2->3
-  {:input-type  :dense
+  {:matrix-kit default-matrix-kit
+   :input-type  :dense
    :output-type :prediction
    :hidden {:unit-num 2
             :activation :sigmoid
@@ -30,7 +33,8 @@
 
 
 (def sample-model2:sparse ;3->2->3
-  {:input-type  :sparse
+  {:matrix-kit default-matrix-kit
+   :input-type  :sparse
    :output-type :prediction
    :hidden {:unit-num 2
             :activation :sigmoid
@@ -46,7 +50,8 @@
 (deftest feedforward-test
   (testing "hidden-state-by-sparse"
     (are [arg expect] (= (vec (hidden-state-by-sparse
-                                {:hidden {:w {"natural"    (float-array [0 1])
+                                {:matrix-kit default-matrix-kit
+                                 :hidden {:w {"natural"    (float-array [0 1])
                                               "language"   (float-array [2 3])
                                               "processing" (float-array [4 5])}
                                           :unit-num 2}}
@@ -85,11 +90,11 @@
 
 
   (testing "param-delta"
-    (let [r (param-delta (float-array (range 4)) (float-array (range 4)))]
+    (let [r (param-delta {:matrix-kit default-matrix-kit} (float-array (range 4)) (float-array (range 4)))]
       (is (= (vec (:w-delta r)) [0.0 0.0 0.0 0.0, 0.0 1.0 2.0 3.0, 0.0 2.0 4.0 6.0, 0.0 3.0 6.0 9.0]))
       (is (= (vec (:bias-delta r)) [0.0 1.0 2.0 3.0]))))
 
-  (testing "back-propagation with gemv"
+  (testing "back-propagation with dense"
     (let [{:keys [param-loss loss]} (back-propagation sample-model
                                                       (network-output sample-model (float-array [2]) #{"prediction"})
                                                       {"prediction" 2})

@@ -9,7 +9,6 @@
     [clojure.data.json :as json]
     [matrix.default :as default]
     [prism.util :refer [l2-normalize l2-normalize! similarity] :as util]
-    [prism.unit :refer [activation model-rand]]
     [prism.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
     [prism.nn.feedforward :as ff]))
 
@@ -76,9 +75,9 @@
               negative 5
               initial-learning-rate 0.025
               min-learning-rate　0.0001}} option
-        _(println "counting lines ...")
+        _(print "counting lines ... ")
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
-        _(println (str all-lines-num " lines considered"))
+        _(println (str "done, "all-lines-num " lines considered"))
         wc (:wc w2v-model)
         neg-wc (dissoc wc "<unk>")
         _(println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))

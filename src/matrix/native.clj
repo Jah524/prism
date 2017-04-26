@@ -1,80 +1,102 @@
 (ns matrix.native
   (:require
-    [uncomplicate.neanderthal.core :as n]
-    [uncomplicate.neanderthal.native :refer [fv dv fge dge ftr]]
-    [matrix.default :as default]
-    [prism.unit :refer [model-rand]]))
-
-(def b (fv (repeat 5 1)))
-(def c (fv (repeat 5 0.1)))
-
-(def x (fv (range 0 10 1)))
-(def y (fv (range 0 100 10)))
-(def z (fv (range 0 0.9 0.1)))
-
-(def t (ftr 4 (range 10) {:order :row  :diag :unit}))
-(def a (fge 5 10 (range 50)))
-
+    [uncomplicate.neanderthal.core :as c]
+    [uncomplicate.neanderthal.native :refer [dv dge dtr]]))
 
 (defn sum
   ([v1]
    v1)
   ([v1 v2]
-   (n/axpy v1 v2))
+   (c/axpy v1 v2))
   ([v1 v2 & more]
    (reduce #(sum %1 %2) (sum v1 v2) more)))
 
 (defn minus
   ([v1 v2]
-   (n/axpy (float -1) v2 v1))
-;;    (let [v3 (n/axpy! -1 (n/copy v2) (n/zero v2))]
-;;      (n/axpy v1 v3)))
+   (c/axpy (double -1) v2 v1))
   ([v1 v2 & more]
    (reduce #(minus %1 %2) (minus v1 v2) more)))
 
 (defn scal
-  [a v]
-  (n/scal a v))
+  [^double a v]
+  (c/scal a v))
 
 (defn times
-  "element-wise product
-  this function need to get faster"
+  "element-wise multiplication"
   ([v1 v2]
-   (dv (vec (default/times (float-array v1) (float-array v2)))))
+   (let [tmp (c/zero v1)]
+     (c/copy! v2 tmp)
+     (dotimes [x (c/dim v1)]
+       (c/scal! (c/entry v1 x) (c/subvector tmp x (int 1))))
+     tmp))
   ([v1 v2 & more]
    (reduce #(times %1 %2) (times v1 v2) more)))
 
+(defn times!
+  "element-wise multiplication
+  vector v2 will be changed"
+  ([v1 v2]
+   (dotimes [x (c/dim v1)]
+     (c/scal! (c/entry v1 x) (c/subvector v2 x (int 1))))
+   v2)
+  ([v1 v2 & more]
+   (reduce #(times! %1 %2) (times! v1 v2) more)))
+
 (defn dot
   [v1 v2]
-  (n/dot v1 v2))
+  (c/dot v1 v2))
 
 (defn outer
   [v1 v2]
-  (n/rk v1 v2))
+  (c/rk v1 v2))
 
 (defn transpose
   [matrix]
-  (n/trans matrix))
+  (c/trans matrix))
 
 (defn gemv
   [matrix v]
-  (n/mv matrix v))
+  (c/mv matrix v))
 
 (defn rewrite-vector!
-  [alpha v! v2]
-  (n/axpy! alpha v2 v!))
+  [^double alpha v! v2]
+  (c/axpy! alpha v2 v!))
+
+(defn rewrite-matrix!
+  [^double alpha a! a2]
+  (dotimes [i (c/mrows a!)]
+    (rewrite-vector! alpha (c/row a! i) (c/row a2 i)))
+  a!)
+
+
+(defn alter-vec
+  [v f]
+  (let [tmp (c/copy v)]
+    (dotimes [i (c/dim tmp)]
+      (c/alter! tmp i f))
+    tmp))
+
+(defn ^double model-rand []
+  (double (/ (- (rand 16) 8) 1000)))
 
 (def native-matrix-kit
   {:type :native
    :sum sum
    :minus minus
    :times times
+   :times! times!
    :scal scal
    :dot dot
    :outer outer
    :transpose transpose
    :gemv gemv
    :init-vector (fn [n] (dv (take n (repeatedly model-rand))))
-   :init-matrix (fn [r c] (transpose (dge c r (vec (take (* r c) (repeatedly model-rand))))))
+   :init-matrix (fn [bottom-num hidden-num] (dge hidden-num bottom-num (vec (take (* bottom-num hidden-num) (repeatedly model-rand)))))
    :make-vector dv
-   :rewrite-vector! rewrite-vector!})
+   :rewrite-vector! rewrite-vector!
+   :rewrite-matrix! rewrite-matrix!
+   :sigmoid (fn ^double [^double x] (/ 1 (+ 1 (Math/exp (-  x)))))
+   :sigmoid-derivative (fn ^double [^double x] (let [s (/ 1 (+ 1 (Math/exp (- x))))] (* s (- 1 s))))
+   :tanh  (fn ^double [^double x] (Math/tanh x))
+   :tanh-derivative (fn ^double [^double x] (let [it (Math/tanh x)] (- 1 (* it it))))
+   :alter-vec alter-vec})

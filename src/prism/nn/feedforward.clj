@@ -1,9 +1,8 @@
 (ns prism.nn.feedforward
   (:require
     [clojure.pprint :refer [pprint]]
-    [prism.unit :refer [activation derivative model-rand random-array]]
     [matrix.default :as default]
-    [prism.unit :refer [sigmoid tanh activation derivative binary-classification-error prediction-error]]))
+    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]))
 
 
 (defn hidden-state-by-sparse
@@ -23,9 +22,9 @@
 
 (defn output-activation
   [model input-list sparse-outputs]
-  (let [{:keys [output-type output matrix-kit]} model
-        activation-function (condp = output-type :binary-classification sigmoid :prediction identity)
-        {:keys [dot]} matrix-kit]
+  (let [{:keys [output-type output matrix-kit sigmoid]} model
+        {:keys [dot sigmoid]} matrix-kit
+        activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
     (if (= output-type :multi-class-classification)
       :FIXME
       (reduce (fn [acc s]
@@ -45,7 +44,7 @@
         state (if (= :sparse input-type)
                 (hidden-state-by-sparse model x-input bias)
                 (sum (gemv w x-input) bias))
-        hidden-activation (activation state activation-function matrix-kit-type native-dv)
+        hidden-activation (activation state activation-function matrix-kit)
         output-activation (output-activation model hidden-activation sparse-outputs)]
     {:activation {:input x-input :hidden hidden-activation :output output-activation}
      :state      {:hidden state}}))
@@ -105,7 +104,7 @@
                                      (let [w (:w (get output item))]
                                        (scal delta w))))
                               (apply sum))
-        hidden-delta (times (derivative (:hidden state) (:activation hidden) matrix-kit-type native-dv)
+        hidden-delta (times (derivative (:hidden state) (:activation hidden) matrix-kit)
                             propagated-delta)
         hidden-param-delta (if (= :sparse input-type)
                              (param-delta:sparse model hidden-delta training-x unit-num)
@@ -119,7 +118,7 @@
   (let [{:keys [output hidden input-type matrix-kit]} model
         {:keys [output-delta hidden-delta]} param-delta
         {:keys [unit-num]} hidden
-        {:keys [rewrite-vector!]} matrix-kit]
+        {:keys [type rewrite-vector! rewrite-matrix!]} matrix-kit]
     ;; update output
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
@@ -140,7 +139,9 @@
                       (rewrite-vector! learning-rate word-w v))))
              doall)
         ;; update hidden w
-        :fixme)
+        (if (= type :native)
+          (rewrite-matrix! learning-rate w w-delta)
+          (rewrite-vector! learning-rate w w-delta)))
 ;;         (dotimes [x (count w)]
 ;;           (aset ^floats w x (float (+ (aget ^floats w x) (* learning-rate (aget ^floats w-delta x)))))))
       ;; update hidden bias
@@ -148,13 +149,12 @@
   model)
 
 
-
 (defn init-model
   [{:keys [input-type input-items input-size hidden-size output-type output-items activation matrix-kit]
     :or {matrix-kit default/default-matrix-kit}}]
   (let [sparse-input? (= input-type :sparse)
         {:keys [type init-vector init-matrix]} matrix-kit]
-    (println (str "initialize model as " (if (= type :native) "native-array" "float-array")))
+    (println (str "initializing model as " (if (= type :native) "native-array" "float-array") " ..."))
     {:matrix-kit matrix-kit
      :hidden (-> (if (= input-type :sparse)
                    (let [sparses (reduce (fn [acc sparse]

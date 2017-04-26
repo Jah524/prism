@@ -1,10 +1,5 @@
 (ns prism.unit)
 
-(defn ^"[[D" sigmoid [^double x]
-  (float (/ 1 (+ 1 (Math/exp (- (float x)))))))
-
-(defn ^"[[D" tanh [^double x]
-  (float (Math/tanh x)))
 
 (defn softmax [y-list]
   (let [n (count y-list)
@@ -15,41 +10,28 @@
     ret))
 
 (defn activation
-  [state activate-fn-key matrix-kit-type native-dv]
-  (cond
-    (= activate-fn-key :softmax)
-    (softmax state)
-    (= activate-fn-key :linear)
-    state
-    :else
-    (let [n (count state)
-          ret (float-array n)
-          func (condp = activate-fn-key
-                 :sigmoid sigmoid
-                 :tanh    tanh)]
-      (dotimes [x n] (aset ^floats ret x (func (aget ^floats state x))))
-      (if (= matrix-kit-type :native) (native-dv (vec ret)) ret))))
+  [state activate-fn-key matrix-kit]
+  (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
+    (cond
+      (= activate-fn-key :softmax)
+      (softmax state)
+      (= activate-fn-key :linear)
+      state
+      :else
+      (let [f (condp = activate-fn-key :sigmoid sigmoid :tanh tanh)]
+        (alter-vec state f)))))
 
-(defn derivative [state activate-fn-key matrix-kit-type native-dv]
-  (cond
-    (= activate-fn-key :linear)
-    state
-    :else
-    (let [n (count state)
-          func (condp = activate-fn-key
-                 :sigmoid #(float (* (sigmoid %) (- 1 (sigmoid %))))
-                 :tanh    #(float (- 1 (* (tanh %) (tanh %)))))
-          ret (float-array n)]
-      (dotimes [x n] (aset ^floats ret x (func (aget ^floats state x))))
-      (if (= matrix-kit-type :native) (native-dv (vec ret)) ret))))
+(defn derivative [state activate-fn-key matrix-kit]
+  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative]} matrix-kit]
+    (cond
+      (= activate-fn-key :linear)
+      state
+      :else
+      (let [f (condp = activate-fn-key
+                   :sigmoid sigmoid-derivative
+                   :tanh    tanh-derivative)]
+        (alter-vec state f)))))
 
-(defn ^"[[D"  model-rand []
-  (float (/ (- (rand 16) 8) 1000)))
-
-(defn random-array [n]
-  (let [it (float-array n)]
-    (dotimes [x n] (aset ^floats it x (model-rand)))
-    it))
 
 (defn binary-classification-error
   [activation positives negatives]
