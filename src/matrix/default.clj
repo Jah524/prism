@@ -53,14 +53,19 @@
         (aset ^objects mat x tmp)))
     mat))
 
+
 (defn transpose
-  [^Integer row-size ^floats matrix]
-  (let [col-size (quot (alength matrix) row-size)
-        ret-mat  (float-array (alength matrix))]
-    (dotimes [row-index row-size]
-      (dotimes [col-index col-size]
-        (aset ^floats ret-mat (+ (* row-index col-size) col-index) (aget ^floats matrix (+ (* col-index row-size) row-index)))))
-    ret-mat))
+  [^objects matrix]
+  (let [row-n (alength matrix)
+        col-n (alength (aget ^objects matrix 0))
+        ret (object-array col-n)]
+    (dotimes [y col-n]
+      (let [tmp (float-array row-n)]
+        (dotimes [x row-n]
+          (aset ^floats tmp x (aget ^floats (aget ^objects matrix x) y)))
+        (aset ^objects ret y tmp)))
+    ret))
+
 
 (defn gemv
   [^objects matrix ^floats v]
@@ -112,7 +117,7 @@
    :scal scal
    :dot dot
    :outer outer
-;;    :transpose transpose
+   :transpose transpose
    :gemv gemv
    :init-vector random-array
    :init-matrix (fn [input-num hidden-num]

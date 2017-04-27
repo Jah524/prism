@@ -23,19 +23,17 @@
     (is (= (dot x y)
            (float 300))))
   (testing "outer"
-    (is (= (vec (outer x y))
-           [0.0 0.0 0.0 0.0 0.0
-            0.0 10.0 20.0 30.0 40.0
-            0.0 20.0 40.0 60.0 80.0
-            0.0 30.0 60.0 90.0 120.0
-            0.0 40.0 80.0 120.0 160.0])))
+    (is (= (map vec (outer x y))
+           [[0.0 0.0 0.0 0.0 0.0]
+            [0.0 10.0 20.0 30.0 40.0]
+            [0.0 20.0 40.0 60.0 80.0]
+            [0.0 30.0 60.0 90.0 120.0]
+            [0.0 40.0 80.0 120.0 160.0]])))
   (testing "transpose"
-    (let [it (float-array (range 25))
-          result  (transpose 5 it)]
-      (is (= (vec result)
-             (map float [0 5 10 15 20 1 6 11 16 21 2 7 12 17 22 3 8 13 18 23 4 9 14 19 24])))))
+    (is (= (map vec  (transpose (object-array (map float-array (partition 5 (range 20))))))
+           (map #(map float %) [[0 5 10 15] [1 6 11 16] [2 7 12 17] [3 8 13 18] [4 9 14 19]]))))
   (testing "gemv"
-    (let [mat (float-array [1 2 3, 4 5 6, 7 8 9, 10 11 12])
+    (let [mat (object-array (map float-array [[1 2 3], [4 5 6], [7 8 9], [10 11 12]]))
           v   (float-array [1 1 1])
           result   [6.0 15.0 24.0, 33.0]]
       (is (= (vec (gemv mat v)) result))))

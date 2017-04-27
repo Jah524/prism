@@ -1,7 +1,7 @@
 (ns prism.nn.lstm
   (:require
     [clojure.pprint :refer [pprint]]
-    [matrix.default :refer [transpose sum times outer minus] :as default]
+    [matrix.default :as default]
     [prism.unit :refer [sigmoid tanh activation derivative model-rand random-array binary-classification-error prediction-error]]))
 
 

@@ -88,7 +88,7 @@
    :scal scal
    :dot dot
    :outer outer
-;;    :transpose transpose
+   :transpose transpose
    :gemv gemv
    :init-vector (fn [n] (dv (take n (repeatedly model-rand))))
    :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (vec (take (* input-num hidden-num) (repeatedly model-rand)))))
