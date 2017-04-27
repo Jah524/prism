@@ -189,5 +189,4 @@
       :output (reduce (fn [acc [item {:keys [w bias]}]]
                         (assoc acc item {:w (make-vector (seq w)) :bias (make-vector (seq bias))}))
                       {}
-                      output))
-    model))
+                      output))))
