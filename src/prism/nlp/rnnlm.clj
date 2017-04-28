@@ -6,7 +6,8 @@
     [clojure.core.async :refer [go]]
     [prism.nn.lstm :as lstm];:refer [lstm-activation init-model train!]]
     [prism.util :as util]
-    [prism.sampling :refer [uniform->cum-uniform samples]]))
+    [prism.sampling :refer [uniform->cum-uniform samples]]
+    [matrix.default :as default]))
 
 (defn convert-rare-word-to-unk
   [wc word]
@@ -47,7 +48,7 @@
   (let [interval-ms (or (:interval-ms option) 30000) ;; 30 seconds
         workers (or (:workers option) 4)
         negative (or (:negative option) 5)
-        initial-learning-rate (or (:learning-rate option) 0.05)
+        initial-learning-rate (or (:learning-rate option) 0.025)
         min-learning-rate (or (:min-learning-rate option) 0.001)
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
         {:keys [wc em input-type]} model
@@ -61,9 +62,9 @@
       (dotimes [w workers]
         (go (loop [negatives (samples neg-cum (* negative cache-size))]
               (if-let [line (.readLine r)]
-                (let [;progress (/ @local-counter all-lines-num)
-                       learning-rate initial-learning-rate;(max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
-                       rnnlm-pair (tok->rnnlm-pairs wc line)]
+                (let [progress (/ @local-counter all-lines-num)
+                      learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
+                      rnnlm-pair (tok->rnnlm-pairs wc line)]
                   (swap! local-counter inc)
                   (if (= :skip rnnlm-pair)
                     (recur negatives)
@@ -74,7 +75,7 @@
                                                                                           (cycle neg-pool))))]
                       (try
                         (let [forward (lstm/sequential-output model x (map #(apply clojure.set/union (vals %)) y))
-                              {:keys [param-loss loss]} (lstm/bptt model forward y option)
+                              {:keys [param-loss loss]} (lstm/bptt model forward y)
                               loss-seq (->> loss
                                             (map #(/ (->> % ; by 1 target and some negatives
                                                           (map (fn [[_ v]] (Math/abs v)))
@@ -108,7 +109,7 @@
 
 
 (defn init-rnnlm-model
-  [wc hidden-size]
+  [wc hidden-size {:keys [matrix-kit] :or {matrix-kit default/default-matrix-kit}}]
   (let [wc-set (conj (set (keys wc)) "<eos>")]
     (-> (lstm/init-model {:input-type :sparse
                           :input-items wc-set
@@ -116,15 +117,16 @@
                           :hidden-size hidden-size
                           :output-type :binary-classification
                           :output-items wc-set
-                          :activation :linear})
+                          :activation :linear
+                          :matrix-kit matrix-kit})
         (assoc :wc wc))))
 
 (defn make-rnnlm
-  [training-path export-path hidden-size & [option]]
+  [training-path export-path hidden-size option]
   (let [_(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
-        model (init-rnnlm-model wc hidden-size)
+        model (init-rnnlm-model wc hidden-size option)
         model-path     (str export-path ".rnnlm")]
     (train-rnnlm! model training-path option)
     (println (str "Saving RNNLM model as " model-path))
