@@ -2,81 +2,71 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
-    [prism.unit :refer [sigmoid tanh activation derivative model-rand random-array binary-classification-error prediction-error]]))
+    [prism.nn.feedforward :as ff]
+    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]))
 
 
 (defn partial-state-sparse
-  [x-input sparses unit-num]
-  (->> x-input
-       (mapv (fn [sparse]
-               (cond (set? x-input)
-                     (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse)]
-                       [block-w input-gate-w forget-gate-w output-gate-w])
-                     (map? x-input)
-                     (let [[sparse-k v] sparse
-                           {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse-k)
-                           v-arr (float-array (take unit-num (repeat v)))]
-                       [(times block-w v-arr) (times input-gate-w v-arr) (times forget-gate-w v-arr) (times output-gate-w v-arr)]))))
-       (apply mapv sum)))
+  "lstm states of each part caused by input"
+  [model x-input sparses unit-num]
+  (let [{:keys [scal sum]} (:matrix-kit model)]
+    (->> x-input
+         (mapv (fn [sparse]
+                 (cond (set? x-input)
+                       (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse)]
+                         [block-w input-gate-w forget-gate-w output-gate-w])
+                       (map? x-input)
+                       (let [[sparse-k v] sparse
+                             {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse-k)]
+                         [(scal v block-w) (scal v input-gate-w) (scal v forget-gate-w) (scal v output-gate-w)]))))
+         (apply mapv sum))))
 
-(defn lstm-activation [model x-input recurrent-input-list previous-cell-state & [lstm-option]]
-  (let [gemv (if-let [it (:gemv lstm-option)] it default/gemv)
-        lstm-layer (:hidden model)
+(defn lstm-activation
+  [model x-input recurrent-input-list previous-cell-state]
+  (let [{:keys [hidden matrix-kit]} model
+        lstm-layer hidden
+        {:keys [gemv sum times sigmoid tanh alter-vec]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole unit-num
                 sparses]} lstm-layer
-        [block' input-gate' forget-gate' output-gate']
-        (if (= (:input-type model) :sparse)
-          (partial-state-sparse x-input sparses unit-num)
-          (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} lstm-layer
-                lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
-            (mapv #(gemv % x-input) lstm-mat)))
+        [block' input-gate' forget-gate' output-gate'] (if (= (:input-type model) :sparse)
+                                                         (partial-state-sparse model x-input sparses unit-num)
+                                                         (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} lstm-layer
+                                                               lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
+                                                           (mapv #(gemv % x-input) lstm-mat)))
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
         [block-r' input-gate-r' forget-gate-r' output-gate-r'] (mapv #(gemv % recurrent-input-list) lstm-mat-r)
         block       (sum block' block-r' block-bias)
         input-gate  (sum input-gate' input-gate-r' input-gate-bias    (times input-gate-peephole  previous-cell-state))
         forget-gate (sum forget-gate' forget-gate-r' forget-gate-bias (times forget-gate-peephole previous-cell-state))
         output-gate (sum output-gate' output-gate-r' output-gate-bias (times output-gate-peephole previous-cell-state))
-        cell-state  (float-array unit-num)
-        _ (dotimes [x unit-num]
-            (aset ^floats cell-state x
-                  (float (+ (* (tanh (aget ^floats block x)) (sigmoid (aget ^floats input-gate x)))
-                            (* (sigmoid (aget ^floats forget-gate x)) (aget ^floats previous-cell-state x))))))
-        lstm (float-array unit-num)
-        _ (dotimes [x unit-num]
-            (aset ^floats lstm x (float (* (sigmoid (aget ^floats output-gate x)) (tanh (aget ^floats cell-state x))))))]
+        cell-state  (sum (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
+                         (times (alter-vec forget-gate sigmoid) previous-cell-state))
+        lstm  (times (alter-vec output-gate sigmoid) (alter-vec cell-state tanh))]
     {:activation lstm
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
 
-(defn output-activation
-  [model input-list sparse-outputs & [lstm-option]]
-  (let [{:keys [output-type output]} model
-        activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
-    (if (= output-type :multi-class-classification)
-      :FIXME
-      (reduce (fn [acc s]
-                (let [{:keys [w bias]} (get output s)]
-                  (assoc acc s (activation-function (+ (reduce + (times w input-list)) (aget ^floats bias 0))))))
-              {}
-              (vec sparse-outputs)))))
 
 (defn lstm-model-output
-  [model x-input sparse-outputs previous-hidden-output previous-cell-state & [lstm-option]]
-  (let [{:keys [activation state]} (lstm-activation model x-input previous-hidden-output previous-cell-state lstm-option)
-        output (if (= :skip sparse-outputs) :skipped (output-activation model activation sparse-outputs lstm-option))]
+  [model x-input sparse-outputs previous-hidden-output previous-cell-state]
+  (let [{:keys [activation state]} (lstm-activation model x-input previous-hidden-output previous-cell-state)
+        output (if (= :skip sparse-outputs) :skipped (ff/output-activation model activation sparse-outputs))]
     {:activation {:input x-input :hidden activation :output output}
      :state  {:input x-input :hidden state}}))
 
-(defn sequential-output [model x-seq output-items-seq & [lstm-option]]
-  (let [hidden-size (:unit-num (:hidden model))]
+(defn sequential-output
+  [model x-seq output-items-seq]
+  (let [{:keys [hidden matrix-kit]} model
+        hidden-size (:unit-num hidden)
+        {:keys [make-vector]} matrix-kit]
     (loop [x-seq x-seq,
            output-items-seq output-items-seq,
-           previous-hidden-output (float-array hidden-size),
-           previous-cell-state    (float-array hidden-size),
+           previous-hidden-output (make-vector hidden-size),
+           previous-cell-state    (make-vector hidden-size),
            acc []]
       (if-let [x-list (first x-seq)]
-        (let [model-output (lstm-model-output model x-list (first output-items-seq) previous-hidden-output previous-cell-state lstm-option)
+        (let [model-output (lstm-model-output model x-list (first output-items-seq) previous-hidden-output previous-cell-state)
               {:keys [activation state]} model-output]
           (recur (rest x-seq)
                  (rest output-items-seq)
@@ -88,75 +78,61 @@
 
 ;;;;    Back Propagation Through Time    ;;;;
 
-(defn output-param-delta
-  [item-delta-pairs hidden-size hidden-activation]
-  (->> item-delta-pairs
-       (reduce (fn [acc [item delta]]
-                 (assoc acc item {:w-delta    (times hidden-activation (float-array (repeat hidden-size delta)))
-                                  :bias-delta (float-array [delta])}))
-               {})))
-
 (defn lstm-part-delta
   "propagation through a lstm unit"
-  [hidden-size propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
+  [model hidden-size propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
    peephole-w-input-gate peephole-w-forget-gate peephole-w-output-gate]
-  (let [output-gate-delta (float-array hidden-size)
-        _dog (derivative (:output-gate lstm-state) :sigmoid)
+  (let [{:keys [matrix-kit]} model
+        {:keys [sum times alter-vec sigmoid tanh]} matrix-kit
+        _dog (derivative (:output-gate lstm-state) :sigmoid matrix-kit)
         _cell-state (:cell-state lstm-state)
-        _ (dotimes [x hidden-size] (aset ^floats output-gate-delta x
-                                         (float (* (aget ^floats _dog x) (tanh (aget ^floats _cell-state x)) (aget ^floats propagated-delta x)))))
-        cell-state-delta (float-array hidden-size)
+        output-gate-delta (times _dog (alter-vec _cell-state tanh) propagated-delta)
         _og (:output-gate lstm-state)
-        _dcs (derivative (:cell-state lstm-state) :tanh)
+        _dcs (derivative (:cell-state lstm-state) :tanh matrix-kit)
         _fg:t+1 (:forget-gate lstm-state:t+1)
         _csd:t+1 (:cell-state-delta self-delta:t+1)
         _igd:t+1 (:input-gate-delta self-delta:t+1)
         _fgd:t+1 (:forget-gate-delta self-delta:t+1)
-        _ (dotimes [x hidden-size] (aset ^floats cell-state-delta x
-                                         (float (+ (* (sigmoid (aget ^floats _og x)) (aget ^floats _dcs x) (aget ^floats propagated-delta x))
-                                                   (* (sigmoid (aget ^floats _fg:t+1 x)) (aget ^floats _csd:t+1 x))
-                                                   (* (aget ^floats peephole-w-input-gate  x) (aget ^floats _igd:t+1 x))
-                                                   (* (aget ^floats peephole-w-forget-gate x) (aget ^floats _fgd:t+1 x))
-                                                   (* (aget ^floats peephole-w-output-gate x) (aget ^floats output-gate-delta x))))))
-        block-delta (float-array hidden-size)
+        cell-state-delta (sum (times (alter-vec _og sigmoid) _dcs propagated-delta)
+                              (times (alter-vec _fg:t+1 sigmoid) _csd:t+1)
+                              (times peephole-w-input-gate _igd:t+1)
+                              (times peephole-w-forget-gate _fgd:t+1)
+                              (times peephole-w-output-gate output-gate-delta))
         _ig (:input-gate lstm-state)
-        _db (derivative (:block lstm-state) :tanh)
-        _ (dotimes [x hidden-size] (aset ^floats block-delta x
-                                         (float (* (sigmoid (aget ^floats _ig x)) (aget ^floats _db x) (aget ^floats cell-state-delta x)))))
-        forget-gate-delta (float-array hidden-size)
-        _dfg (derivative (:forget-gate lstm-state) :sigmoid)
-        _ (dotimes [x hidden-size] (aset ^floats forget-gate-delta x
-                                         (float (* (aget ^floats _dfg x) (aget ^floats cell-state:t-1 x) (aget ^floats cell-state-delta x)))))
-        input-gate-delta (float-array hidden-size)
-        _dig (derivative (:input-gate lstm-state) :sigmoid)
+        _db (derivative (:block lstm-state) :tanh matrix-kit)
+        block-delta (times (alter-vec _ig sigmoid) _db cell-state-delta)
+        _dfg (derivative (:forget-gate lstm-state) :sigmoid matrix-kit)
+        forget-gate-delta (times _dfg cell-state:t-1 cell-state-delta)
+        _dig (derivative (:input-gate lstm-state) :sigmoid matrix-kit)
         _b (:block lstm-state)
-        _ (dotimes [x hidden-size] (aset ^floats input-gate-delta x
-                                         (float (* (aget ^floats _dig x) (tanh (aget ^floats _b x)) (aget ^floats cell-state-delta x)))))]
+        input-gate-delta (times _dig (alter-vec _b tanh) cell-state-delta)]
     {:output-gate-delta output-gate-delta :cell-state-delta cell-state-delta :block-delta block-delta
      :forget-gate-delta forget-gate-delta :input-gate-delta input-gate-delta}))
 
 (defn param-delta-sparse
-  [x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num]
-  (reduce (fn [acc sparse]
-            (cond (set? x-input)
-                  (assoc acc sparse {:block-w-delta block-delta
-                                     :input-gate-w-delta  input-gate-delta
-                                     :forget-gate-w-delta forget-gate-delta
-                                     :output-gate-w-delta output-gate-delta})
-                  (map? x-input)
-                  (let [[sparse-k v] sparse
-                        v-arr (float-array (take unit-num (repeat v)))]
-                    (assoc acc sparse-k {:block-w-delta       (times block-delta v-arr)
-                                         :input-gate-w-delta  (times input-gate-delta v-arr)
-                                         :forget-gate-w-delta (times forget-gate-delta v-arr)
-                                         :output-gate-w-delta (times output-gate-delta v-arr)}))))
-          {}
-          x-input))
+  [model x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num]
+  (let [{:keys [scal]} (:matrix-kit model)]
+    (reduce (fn [acc sparse]
+              (cond (set? x-input)
+                    (assoc acc sparse {:block-w-delta block-delta
+                                       :input-gate-w-delta  input-gate-delta
+                                       :forget-gate-w-delta forget-gate-delta
+                                       :output-gate-w-delta output-gate-delta})
+                    (map? x-input)
+                    (let [[sparse-k v] sparse]
+                      (assoc acc sparse-k {:block-w-delta       (scal v block-delta)
+                                           :input-gate-w-delta  (scal v input-gate-delta)
+                                           :forget-gate-w-delta (scal v forget-gate-delta)
+                                           :output-gate-w-delta (scal v output-gate-delta)}))))
+            {}
+            x-input)))
 
 (defn lstm-param-delta
   [model lstm-part-delta x-input self-activation:t-1 self-state:t-1]
-  (let [{:keys [sparses unit-num]} (:hidden model)
-        sparse? (= (:input-type model) :sparse)
+  (let [{:keys [hidden  matrix-kit input-type]} model
+        {:keys [outer times]} matrix-kit
+        {:keys [sparses unit-num]} hidden
+        sparse? (= input-type :sparse)
         {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
         block-wr-delta       (outer block-delta self-activation:t-1)
         input-gate-wr-delta  (outer input-gate-delta self-activation:t-1)
@@ -174,7 +150,7 @@
                   :peephole-input-gate-delta peephole-input-gate :peephole-forget-gate-delta peephole-forget-gate
                   :peephole-output-gate-delta peephole-output-gate}
         param-delta (if sparse?
-                      (-> template (assoc :sparses-delta (param-delta-sparse x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num)))
+                      (-> template (assoc :sparses-delta (param-delta-sparse model x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num)))
                       (let [block-w-delta        (outer block-delta x-input)
                             input-gate-w-delta   (outer input-gate-delta x-input)
                             forget-gate-w-delta  (outer forget-gate-delta x-input)
@@ -185,22 +161,37 @@
     param-delta))
 
 (defn lstm-delta-zeros
-  [unit-num]
-  {:block-delta       (float-array unit-num)
-   :input-gate-delta  (float-array unit-num)
-   :forget-gate-delta (float-array unit-num)
-   :output-gate-delta (float-array unit-num)
-   :cell-state-delta  (float-array unit-num)})
+  [make-vector unit-num]
+  {:block-delta       (make-vector unit-num)
+   :input-gate-delta  (make-vector unit-num)
+   :forget-gate-delta (make-vector unit-num)
+   :output-gate-delta (make-vector unit-num)
+   :cell-state-delta  (make-vector unit-num)})
 
 (defn gate-zeros
-  [unit-num]
-  {:forget-gate (float-array unit-num)})
+  [make-vector unit-num]
+  {:forget-gate (make-vector unit-num)})
 
+(defn merge-param
+  [sum merger! acc param-delta]
+  (if (nil? acc)
+    param-delta
+    (merge-with #(cond
+                   (map? %1); if each value is sparses
+                   (merge-with (fn [accw dw] ;for each items
+                                 (if (map? accw)
+                                   (merge-with (fn [a b] (sum a b)) accw dw);sprase w of each gates
+                                   (sum accw dw)));w also bias
+                               %1 %2)
+                   :else ;if hidden weight map or bias
+                   (merger! %2 %1))
+                acc
+                param-delta)))
 
 (defn bptt
-  [model activation output-items-seq & [option]]
-  (let [gemv (if-let [it (:gemv option)] it default/gemv)
-        {:keys [output hidden]} model
+  [model activation output-items-seq]
+  (let [{:keys [output hidden matrix-kit]} model
+        {:keys [make-vector scal sum merger! transpose gemv]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden]
@@ -208,8 +199,8 @@
     (loop [output-items-seq (reverse output-items-seq),
            propagated-hidden-to-hidden-delta nil,
            output-seq (reverse activation),
-           self-delta:t+1 (lstm-delta-zeros unit-num),
-           lstm-state:t+1 (gate-zeros unit-num),
+           self-delta:t+1 (lstm-delta-zeros make-vector unit-num),
+           lstm-state:t+1 (gate-zeros make-vector unit-num),
            output-loss [],
            output-acc nil,
            hidden-acc nil]
@@ -229,14 +220,13 @@
                              :binary-classification
                              (binary-classification-error (:output (:activation (first output-seq))) pos neg)
                              :prediction
-                             (prediction-error  (:output (:activation (first output-seq))) (first output-items-seq)))
-              output-param-delta (output-param-delta output-delta unit-num (:hidden (:activation (first output-seq))))
+                             (prediction-error (:output (:activation (first output-seq))) (first output-items-seq)))
+              output-param-delta (ff/output-param-delta model output-delta unit-num (:hidden (:activation (first output-seq))))
               propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
-                                                              (let [w (:w (get output item))
-                                                                    v (float-array (repeat unit-num delta))]
-                                                                (times w v))))
+                                                              (let [w (:w (get output item))]
+                                                                (scal delta w))))
                                                        (apply sum)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
@@ -247,18 +237,18 @@
                                             propagated-output-to-hidden-delta)
               ;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
-              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (float-array unit-num))
-              lstm-part-delta (lstm-part-delta unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
+              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (make-vector unit-num))
+              lstm-part-delta (lstm-part-delta model unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (:activation (first output-seq)))
               self-activation:t-1 (or (:hidden (:activation (second output-seq)))
-                                      (float-array unit-num));when first output time (last time of bptt
-              self-state:t-1      (or (:hidden (:state      (second output-seq)))
-                                      {:cell-state (float-array unit-num)});when first output time (last time of bptt)
+                                      (make-vector unit-num));when first output time (last time of bptt
+              self-state:t-1      (or (:hidden (:state (second output-seq)))
+                                      {:cell-state (make-vector unit-num)});when first output time (last time of bptt)
               lstm-param-delta (lstm-param-delta model lstm-part-delta x-input self-activation:t-1 self-state:t-1)
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
-                                                                (gemv (transpose unit-num w) d))
+                                                                (gemv (transpose w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
                                                          (apply sum))]
@@ -268,25 +258,8 @@
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (cons output-delta output-loss)
-                 (if (nil? output-acc)
-                   output-param-delta
-                   (merge-with #(if (map? %1); if sparses
-                                  (merge-with (fn [accw dw]
-                                                (sum accw dw));w also bias
-                                              %1 %2)
-                                  (sum %1 %2))
-                               output-acc
-                               output-param-delta))
-                 (if (nil? hidden-acc)
-                   lstm-param-delta
-                   (merge-with #(if (map? %1); if sparses
-                                  (merge-with (fn [accw dw]
-                                                (merge-with (fn [acc d]
-                                                              (sum acc d))
-                                                            accw dw))
-                                              %1 %2)
-                                  (sum %1 %2))
-                               hidden-acc lstm-param-delta))))
+                 (merge-param sum merger! output-acc output-param-delta)
+                 (merge-param sum merger! hidden-acc lstm-param-delta)))
         :else
         {:param-loss  {:output-delta output-acc
                        :hidden-delta hidden-acc}
@@ -295,7 +268,8 @@
 
 (defn update-model!
   [model param-delta-list learning-rate]
-  (let [{:keys [output hidden]} model
+  (let [{:keys [output hidden matrix-kit input-type]} model
+        {:keys [rewrite-vector! rewrite-matrix!]} matrix-kit
         {:keys [output-delta hidden-delta]} param-delta-list
         {:keys [block-w-delta block-wr-delta block-bias-delta input-gate-w-delta input-gate-wr-delta input-gate-bias-delta
                 forget-gate-w-delta forget-gate-wr-delta forget-gate-bias-delta output-gate-w-delta output-gate-wr-delta output-gate-bias-delta
@@ -308,65 +282,62 @@
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
-                  (aset ^floats bias 0 (float (+ (aget ^floats bias 0) (* learning-rate (aget ^floats bias-delta 0)))))
-                  (dotimes [x unit-num]
-                    (aset ^floats w x (float (+ (aget ^floats w x) (* learning-rate (aget ^floats w-delta x)))))))))
-         doall)
+                  (rewrite-vector! learning-rate bias bias-delta)
+                  (rewrite-vector! learning-rate w w-delta))))
+         dorun)
     ;update input connection
-    (if sparse?
+    (if (= input-type :sparse)
       (->> sparses-delta
            vec
            (mapv (fn [[word lstm-w-delta]]
                    (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]} lstm-w-delta
                          {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses word)]
                      (dotimes [x unit-num]
-                       (aset ^floats block-w x (float (+ (aget ^floats block-w x) (* learning-rate (aget ^floats block-w-delta x)))))
-                       (aset ^floats input-gate-w x (float (+ (aget ^floats input-gate-w x) (* learning-rate (aget ^floats input-gate-w-delta x)))))
-                       (aset ^floats forget-gate-w x (float (+ (aget ^floats forget-gate-w x) (* learning-rate (aget ^floats forget-gate-w-delta x)))))
-                       (aset ^floats output-gate-w x (float (+ (aget ^floats output-gate-w x) (* learning-rate (aget ^floats output-gate-w-delta x)))))))))
-           doall)
-      (dotimes [x (count block-w-delta)]
-        (aset ^floats block-w x (float (+ (aget ^floats block-w x) (* learning-rate (aget ^floats block-w-delta x)))))
-        (aset ^floats input-gate-w x (float (+ (aget ^floats input-gate-w x) (* learning-rate (aget ^floats input-gate-w-delta x)))))
-        (aset ^floats forget-gate-w x (float (+ (aget ^floats forget-gate-w x) (* learning-rate (aget ^floats forget-gate-w-delta x)))))
-        (aset ^floats output-gate-w x (float (+ (aget ^floats output-gate-w x) (* learning-rate (aget ^floats output-gate-w-delta x)))))))
+                       (rewrite-vector! learning-rate block-w block-w-delta)
+                       (rewrite-vector! learning-rate input-gate-w input-gate-w-delta)
+                       (rewrite-vector! learning-rate forget-gate-w forget-gate-w-delta)
+                       (rewrite-vector! learning-rate output-gate-w output-gate-w-delta)))))
+           dorun)
+      (do
+        (rewrite-matrix! learning-rate block-w block-w-delta)
+        (rewrite-matrix! learning-rate input-gate-w input-gate-w-delta)
+        (rewrite-matrix! learning-rate forget-gate-w forget-gate-w-delta)
+        (rewrite-matrix! learning-rate output-gate-w output-gate-w-delta)))
     ;update recurrent connection
-    (dotimes [x (* unit-num unit-num)]
-      (aset ^floats block-wr x (float (+ (aget ^floats block-wr x) (* learning-rate (aget ^floats block-wr-delta x)))))
-      (aset ^floats input-gate-wr x (float (+ (aget ^floats input-gate-wr x) (* learning-rate (aget ^floats input-gate-wr-delta x)))))
-      (aset ^floats forget-gate-wr x (float (+ (aget ^floats forget-gate-wr x) (* learning-rate (aget ^floats forget-gate-wr-delta x)))))
-      (aset ^floats output-gate-wr x (float (+ (aget ^floats output-gate-wr x) (* learning-rate (aget ^floats output-gate-wr-delta x))))))
+    (rewrite-matrix! learning-rate  block-wr  block-wr-delta)
+    (rewrite-matrix! learning-rate  input-gate-wr  input-gate-wr-delta)
+    (rewrite-matrix! learning-rate  forget-gate-wr  forget-gate-wr-delta)
+    (rewrite-matrix! learning-rate  output-gate-wr  output-gate-wr-delta)
     ;update lstm bias and peephole
-    (dotimes [x unit-num]
-      ;update bias
-      (aset ^floats block-bias x (float (+ (aget ^floats block-bias x) (* learning-rate (aget ^floats block-bias-delta x)))))
-      (aset ^floats input-gate-bias x (float (+ (aget ^floats input-gate-bias x) (* learning-rate (aget ^floats input-gate-bias-delta x)))))
-      (aset ^floats forget-gate-bias x (float (+ (aget ^floats forget-gate-bias x) (* learning-rate (aget ^floats forget-gate-bias-delta x)))))
-      (aset ^floats output-gate-bias x (float (+ (aget ^floats output-gate-bias x) (* learning-rate (aget ^floats output-gate-bias-delta x)))))
-      ;and peephole
-      (when (aset ^floats input-gate-peephole  x
-                  (float (+ (aget ^floats input-gate-peephole x)  (* learning-rate (aget ^floats peephole-input-gate-delta  x))))))
-      (when (aset ^floats forget-gate-peephole x
-                  (float (+ (aget ^floats forget-gate-peephole x) (* learning-rate (aget ^floats peephole-forget-gate-delta x))))))
-      (when (aset ^floats output-gate-peephole x
-                  (float (+ (aget ^floats output-gate-peephole x) (* learning-rate (aget ^floats peephole-output-gate-delta x)))))))
+    (rewrite-vector! learning-rate block-bias block-bias-delta)
+    (rewrite-vector! learning-rate input-gate-bias input-gate-bias-delta)
+    (rewrite-vector! learning-rate forget-gate-bias forget-gate-bias-delta)
+    (rewrite-vector! learning-rate output-gate-bias output-gate-bias-delta)
+    (rewrite-vector! learning-rate input-gate-peephole peephole-input-gate-delta)
+    (rewrite-vector! learning-rate forget-gate-peephole peephole-forget-gate-delta)
+    (rewrite-vector! learning-rate output-gate-peephole peephole-output-gate-delta)
     model))
 
 
 (defn init-model
-  [{:keys [input-type input-items input-size hidden-size output-type output-items]}]
-  (let [sparse-input? (= input-type :sparse)]
-    {:hidden (let [bwr (random-array (* hidden-size hidden-size));for recurrent connection
-                   bb  (random-array hidden-size)
-                   iwr (random-array (* hidden-size hidden-size))
-                   ib  (random-array hidden-size)
-                   ip  (random-array hidden-size)
-                   fwr (random-array (* hidden-size hidden-size))
-                   fb  (float-array (take hidden-size (repeat (float 1))))
-                   fp  (random-array hidden-size)
-                   owr (random-array (* hidden-size hidden-size))
-                   ob  (random-array hidden-size)
-                   op  (random-array hidden-size)
+  [{:keys [input-type input-items input-size hidden-size output-type output-items matrix-kit]
+    :or {matrix-kit default/default-matrix-kit}}]
+  (let [sparse-input? (= input-type :sparse)
+        {:keys [type make-vector init-vector init-matrix]} matrix-kit]
+    (println (str "initializing model as " (if (= type :native) "native-array" "float-array") " ..."))
+    {:matrix-kit matrix-kit
+     :weight-type type
+     :hidden (let [bwr (init-matrix  hidden-size hidden-size);for recurrent connection
+                   bb  (init-vector hidden-size)
+                   iwr (init-matrix  hidden-size hidden-size)
+                   ib  (init-vector hidden-size)
+                   ip  (init-vector hidden-size)
+                   fwr (init-matrix  hidden-size hidden-size)
+                   fb  (make-vector (take hidden-size (repeat (float 1))))
+                   fp  (init-vector hidden-size)
+                   owr (init-matrix  hidden-size hidden-size)
+                   ob  (init-vector hidden-size)
+                   op  (init-vector hidden-size)
                    template {:unit-num hidden-size
                              :block-wr       bwr   :block-bias           bb
                              :input-gate-wr  iwr   :input-gate-bias      ib
@@ -376,27 +347,22 @@
                              :output-gate-peephole op}]
                (if (= input-type :sparse)
                  (let [sparses (reduce (fn [acc sparse]
-                                         (assoc acc sparse {:block-w       (random-array hidden-size)
-                                                            :input-gate-w  (random-array hidden-size)
-                                                            :forget-gate-w (random-array hidden-size)
-                                                            :output-gate-w (random-array hidden-size)}))
+                                         (assoc acc sparse {:block-w       (init-vector hidden-size)
+                                                            :input-gate-w  (init-vector hidden-size)
+                                                            :forget-gate-w (init-vector hidden-size)
+                                                            :output-gate-w (init-vector hidden-size)}))
                                        {} input-items)]
                    (-> template (assoc :sparses sparses :sparse? (= input-type :sparse))))
-                 (let [bw  (random-array (* input-size hidden-size))
-                       iw  (random-array (* input-size hidden-size))
-                       fw  (random-array (* input-size hidden-size))
-                       ow  (random-array (* input-size hidden-size))]
+                 (let [bw  (init-matrix input-size hidden-size)
+                       iw  (init-matrix input-size hidden-size)
+                       fw  (init-matrix input-size hidden-size)
+                       ow  (init-matrix input-size hidden-size)]
                    (-> template (assoc :block-w bw :input-gate-w iw  :forget-gate-w fw :output-gate-w ow)))))
      :output (reduce (fn [acc sparse]
-                       (assoc acc sparse {:w (random-array hidden-size) :bias (float-array [(model-rand)])}))
+                       (assoc acc sparse {:w (init-vector hidden-size) :bias (init-vector 1)}))
                      {}
                      output-items)
      :input-type input-type
      :input-size input-size
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
-
-(defn train!
-  [model x-seq training learning-rate & [option]]
-  (let [delta-list (bptt model x-seq training option)]
-    (update-model! model delta-list learning-rate)))

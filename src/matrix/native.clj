@@ -11,6 +11,10 @@
   ([v1 v2 & more]
    (reduce #(sum %1 %2) (sum v1 v2) more)))
 
+(defn merger!
+  [m m!]
+  (c/axpy! m m!))
+
 (defn minus
   ([v1 v2]
    (c/axpy (double -1) v2 v1))
@@ -68,7 +72,6 @@
     (rewrite-vector! alpha (c/row a! i) (c/row a2 i)))
   a!)
 
-
 (defn alter-vec
   [v f]
   (let [tmp (c/copy v)]
@@ -82,6 +85,7 @@
 (def native-matrix-kit
   {:type :native
    :sum sum
+   :merger! merger!
    :minus minus
    :times times
    :times! times!

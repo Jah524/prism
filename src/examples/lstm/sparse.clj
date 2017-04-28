@@ -1,8 +1,9 @@
 (ns examples.lstm.sparse
   (:require
     [clojure.pprint :refer [pprint]]
-    [prism.nn.lstm :as lstm]
-    [clj-time.local  :as l]))
+    [clj-time.local  :as l]
+    [matrix.default :refer [default-matrix-kit]]
+    [prism.nn.lstm :as lstm]))
 
 
 (defn train-sgd [model training-list learning-rate]
@@ -33,11 +34,6 @@
             (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
                               ", optimizer: SGD"
                               ", learning-rate: " learning-rate ", loss: " loss)))
-          (when (= 0 (rem e 1000))
-            (println (apply str "[ Sparse Model ]: "
-                            (->> (map #(:unit-num %) (:layers model))
-                                 (cons (count (first (:x (first training-list)))))
-                                 (interpose " => ")))))
           (recur updated-model  (inc e)))
         model))))
 
@@ -56,13 +52,16 @@
 
 (defn sparse-demo
   "success with 10 lstm units"
-  []
-  (let [model (train-with-demo-dataset (lstm/init-model {:input-items #{"A" "B" "C" "D"}
+  [matrix-kit]
+  (let [mk (or matrix-kit default-matrix-kit)
+        {:keys [make-vector]} mk
+        model (train-with-demo-dataset (lstm/init-model {:input-items #{"A" "B" "C" "D"}
                                                          :output-items #{"prediction"}
                                                          :input-type :sparse
                                                          :inupt-size nil
                                                          :hidden-size 10
-                                                         :output-type :prediction})
+                                                         :output-type :prediction
+                                                         :matrix-kit mk})
                                        dataset-sparse
                                        {:loss-interval 100
                                         :epoc 2000
@@ -93,4 +92,4 @@
     ))
 
 (defn -main []
-  (sparse-demo))
+  (sparse-demo nil))

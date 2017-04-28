@@ -2,27 +2,30 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.test :refer :all]
+    [matrix.default :refer [default-matrix-kit]]
+    [prism.nn.feedforward :as ff]
     [prism.nn.lstm :refer :all]))
 
 
 (def sample-w-network
-  {:input-type :dense
+  {:matrix-kit default-matrix-kit
+   :input-type :dense
    :input-size 3
    :output-type :binary-classification
    :hidden {:unit-type :lstm
             :unit-num 10
             :layer-type :hidden
-            :block-w (float-array (take 30 (repeat 0.1)))
-            :block-wr (float-array (take 100 (repeat 0.1)))
+            :block-w (object-array (map float-array (partition 3 (take 30 (repeat 0.1)))))
+            :block-wr (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :block-bias (float-array (take 10 (repeat -1)))
-            :input-gate-w  (float-array (take 30 (repeat 0.1)))
-            :input-gate-wr  (float-array (take 100 (repeat 0.1)))
+            :input-gate-w  (object-array (map float-array (partition 3 (take 30 (repeat 0.1)))))
+            :input-gate-wr  (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :input-gate-bias (float-array (take 10 (repeat -1)))
-            :forget-gate-w (float-array (take 30 (repeat 0.1)))
-            :forget-gate-wr (float-array (take 100 (repeat 0.1)))
+            :forget-gate-w (object-array (map float-array (partition 3 (take 30 (repeat 0.1)))))
+            :forget-gate-wr (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :forget-gate-bias (float-array (take 10 (repeat -1)))
-            :output-gate-w (float-array (take 30 (repeat 0.1)))
-            :output-gate-wr (float-array (take 100 (repeat 0.1)))
+            :output-gate-w (object-array (map float-array (partition 3 (take 30 (repeat 0.1)))))
+            :output-gate-wr (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :output-gate-bias (float-array (take 10 (repeat -1)))
             :peephole #{:input-gate :forget-gate :output-gate}
             :input-gate-peephole  (float-array (take 10 (repeat -0.1)))
@@ -36,7 +39,8 @@
                            :bias (float-array [-1])}}})
 
 (def sample-w-network-sparse
-  {:input-type :sparse
+  {:matrix-kit default-matrix-kit
+   :input-type :sparse
    :output-type :binary-classification
    :hidden {:sparses {"natural" {:block-w (float-array (take 10 (repeat 0.1)))
                                  :input-gate-w  (float-array (take 10 (repeat 0.1)))
@@ -51,13 +55,13 @@
                                     :forget-gate-w (float-array (take 10 (repeat 0.1)))
                                     :output-gate-w (float-array (take 10 (repeat 0.1)))}}
             :unit-num 10
-            :block-wr (float-array (take 100 (repeat 0.1)))
+            :block-wr (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :block-bias (float-array (take 10 (repeat -1)))
-            :input-gate-wr  (float-array (take 100 (repeat 0.1)))
+            :input-gate-wr  (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :input-gate-bias (float-array (take 10 (repeat -1)))
-            :forget-gate-wr (float-array (take 100 (repeat 0.1)))
+            :forget-gate-wr (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :forget-gate-bias (float-array (take 10 (repeat -1)))
-            :output-gate-wr (float-array (take 100 (repeat 0.1)))
+            :output-gate-wr (object-array (map float-array (partition 10 (take 100 (repeat 0.1)))))
             :output-gate-bias (float-array (take 10 (repeat -1)))
             :input-gate-peephole  (float-array (take 10 (repeat -0.1)))
             :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
@@ -71,7 +75,8 @@
                            :bias (float-array [-1])}}})
 
 (def sample-w-network-prediction
-  {:input-type :sparse
+  {:matrix-kit default-matrix-kit
+   :input-type :sparse
    :output-type :prediction
    :unit-nums [3 10 1]
    :hidden {:sparses {"natural" {:block-w (float-array (take 10 (repeat 0.1)))
@@ -87,13 +92,13 @@
                                     :forget-gate-w (float-array (take 10 (repeat 0.1)))
                                     :output-gate-w (float-array (take 10 (repeat 0.1)))}}
             :unit-num 10
-            :block-wr (float-array (take 100 (repeat 0.1)))
+            :block-wr (object-array (map float-array (partition 10 (take 100 (take 100 (repeat 0.1))))))
             :block-bias (float-array (take 10 (repeat -1)))
-            :input-gate-wr  (float-array (take 100 (repeat 0.1)))
+            :input-gate-wr  (object-array (map float-array (partition 10 (take 100 (take 100 (repeat 0.1))))))
             :input-gate-bias (float-array (take 10 (repeat -1)))
-            :forget-gate-wr (float-array (take 100 (repeat 0.1)))
+            :forget-gate-wr (object-array (map float-array (partition 10 (take 100 (take 100 (repeat 0.1))))))
             :forget-gate-bias (float-array (take 10 (repeat -1)))
-            :output-gate-wr (float-array (take 100 (repeat 0.1)))
+            :output-gate-wr (object-array (map float-array (partition 10 (take 100 (take 100 (repeat 0.1))))))
             :output-gate-bias (float-array (take 10 (repeat -1)))
             :input-gate-peephole  (float-array (take 10 (repeat -0.1)))
             :forget-gate-peephole (float-array (take 10 (repeat -0.1)))
@@ -105,15 +110,15 @@
 (deftest lstm-test
   (testing "partial-state-sparse with set"
     (let [{:keys [hidden]} sample-w-network-sparse]
-      (is (= (->> (partial-state-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
+      (is (= (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
              (take 4 (repeat (take 10 (repeat (float 0.1)))))))))
   (testing "partial-state-sparse with map"
     (let [{:keys [hidden]} sample-w-network-sparse]
-      (is (= (->> (partial-state-sparse {"language" 1} (:sparses hidden) (:unit-num hidden)) (map vec))
-             (->> (partial-state-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
+      (is (= (->> (partial-state-sparse sample-w-network-sparse {"language" 1} (:sparses hidden) (:unit-num hidden)) (map vec))
+             (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
              (take 4 (repeat (take 10 (repeat (float 0.1)))))))
-      (is (not= (->> (partial-state-sparse {"language" 2} (:sparses hidden) (:unit-num hidden)) (map vec))
-                (->> (partial-state-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))))))
+      (is (not= (->> (partial-state-sparse sample-w-network-sparse {"language" 2} (:sparses hidden) (:unit-num hidden)) (map vec))
+                (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))))))
   (testing "lstm-activation"
     (let [result (lstm-activation sample-w-network
                                   (float-array (take 3 (repeat 2)))
@@ -251,7 +256,7 @@
 
   ;; Back Propagation Through Time ;;
   (testing "output-param-delta"
-    (let [result (->> (output-param-delta {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
+    (let [result (->> (ff/output-param-delta {:matrix-kit default-matrix-kit} {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
                       (reduce (fn [acc [item {:keys [w-delta bias-delta]}]]
                                 (assoc acc item {:w-delta (mapv float w-delta) :bias-delta (map float bias-delta)}))
                               {}))
@@ -261,7 +266,8 @@
       (is (= C {:w-delta (map float [-0.0 -0.5 -1.0 -1.5 -2.0 -2.5 -3.0 -3.5 -4.0 -4.5]) :bias-delta [(float -0.5)]}))))
 
   (testing "lstm-part-delta with peephole, assumed 1 lstm unit"
-    (let [result (lstm-part-delta 1
+    (let [result (lstm-part-delta {:matrix-kit default-matrix-kit}
+                                  1
                                   (float-array [10])
                                   {:input-gate-delta (float-array [2]) :forget-gate-delta (float-array [2]) :cell-state-delta (float-array [2])}
                                   {:output-gate (float-array [1]) :forget-gate (float-array [1]) :input-gate (float-array [1]) :block (float-array [1.2]) :cell-state (float-array[2])}
@@ -270,15 +276,16 @@
                                   (float-array [2])
                                   (float-array [3])
                                   (float-array[4]))]
-      (is (= (vec (:output-gate-delta result)) [(float 1.8953932621681382)]))
+      (is (= (vec (:output-gate-delta result)) [(float 1.8953931)]))
       (is (= (vec (:cell-state-delta result)) [(float 19.56018912189448)]))
-      (is (= (vec (:block-delta result)) [(float 4.3616767)]))
+      (is (= (vec (:block-delta result)) [(float 4.361677)]))
       (is (= (vec (:forget-gate-delta result)) [(float 3.8457663)]))
       (is (= (vec (:input-gate-delta result)) [(float 3.2060409)]))))
 
   (testing "param-delta-sparse with set"
     (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]}
-          (-> (param-delta-sparse #{"processing"}
+          (-> (param-delta-sparse {:matrix-kit default-matrix-kit}
+                                  #{"processing"}
                                   (float-array (take 10 (repeat 1)))
                                   (float-array (take 10 (repeat 1)))
                                   (float-array (take 10 (repeat 1)))
@@ -301,14 +308,14 @@
                                    (float-array [2 1 -1])
                                    (:hidden (:activation (first it)))
                                    (:hidden (:state      (first it))))]
-      (is (= (vec (:block-w-delta result))  (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
-      (is (= (vec (:block-wr-delta result)) (take 100 (repeat (float -0.0629378)))))
-      (is (= (vec (:input-gate-w-delta result)) (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
-      (is (= (vec (:input-gate-wr-delta result))  (take 100 (repeat (float -0.0629378)))))
-      (is (= (vec (:forget-gate-w-delta result)) (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
-      (is (= (vec (:forget-gate-wr-delta result)) (take 100 (repeat (float -0.0629378)))))
-      (is (= (vec (:output-gate-w-delta result))  (take 30 (flatten (repeat (map float [2.0 1.0 -1.0]))))))
-      (is (= (vec (:output-gate-wr-delta result)) (take 100 (repeat (float -0.0629378)))))
+      (is (= (map vec (:block-w-delta result))  (partition 3 (take 30 (flatten (repeat (map float [2.0 1.0 -1.0])))))))
+      (is (= (map vec (:block-wr-delta result)) (partition 10 (take 100 (repeat (float -0.0629378))))))
+      (is (= (map vec (:input-gate-w-delta result)) (partition 3 (take 30 (flatten (repeat (map float [2.0 1.0 -1.0])))))))
+      (is (= (map vec (:input-gate-wr-delta result)) (partition 10 (take 100 (repeat (float -0.0629378))))))
+      (is (= (map vec (:forget-gate-w-delta result)) (partition 3 (take 30 (flatten (repeat (map float [2.0 1.0 -1.0])))))))
+      (is (= (map vec (:forget-gate-wr-delta result)) (partition 10 (take 100 (repeat (float -0.0629378))))))
+      (is (= (map vec (:output-gate-w-delta result))  (partition 3 (take 30 (flatten (repeat (map float [2.0 1.0 -1.0])))))))
+      (is (= (map vec (:output-gate-wr-delta result)) (partition 10 (take 100 (repeat (float -0.0629378))))))
       (is (= (vec (:block-bias-delta result)) (take 10 (repeat (float 1)))))
       (is (= (vec (:input-gate-bias-delta result)) (take 10 (repeat (float 1)))))
       (is (= (vec (:forget-gate-bias-delta result)) (take 10 (repeat (float 1)))))
@@ -338,17 +345,17 @@
                                     (:hidden (:state      (first it2))))
           ws (get (:sparses-delta result) "processing")]
       (is (= (vec (:block-w-delta ws))
-             (->> (take-nth 3 (drop 2 (vec (:block-w-delta result2)))))))
+             (->> (vec (map #(nth % 2) (:block-w-delta result2))))))
       (is (= (vec (:input-gate-w-delta ws))
-             (->> (take-nth 3 (drop 2 (vec (:input-gate-w-delta result2)))))))
+             (->> (vec (map #(nth % 2) (:input-gate-w-delta result2))))))
       (is (= (vec (:forget-gate-w-delta ws))
-             (->> (take-nth 3 (drop 2 (vec (:forget-gate-w-delta result2)))))))
+             (->> (vec (map #(nth % 2) (:forget-gate-w-delta result2))))))
       (is (= (vec (:output-gate-w-delta ws))
-             (->> (take-nth 3 (drop 2 (vec (:output-gate-w-delta result2)))))))))
+             (->> (vec (map #(nth % 2) (:output-gate-w-delta result2))))))))
 
 
   (testing "lstm-delta-zeros"
-    (let [result (lstm-delta-zeros (:unit-num (:hidden sample-w-network)))]
+    (let [result (lstm-delta-zeros (:make-vector default-matrix-kit) (:unit-num (:hidden sample-w-network)))]
       (is (= (count (:block-delta result))  10))
       (is (= (count (:input-gate-delta result)) 10))
       (is (= (count (:forget-gate-delta result)) 10))
@@ -363,19 +370,22 @@
           {hd :hidden-delta od :output-delta} param-loss]
       (is (= (count loss) 2))
       (is (= loss [{"prediction1" (float 0.74250054) "prediction3" (float -0.25749943)} {"prediction2" (float 0.746551) "prediction3" (float -0.25344902)}]))
-      (is (= (count (:block-w-delta                 hd)) 30))
-      (is (= (count (remove zero? (:block-w-delta   hd))) 20))
-      (is (= (count (remove zero? (:block-wr-delta  hd))) 100))
-      (is (= (count (:input-gate-w-delta            hd)) 30))
-      (is (= (count (remove zero? (:input-gate-w-delta   hd))) 20))
-      (is (= (count (remove zero? (:input-gate-wr-delta  hd))) 100))
-      (is (= (count (:forget-gate-w-delta           hd)) 30))
-      (is (= (count (remove zero? (:forget-gate-w-delta   hd))) 10))
-      (is (= (count (:forget-gate-wr-delta          hd)) 100))
-      (is (= (count (remove zero? (:forget-gate-wr-delta  hd))) 100))
-      (is (= (count (:output-gate-w-delta           hd)) 30))
-      (is (= (count (remove zero? (:output-gate-w-delta   hd))) 20))
-      (is (= (count (remove zero? (:output-gate-wr-delta  hd))) 100))
+      (is (= (count (:block-w-delta                 hd)) 10))
+      (is (= (count (first (:block-w-delta               hd))) 3))
+      (is (= (count (:block-wr-delta  hd)) 10))
+      (is (= (count (first (:block-wr-delta  hd))) 10))
+      (is (= (count (:input-gate-w-delta            hd)) 10))
+      (is (= (count (first (:input-gate-w-delta          hd))) 3))
+      (is (= (count (:input-gate-wr-delta  hd)) 10))
+      (is (= (count (first (:input-gate-wr-delta  hd))) 10))
+      (is (= (count (:forget-gate-w-delta           hd)) 10))
+      (is (= (count (first (:forget-gate-w-delta           hd))) 3))
+      (is (= (count (:forget-gate-wr-delta          hd)) 10))
+      (is (= (count (first (:forget-gate-wr-delta          hd))) 10))
+      (is (= (count (:output-gate-w-delta           hd)) 10))
+      (is (= (count (first (:output-gate-w-delta     hd))) 3))
+      (is (= (count (:output-gate-wr-delta  hd)) 10))
+      (is (= (count (first (:output-gate-wr-delta  hd))) 10))
 
 
       (is (= (count (:block-bias-delta           hd)) 10))
@@ -427,31 +437,31 @@
                                                    [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}]))
                                 0.1)
           hd (:hidden result)]
-      (is (= (count (:block-w hd)) 30))
-      (is (= (count (:block-wr hd)) 100))
-      (is (= (count (:input-gate-w hd)) 30))
-      (is (= (count (:input-gate-wr hd)) 100))
-      (is (= (count (:forget-gate-w hd)) 30))
-      (is (= (count (:forget-gate-wr hd)) 100))
-      (is (= (count (:output-gate-w hd)) 30))
-      (is (= (count (:output-gate-wr hd)) 100))
+      (is (= (count (:block-w hd)) 10))
+      (is (= (count (:block-wr hd)) 10))
+      (is (= (count (:input-gate-w hd)) 10))
+      (is (= (count (:input-gate-wr hd)) 10))
+      (is (= (count (:forget-gate-w hd)) 10))
+      (is (= (count (:forget-gate-wr hd)) 10))
+      (is (= (count (:output-gate-w hd)) 10))
+      (is (= (count (:output-gate-wr hd)) 10))
 
-      (is (= (vec (:block-w hd))
-             (flatten (take 10 (repeat (map float [0.10043954 0.100242816 0.1]))))))
-      (is (= (vec (:block-wr hd))
-             (take 100 (repeat (float 0.09998704)))))
-      (is (= (vec (:input-gate-w hd))
-             (flatten (take 10 (repeat (map float [0.09958622 0.099746056 0.1]))))))
-      (is (= (vec (:input-gate-wr hd))
-             (take 100 (repeat (float 0.100012206)))))
-      (is (= (vec (:forget-gate-w hd))
-             (flatten (take 10 (repeat (map float [0.099876866 0.1 0.1]))))))
-      (is (= (vec (:forget-gate-wr hd))
-             (take 100 (repeat (float 0.10000364)))))
-      (is (= (vec (:output-gate-w hd))
-             (flatten (take 10 (repeat (map float [0.099447146 0.09981018 0.1]))))))
-      (is (= (vec (:output-gate-wr hd))
-             (take 100 (repeat (float 0.10001631)))))
+      (is (= (map vec (:block-w hd))
+             (take 10 (repeat (map float [0.10043954 0.100242816 0.1])))))
+      (is (= (map vec (:block-wr hd))
+             (partition 10 (take 100 (repeat (float 0.09998704))))))
+      (is (= (map vec (:input-gate-w hd))
+             (take 10 (repeat (map float [0.09958622 0.099746056 0.1])))))
+      (is (= (map vec (:input-gate-wr hd))
+             (partition 10 (take 100 (repeat (float 0.100012206))))))
+      (is (= (map vec (:forget-gate-w hd))
+             (take 10 (repeat (map float [0.099876866 0.1 0.1])))))
+      (is (= (map vec (:forget-gate-wr hd))
+             (partition 10 (take 100 (repeat (float 0.10000364))))))
+      (is (= (map vec (:output-gate-w hd))
+             (take 10 (repeat (map float [0.099447146 0.09981018 0.1])))))
+      (is (= (map vec (:output-gate-wr hd))
+             (partition 10 (take 100 (repeat (float 0.10001631))))))
       ;peephole
       (is (= (vec (:input-gate-peephole hd))
              (take 10 (repeat (float -0.09995717)))))
@@ -466,11 +476,11 @@
 
   (testing "update-model! with sparse model"
     (let [result (update-model! sample-w-network-sparse
-                                (:param-loss(bptt sample-w-network-sparse
-                                                  (sequential-output sample-w-network-sparse
-                                                                     [{"language" (float 1)} {"processing" (float 1)}]
-                                                                     [:skip ["prediction1" "prediction3"]])
-                                                  [:skip {:pos ["prediction1"] :neg ["prediction3"]}]))
+                                (:param-loss (bptt sample-w-network-sparse
+                                                   (sequential-output sample-w-network-sparse
+                                                                      [{"language" (float 1)} {"processing" (float 1)}]
+                                                                      [:skip ["prediction1" "prediction3"]])
+                                                   [:skip {:pos ["prediction1"] :neg ["prediction3"]}]))
                                 0.1)
           hd (:hidden result)
           sparses (:sparses hd)]
@@ -478,10 +488,10 @@
       (is (= (count (:input-gate-w (get sparses "language"))) 10))
       (is (= (count (:forget-gate-w (get sparses "language"))) 10))
       (is (= (count (:output-gate-w (get sparses "language"))) 10))
-      (is (= (count (:block-wr hd)) 100))
-      (is (= (count (:input-gate-wr hd)) 100))
-      (is (= (count (:forget-gate-wr hd)) 100))
-      (is (= (count (:output-gate-wr hd)) 100))))
+      (is (= (count (:block-wr hd)) 10))
+      (is (= (count (:input-gate-wr hd)) 10))
+      (is (= (count (:forget-gate-wr hd)) 10))
+      (is (= (count (:output-gate-wr hd)) 10))))
 
   (testing "init-model with dense input"
     (let [m (init-model {:input-items  nil
@@ -493,14 +503,14 @@
           h (:hidden m)]
       (is (= [3 10 3] (:unit-nums m)))
       (is (not= :sparse (:input-type m)))
-      (is (= 30  (count (remove zero? (:block-w h)))))
-      (is (= 100 (count (remove zero? (:block-wr h)))))
-      (is (= 30  (count (remove zero? (:input-gate-w h)))))
-      (is (= 100 (count (remove zero? (:input-gate-wr h)))))
-      (is (= 30  (count (remove zero? (:forget-gate-w h)))))
-      (is (= 100 (count (remove zero? (:forget-gate-wr h)))))
-      (is (= 30  (count (remove zero? (:output-gate-w h)))))
-      (is (= 100 (count (remove zero? (:output-gate-wr h)))))
+      (is (= 10  (count (:block-w h))))
+      (is (= 10 (count (:block-wr h))))
+      (is (= 10  (count (:input-gate-w h))))
+      (is (= 10 (count (:input-gate-wr h))))
+      (is (= 10  (count (:forget-gate-w h))))
+      (is (= 10 (count (:forget-gate-wr h))))
+      (is (= 10  (count (:output-gate-w h))))
+      (is (= 10 (count (:output-gate-wr h))))
       (is (= 10  (count (remove zero? (:block-bias h)))))
       (is (= 10  (count (remove zero? (:input-gate-bias h)))))
       (is (= 10  (count (remove zero? (:forget-gate-bias h)))))
@@ -524,13 +534,13 @@
       (is (= [3 10 3] (:unit-nums m)))
       (is (= :sparse (:input-type m)))
       (is (= 10 (count (remove zero? (:block-w (get (:sparses h) "X"))))))
-      (is (= 100 (count (remove zero? (:block-wr h)))))
+      (is (= 10 (count  (:block-wr h))))
       (is (= 10 (count (remove zero? (:input-gate-w (get (:sparses h) "Y"))))))
-      (is (= 100 (count (remove zero? (:input-gate-wr h)))))
+      (is (= 10 (count (:input-gate-wr h))))
       (is (= 10 (count (remove zero? (:forget-gate-w (get (:sparses h) "Z"))))))
-      (is (= 100 (count (remove zero? (:forget-gate-wr h)))))
+      (is (= 10 (count (:forget-gate-wr h))))
       (is (= 10 (count (remove zero? (:output-gate-w (get (:sparses h) "X"))))))
-      (is (= 100 (count (remove zero? (:output-gate-wr h)))))
+      (is (= 10 (count  (:output-gate-wr h))))
       (is (= 10 (count (remove zero? (:block-bias h)))))
       (is (= 10 (count (remove zero? (:input-gate-bias h)))))
       (is (= 10 (count (remove zero? (:forget-gate-bias h)))))
