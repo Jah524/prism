@@ -10,8 +10,6 @@
 (def y (float-array (range 0 50 10)))
 
 (def A (dge 4 5 [0 5 10 15 1 6 11 16 2 7 12 17 3 8 13 18 4 9 14 19]))
-(println A)
-
 (def X (dv (range 5)))
 (def Y (dv (range 0 50 10)))
 
