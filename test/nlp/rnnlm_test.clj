@@ -1,13 +1,14 @@
 (ns nlp.rnnlm-test
   (:require [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]
-            [prism.nlp.rnnlm :refer :all]))
+            [prism.nlp.rnnlm :refer :all]
+            [matrix.default :as default]))
 
 (def sample-wc {"A" 5 "B" 5 "C" 5 "D" 5 "<unk>" 10})
 
 (deftest word2ec-test
   (testing "init-rnnlm-model"
-    (let [{:keys [hidden wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10)
+    (let [{:keys [hidden wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10 default/default-matrix-kit)
           {:keys [unit-num]} hidden]
       (is (= unit-num 10))
       (is (= input-type :sparse))
