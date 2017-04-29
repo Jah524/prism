@@ -106,7 +106,7 @@
             (reset! tmp-loss 0)
             (reset! local-counter 0)
             (when (and snapshot-path (not (zero? snapshot-counter)) (not (zero? (rem snapshot-counter snapshot))))
-              (let [spath (str snapshot-path "-SNAPSHOT" snapshot-counter)]
+              (let [spath (str snapshot-path "-SNAPSHOT-" snapshot-counter)]
                 (println (str "saving " spath))
                 (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)))
             (Thread/sleep interval-ms)
