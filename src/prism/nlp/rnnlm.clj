@@ -129,9 +129,10 @@
         model (init-rnnlm-model wc hidden-size option)
         model-path     (str export-path ".rnnlm")]
     (train-rnnlm! model training-path option)
-    (println (str "Saving RNNLM model as " model-path))
-    (util/save-model model model-path)
-    (println "Done")
+    (let [m (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit)]
+      (print (str "Saving RNNLM model as " model-path " ... "))
+      (util/save-model m model-path)
+      (println "Done"))
     model))
 
 (defn resume-train

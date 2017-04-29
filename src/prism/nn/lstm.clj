@@ -277,7 +277,7 @@
         {:keys [block-w block-wr block-bias input-gate-w input-gate-wr input-gate-bias
                 forget-gate-w forget-gate-wr forget-gate-bias output-gate-w output-gate-wr output-gate-bias
                 input-gate-peephole forget-gate-peephole output-gate-peephole
-                unit-num sparse? sparses]} hidden]
+                sparse? sparses]} hidden]
     ;update output connection
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
@@ -292,11 +292,10 @@
            (mapv (fn [[word lstm-w-delta]]
                    (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]} lstm-w-delta
                          {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses word)]
-                     (dotimes [x unit-num]
-                       (rewrite-vector! learning-rate block-w block-w-delta)
-                       (rewrite-vector! learning-rate input-gate-w input-gate-w-delta)
-                       (rewrite-vector! learning-rate forget-gate-w forget-gate-w-delta)
-                       (rewrite-vector! learning-rate output-gate-w output-gate-w-delta)))))
+                     (rewrite-vector! learning-rate block-w block-w-delta)
+                     (rewrite-vector! learning-rate input-gate-w input-gate-w-delta)
+                     (rewrite-vector! learning-rate forget-gate-w forget-gate-w-delta)
+                     (rewrite-vector! learning-rate output-gate-w output-gate-w-delta))))
            dorun)
       (do
         (rewrite-matrix! learning-rate block-w block-w-delta)
@@ -366,3 +365,54 @@
      :input-size input-size
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
+
+(defn convert-model
+  [model new-matrix-kit]
+  (let [{:keys [hidden output input-type unit-nums]} model
+        [input-num hidden-num] unit-nums
+        {:keys [make-vector make-matrix]} new-matrix-kit]
+    (assoc model
+      :hidden (let [{:keys [sparses block-w input-gate-w forget-gate-w output-gate-w
+                            unit-num block-wr block-bias input-gate-wr input-gate-bias
+                            forget-gate-wr forget-gate-bias output-gate-wr　output-gate-bias
+                            input-gate-peephole　forget-gate-peephole　output-gate-peephole]} hidden
+                    bwr (make-matrix unit-num unit-num (apply concat (seq block-wr)))
+                    bb  (make-vector (seq block-bias))
+                    iwr (make-matrix unit-num unit-num (apply concat (seq input-gate-wr)))
+                    ib  (make-vector (seq input-gate-bias))
+                    ip  (make-vector (seq input-gate-peephole))
+                    fwr (make-matrix unit-num unit-num (apply concat (seq forget-gate-wr)))
+                    fb  (make-vector (seq forget-gate-bias))
+                    fp  (make-vector (seq forget-gate-peephole))
+                    owr (make-matrix unit-num unit-num (apply concat (seq output-gate-wr)))
+                    ob  (make-vector (seq output-gate-bias))
+                    op  (make-vector (seq output-gate-peephole))
+                    template (assoc hidden
+                               :block-wr       bwr   :block-bias           bb
+                               :input-gate-wr  iwr   :input-gate-bias      ib
+                               :forget-gate-wr fwr   :forget-gate-bias     fb
+                               :output-gate-wr owr   :output-gate-bias     ob
+                               :input-gate-peephole  ip  :forget-gate-peephole fp :output-gate-peephole op)]
+                (if (= input-type :sparse)
+                  (assoc template
+                    :sparses (reduce (fn [acc [item {:keys[ block-w input-gate-w forget-gate-w output-gate-w]}]]
+                                       (assoc acc item
+                                         {:block-w       (make-vector (seq block-w))
+                                          :input-gate-w  (make-vector (seq input-gate-w))
+                                          :forget-gate-w (make-vector (seq forget-gate-w))
+                                          :output-gate-w (make-vector (seq output-gate-w))}))
+                                     {}
+                                     sparses))
+                  (assoc template
+                    :block-w (make-matrix input-num hidden-num (apply concat (seq block-w)))
+                    :input-gate-w (make-matrix input-num hidden-num (apply concat (seq input-gate-w)))
+                    :forget-gate-w (make-matrix input-num hidden-num (apply concat (seq forget-gate-w)))
+                    :output-gate-w (make-matrix input-num hidden-num (apply concat (seq output-gate-w))))))
+      :output (reduce (fn [acc [item {:keys [w bias]}]]
+                        (assoc acc item {:w (make-vector (seq w)) :bias (make-vector (seq bias))}))
+                      {}
+                      output))))
+
+
+
+

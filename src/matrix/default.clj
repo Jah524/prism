@@ -150,7 +150,7 @@
                       (let [tmp (float-array input-num)]
                         (dotimes [y input-num]
                           (aset ^floats tmp y (float (nth v y))))
-                        (aset ^objects mat tmp)))
+                        (aset ^objects mat x tmp)))
                     mat))
    :rewrite-vector! rewrite-vector!
    :rewrite-matrix! rewrite-matrix!

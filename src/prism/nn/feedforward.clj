@@ -173,7 +173,7 @@
      :output-type output-type
      :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
 
-(defn convert-model-matrix-kit
+(defn convert-model
   [model new-matrix-kit]
   (let [{:keys [hidden output input-type unit-nums]} model
         [input-num hidden-num] unit-nums

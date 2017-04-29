@@ -174,7 +174,7 @@
         model-path     (str export-path ".w2v")
         embedding-path (str export-path ".w2v.em")]
     (train-word2vec! model training-path option)
-    (let [m (-> (ff/convert-model-matrix-kit model default/default-matrix-kit) (dissoc :matrix-kit))]
+    (let [m (-> (ff/convert-model model default/default-matrix-kit) (dissoc :matrix-kit))]
       (println (str "Saving word2vec model as " model-path))
       (util/save-model m model-path)
       (println (str "Saving embedding as " embedding-path))
@@ -189,7 +189,7 @@
         model-path     (str model-path ".w2v")
         embedding-path (str model-path "w2v.em")]
     (train-word2vec! model training-path option)
-    (let [m (-> (ff/convert-model-matrix-kit model default/default-matrix-kit) (dissoc :matrix-kit))]
+    (let [m (-> (ff/convert-model model default/default-matrix-kit) (dissoc :matrix-kit))]
       (println (str "Saving word2vec model as " model-path))
       (util/save-model m model-path)
       (println (str "Saving embedding as " embedding-path))
