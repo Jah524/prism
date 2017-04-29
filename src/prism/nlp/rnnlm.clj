@@ -45,11 +45,14 @@
 
 (defn train-rnnlm!
   [model train-path & [option]]
-  (let [interval-ms (or (:interval-ms option) 30000) ;; 30 seconds
-        workers (or (:workers option) 4)
-        negative (or (:negative option) 5)
-        initial-learning-rate (or (:learning-rate option) 0.025)
-        min-learning-rate (or (:min-learning-rate option) 0.001)
+  (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate
+                snapshot snapshot-path]
+         :or {interval-ms 60000 ;; 1 minutes
+              workers 4
+              negative 5
+              initial-learning-rate 0.025
+              min-learning-rate 0.001
+              snapshot 60}} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
         {:keys [wc em input-type]} model
         wc-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wc "<unk>"))
@@ -95,15 +98,19 @@
                                (samples neg-cum (* negative cache-size))
                                rest-negatives)))))
                 (reset! done? true)))))
-      (loop [counter 0]
+      (loop [counter 0, snapshot-counter 0]
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
             (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float @tmp-loss)))
             (reset! tmp-loss 0)
             (reset! local-counter 0)
+            (when (and snapshot-path (not (zero? snapshot-counter)) (not (zero? (rem snapshot-counter snapshot))))
+              (let [spath (str snapshot-path "-SNAPSHOT" snapshot-counter)]
+                (println (str "saving " spath))
+                (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)))
             (Thread/sleep interval-ms)
-            (recur next-counter))))
+            (recur next-counter (inc snapshot-counter)))))
       (println "finished learning")))
   model)
 
@@ -128,7 +135,7 @@
         _(println "done")
         model (init-rnnlm-model wc hidden-size option)
         model-path     (str export-path ".rnnlm")]
-    (train-rnnlm! model training-path option)
+    (train-rnnlm! model training-path (assoc option :snapshot-path model-path))
     (let [m (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit)]
       (print (str "Saving RNNLM model as " model-path " ... "))
       (util/save-model m model-path)
@@ -142,6 +149,10 @@
     (println (str "Saving RNNLM model as " model-path))
     (util/save-model updated-model model-path)
     model))
+
+(defn load-model
+  [model-path matrix-kit]
+  (lstm/load-model model-path matrix-kit))
 
 (defn text-vector [model words]
   (let [{:keys [hidden matrix-kit wc]} model
