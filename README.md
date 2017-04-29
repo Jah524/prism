@@ -14,14 +14,13 @@ See demonstration section and [examples](/src/examples) for more detail.
 
 ## Usage
 
-Add following dependency to your `project.clj`,
+`git clone https://github.com/Jah524/prism.git` and you can find how to do with prism at [project wiki](https://github.com/Jah524/prism/wiki)
+
+If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
 ```
 [jah524/prism "0.3.1"]
 ```
-
-and you can find how to do with prism at [project wiki](https://github.com/Jah524/prism/wiki)
-
 
 ## Demonstration
 
