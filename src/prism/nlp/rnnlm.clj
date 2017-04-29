@@ -136,20 +136,23 @@
     model))
 
 (defn resume-train
-  [training-path model-path & [option]]
+  [training-path model-path option]
   (let [model (util/load-model model-path)
         updated-model (train-rnnlm! model training-path option)]
     (println (str "Saving RNNLM model as " model-path))
     (util/save-model updated-model model-path)
     model))
 
-(defn text-vector [model words & [lstm-option]]
-  (let [hidden-size (:unit-num (:hidden model))]
+(defn text-vector [model words]
+  (let [{:keys [hidden matrix-kit wc]} model
+        {:keys [make-vector]} matrix-kit
+        hidden-size (:unit-num hidden)]
     (loop [words words,
-           previous-activation (float-array hidden-size),
-           previous-cell-state    (float-array hidden-size)]
+           previous-activation (make-vector hidden-size),
+           previous-cell-state (make-vector hidden-size)]
       (if-let [word (first words)]
-        (let [{:keys [activation state]} (lstm/lstm-activation model (set [word]) previous-activation previous-cell-state lstm-option)]
+        (let [word (if (get wc word) word "<unk>")
+              {:keys [activation state]} (lstm/lstm-activation model (set [word]) previous-activation previous-cell-state)]
           (recur (rest words)
                  activation
                  (:cell-state state)))

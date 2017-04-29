@@ -3,7 +3,8 @@
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]))
+    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]
+    [prism.util :as util]))
 
 
 (defn partial-state-sparse
@@ -11,12 +12,12 @@
   [model x-input sparses unit-num]
   (let [{:keys [scal sum]} (:matrix-kit model)]
     (->> x-input
-         (mapv (fn [sparse]
+         (mapv (fn [item]
                  (cond (set? x-input)
-                       (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse)]
+                       (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses item)]
                          [block-w input-gate-w forget-gate-w output-gate-w])
                        (map? x-input)
-                       (let [[sparse-k v] sparse
+                       (let [[sparse-k v] item
                              {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse-k)]
                          [(scal v block-w) (scal v input-gate-w) (scal v forget-gate-w) (scal v output-gate-w)]))))
          (apply mapv sum))))
@@ -277,7 +278,7 @@
         {:keys [block-w block-wr block-bias input-gate-w input-gate-wr input-gate-bias
                 forget-gate-w forget-gate-wr forget-gate-bias output-gate-w output-gate-wr output-gate-bias
                 input-gate-peephole forget-gate-peephole output-gate-peephole
-                sparse? sparses]} hidden]
+                sparses]} hidden]
     ;update output connection
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
@@ -351,7 +352,7 @@
                                                             :forget-gate-w (init-vector hidden-size)
                                                             :output-gate-w (init-vector hidden-size)}))
                                        {} input-items)]
-                   (-> template (assoc :sparses sparses :sparse? (= input-type :sparse))))
+                   (-> template (assoc :sparses sparses)))
                  (let [bw  (init-matrix input-size hidden-size)
                        iw  (init-matrix input-size hidden-size)
                        fw  (init-matrix input-size hidden-size)
@@ -370,8 +371,9 @@
   [model new-matrix-kit]
   (let [{:keys [hidden output input-type unit-nums]} model
         [input-num hidden-num] unit-nums
-        {:keys [make-vector make-matrix]} new-matrix-kit]
+        {:keys [make-vector make-matrix] :as matrix-kit} (or new-matrix-kit default/default-matrix-kit)]
     (assoc model
+      :matrix-kit matrix-kit
       :hidden (let [{:keys [sparses block-w input-gate-w forget-gate-w output-gate-w
                             unit-num block-wr block-bias input-gate-wr input-gate-bias
                             forget-gate-wr forget-gate-bias output-gate-wr　output-gate-bias
@@ -404,8 +406,8 @@
                                      {}
                                      sparses))
                   (assoc template
-                    :block-w (make-matrix input-num hidden-num (apply concat (seq block-w)))
-                    :input-gate-w (make-matrix input-num hidden-num (apply concat (seq input-gate-w)))
+                    :block-w       (make-matrix input-num hidden-num (apply concat (seq block-w)))
+                    :input-gate-w  (make-matrix input-num hidden-num (apply concat (seq input-gate-w)))
                     :forget-gate-w (make-matrix input-num hidden-num (apply concat (seq forget-gate-w)))
                     :output-gate-w (make-matrix input-num hidden-num (apply concat (seq output-gate-w))))))
       :output (reduce (fn [acc [item {:keys [w bias]}]]
@@ -414,5 +416,6 @@
                       output))))
 
 
-
-
+(defn load-model
+  [target-path matrix-kit]
+  (convert-model (util/load-model target-path) matrix-kit))

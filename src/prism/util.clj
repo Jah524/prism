@@ -13,11 +13,14 @@
     (freeze-to-out! (java.io.DataOutputStream. w) obj)))
 
 (defn load-model
-  ([target]
-   (load-model target default/default-matrix-kit))
-  ([target-path matrix-kit]
-   (with-open [w (clojure.java.io/input-stream target-path)]
-     (thaw-from-in! (java.io.DataInputStream. w)))))
+  [target-path]
+  (with-open [w (clojure.java.io/input-stream target-path)]
+    (thaw-from-in! (java.io.DataInputStream. w))))
+
+(defn load-model-with-matrix-kit
+  [target-path convert-model matrix-kit]
+  (convert-model (load-model target-path) matrix-kit))
+
 
 (defn progress-format [done all interval-done interval-ms unit]
   (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] "
