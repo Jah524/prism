@@ -8,7 +8,7 @@
     [clj-time.core  :as t]
     [clojure.data.json :as json]
     [matrix.default :as default]
-    [prism.util :refer [l2-normalize l2-normalize! similarity] :as util]
+    [prism.util :refer [l2-normalize similarity] :as util]
     [prism.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
     [prism.nn.feedforward :as ff]))
 
@@ -147,23 +147,17 @@
         (assoc :wc wc))))
 
 
-
 (defn save-embedding
   "top-n = 0 represents all words"
-  ([model path] (save-embedding model path false 0))
-  ([model path replace? top-n]
-   (let [{:keys [hidden wc]} model
+  ([model path top-n]
+   (let [{:keys [hidden wc matrix-kit]} model
          word-em (:w hidden)
          considered (set (->> (dissoc wc "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
          word-em (if (or (zero? top-n) (= :all top-n))
                    word-em
-                   (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} word-em))]
-     (if replace?
-       (do
-         (dorun (map #(l2-normalize! (second %)) word-em))
-         (util/save-model word-em path))
-       (let [l2-em (reduce (fn [acc kv] (assoc acc (first kv) (l2-normalize (second kv)))) {} word-em)]
-         (util/save-model l2-em path))))))
+                   (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} word-em))
+         l2-em (reduce (fn [acc kv] (assoc acc (first kv) (l2-normalize matrix-kit (second kv)))) {} word-em)]
+     (util/save-model l2-em path))))
 
 (defn make-word2vec
   [training-path export-path hidden-size option]
@@ -174,11 +168,11 @@
         model-path     (str export-path ".w2v")
         embedding-path (str export-path ".w2v.em")]
     (train-word2vec! model training-path option)
-    (let [m (-> (ff/convert-model model default/default-matrix-kit) (dissoc :matrix-kit))]
+    (let [m (ff/convert-model model default/default-matrix-kit)]
       (println (str "Saving word2vec model as " model-path))
-      (util/save-model m model-path)
+      (util/save-model (dissoc m :matrix-kit) model-path)
       (println (str "Saving embedding as " embedding-path))
-      (save-embedding m embedding-path)
+      (save-embedding m embedding-path 0)
       (println "Done"))
     model))
 

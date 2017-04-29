@@ -6,16 +6,18 @@
     [clj-time.local :as l]
     [clj-time.core  :as t]
     [taoensso.nippy :refer [freeze-to-out! thaw-from-in!]]
-    [matrix.default :refer [sum times dot]]
-    ))
+    [matrix.default :as default]))
 
 (defn save-model [obj target-path]
   (with-open [w (clojure.java.io/output-stream target-path)]
     (freeze-to-out! (java.io.DataOutputStream. w) obj)))
 
-(defn load-model [target-path]
-  (with-open [w (clojure.java.io/input-stream target-path)]
-    (thaw-from-in! (java.io.DataInputStream. w))))
+(defn load-model
+  ([target]
+   (load-model target default/default-matrix-kit))
+  ([target-path matrix-kit]
+   (with-open [w (clojure.java.io/input-stream target-path)]
+     (thaw-from-in! (java.io.DataInputStream. w)))))
 
 (defn progress-format [done all interval-done interval-ms unit]
   (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] "
@@ -71,24 +73,14 @@
 
 
 (defn l2-normalize
-  [^floats v]
-  (let [acc (Math/sqrt (reduce + (times v v)))
-        n (count v)
-        ret (float-array n)]
-    (amap ^floats v i ret (float (/ (aget ^floats v i) acc)))))
-
-(defn l2-normalize!
-  "caution, this function is destructive but is more memory efficiently"
-  [^floats v]
-  (let [acc (Math/sqrt (sum (times v v)))
-        n (count v)]
-    (dotimes [x n] (aset ^floats v x (float (/ (aget ^floats v x) acc))))))
-
+  [matrix-kit v]
+  (let [{:keys [dot scal]} matrix-kit
+        acc (/ 1 (Math/sqrt (dot v v)))]
+    (scal acc v)))
 
 (defn similarity
-  ([v1 v2 l2?]
-   (float (if l2?
-            (dot v1 v2)
-            (dot (l2-normalize v1) (l2-normalize v2)))))
-  ([v1 v2]
-   (similarity v1 v2 true)))
+  "if you give l2-normalized vectors, l2? have to be true"
+  ([dot v1 v2 l2?]
+   (if l2?
+     (dot v1 v2)
+     (dot (l2-normalize v1) (l2-normalize v2)))))
