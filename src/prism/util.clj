@@ -83,7 +83,8 @@
 
 (defn similarity
   "if you give l2-normalized vectors, l2? have to be true"
-  ([dot v1 v2 l2?]
-   (if l2?
-     (dot v1 v2)
-     (dot (l2-normalize v1) (l2-normalize v2)))))
+  [matrix-kit v1 v2 l2?]
+  (let [{:keys [dot]} matrix-kit]
+    (if l2?
+      (dot v1 v2)
+      (dot (l2-normalize matrix-kit v1) (l2-normalize matrix-kit v2)))))

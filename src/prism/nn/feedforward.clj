@@ -2,7 +2,8 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
-    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]))
+    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]
+    [prism.util :as util]))
 
 
 (defn hidden-state-by-sparse
@@ -177,8 +178,9 @@
   [model new-matrix-kit]
   (let [{:keys [hidden output input-type unit-nums]} model
         [input-num hidden-num] unit-nums
-        {:keys [make-vector make-matrix]} new-matrix-kit]
+        {:keys [make-vector make-matrix] :as matrix-kit} (or new-matrix-kit default/default-matrix-kit)]
     (assoc model
+      :matrix-kit matrix-kit
       :hidden (let [{:keys [w bias]} hidden]
                 (-> hidden
                     (assoc
@@ -190,3 +192,7 @@
                         (assoc acc item {:w (make-vector (seq w)) :bias (make-vector (seq bias))}))
                       {}
                       output))))
+
+(defn load-model
+  [target-path matrix-kit]
+  (convert-model (util/load-model target-path) matrix-kit))

@@ -27,12 +27,25 @@
       (is (= output-type :binary-classification))
       (is (= (count (keys wc)) 3))))
   (let [target-tok "test/nlp/example.tok"
-        wc (make-wc target-tok {:interval-ms 1000 :workers 1 :min-count 1})
+        wc (make-wc target-tok {:interval-ms 300 :workers 1 :min-count 1})
         w2v (init-w2v-model wc 10 default-matrix-kit)
         A (aclone (get-in w2v [:hidden :w "A"]))
         D (aclone (get-in w2v [:hidden :w "D"]))
         d (aclone (get-in w2v [:hidden :w "d"]))
         X (aclone (get-in w2v [:hidden :w "X"]))]
     (testing "train-word2vec!"
-      (train-word2vec! w2v target-tok {:min-learning-rate 0.025 :nagetaive 3 :workers 1 :interval-ms 1000 :sample 0.1})
-      (is (not= (vec D) (vec (get-in w2v [:hidden :w "D"])))))))
+      (train-word2vec! w2v target-tok {:initial-learning-rate 0.01 :min-learning-rate 0.005 :nagetaive 10 :workers 1 :interval-ms 500 :sample 0.1})
+      (is (not= (vec D) (vec (get-in w2v [:hidden :w "D"])))))
+    (testing "most-sim-in-model"
+      (let [result (most-sim-in-model w2v "D" 3)
+            sims (->> result (map #(get % :x)) set)]
+        (is (= (:x (first result)) "D")))))
+
+  (testing "most-sim"
+    (let [em {:em {"A" (float-array (range 10))
+                   "B" (float-array (repeat 10 0.3))
+                   "C" (float-array (range 10 20))
+                   "X" (float-array (range 10))}
+               :matrix-kit default-matrix-kit}]
+      (is (= (most-sim em "X" ["A" "B" "C" ] 3 false)
+             [{:x "A", :sim (float 1)} {:x "C", :sim (float 0.9314063545316458)} {:x "B", :sim (float 0.8429272081702948)}])))))

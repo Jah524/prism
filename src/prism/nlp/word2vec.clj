@@ -156,7 +156,7 @@
          word-em (if (or (zero? top-n) (= :all top-n))
                    word-em
                    (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} word-em))
-         l2-em (reduce (fn [acc kv] (assoc acc (first kv) (l2-normalize matrix-kit (second kv)))) {} word-em)]
+         l2-em (reduce (fn [acc [k v]] (assoc acc k (float-array (seq (l2-normalize matrix-kit v))))) {} word-em)]
      (util/save-model l2-em path))))
 
 (defn make-word2vec
@@ -172,7 +172,7 @@
       (println (str "Saving word2vec model as " model-path))
       (util/save-model (dissoc m :matrix-kit) model-path)
       (println (str "Saving embedding as " embedding-path))
-      (save-embedding m embedding-path 0)
+      (save-embedding model embedding-path 0)
       (println "Done"))
     model))
 
@@ -183,37 +183,54 @@
         model-path     (str model-path ".w2v")
         embedding-path (str model-path "w2v.em")]
     (train-word2vec! model training-path option)
-    (let [m (-> (ff/convert-model model default/default-matrix-kit) (dissoc :matrix-kit))]
+    (let [m (ff/convert-model model default/default-matrix-kit)]
       (println (str "Saving word2vec model as " model-path))
-      (util/save-model m model-path)
+      (util/save-model (dissoc m :matrix-kit) model-path)
       (println (str "Saving embedding as " embedding-path))
-      (save-embedding m embedding-path)
+      (save-embedding model embedding-path)
       (println "Done")
       model)))
 
 ;; work on embedding ;;
 
+(defn load-model
+  [model-path matrix-kit]
+  (ff/load-model model-path matrix-kit))
+
+(defn load-embedding
+  [em-path matrix-kit]
+  {:matrix-kit matrix-kit
+   :em (let [{:keys [make-vector]} (or matrix-kit default/default-matrix-kit)
+             em (util/load-model em-path)]
+         (reduce (fn [acc [word em]] (assoc acc word (make-vector (seq em))))
+                 {}
+                 em))})
+
 (defn word2vec [embedding word]
-  (get embedding word))
+  (get (:em embedding) word))
 
 (defn most-sim
-  [em reference-word word-list & [n l2?]]
-  (let [reference-em (word2vec em reference-word)
-        targets (->> word-list
-                     (map (fn [w]
-                            {:word w
-                             :similarity (similarity reference-em (word2vec em w) l2?)}))
-                     (sort-by :similarity >))]
-    (->> (if (= reference-word (:word (first targets)))
-           (rest targets)
-           targets)
-         (take (or n 5)))))
+  "embeddings have to be l2-normalized
+  a word doesn't exist in embeddings are not removed"
+  [embedding reference target-list n l2]
+  (let [{:keys [em matrix-kit]} embedding]
+    (when-let [reference-vec (if (string? reference) (word2vec embedding reference) reference)]
+      (let [targets (->> target-list
+                         (keep (fn [x]
+                                 (when-let [vec2 (if (string? x) (word2vec embedding x) x)]
+                                   {:x x
+                                    :sim (float (min 1 (similarity matrix-kit reference-vec vec2 l2)))})))
+                         (sort-by :sim >))]
+        (->> (if (= reference (:word (first targets)))
+               (rest targets)
+               targets)
+             (take n))))))
 
-(defn most-sim-in-model-words
-  [model word-or-vec & [n limit]]
-  (let [{:keys [wc hidden]} model
+(defn most-sim-in-model
+  [model word-or-vec n & [limit]]
+  (let [{:keys [wc hidden matrix-kit]} model
         {em :w} hidden
-        limit (if (nil? limit) (count wc) limit)
+        limit (or limit (count wc))
         target-word-list (->> wc (sort-by second >) (map first) (take limit))]; sort by frequency
-    (most-sim em word-or-vec target-word-list n false)))
+    (most-sim {:em em :matrix-kit matrix-kit} word-or-vec target-word-list n false)))
 
