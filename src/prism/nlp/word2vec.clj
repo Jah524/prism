@@ -86,13 +86,14 @@
         _(println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] done"))
         all-word-token (reduce #(+ %1 (second %2)) 0 neg-wc)
         tmp-loss (atom 0)
-        local-counter (atom 0)
+        interval-counter (atom 0)
+        progress-counter (atom 0)
         done? (atom false)]
-    (let [r (reader train-path)]
+    (with-open [r (reader train-path)]
       (dotimes [w workers]
         (go (loop [negatives (samples neg-cum (* negative 100000))]
               (if-let [train-line (.readLine r)]
-                (let [progress (/ @local-counter all-lines-num)
+                (let [progress (/ @progress-counter all-lines-num)
                       learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
                       sg (skip-gram-training-pair wc all-word-token (split train-line #" ") option)
                       next-negatives (drop (* negative (count sg)) negatives)]
@@ -115,22 +116,20 @@
                                                 (pprint all-items)
                                                 (Thread/sleep 60000))))))
                                       sg))
-                  (swap! local-counter inc)
+                  (swap! progress-counter inc)
+                  (swap! interval-counter inc)
                   (recur (if (empty? next-negatives)
                            (samples neg-cum (* negative 100000))
                            next-negatives)))
                 (reset! done? true)))))
-      (loop [counter 0]
+      (loop []
         (when-not @done?
-          (let [c @local-counter
-                next-counter (+ counter c)]
-            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", acc-loss: " (float @tmp-loss)))
-            (reset! tmp-loss 0)
-            (reset! local-counter 0)
-            (Thread/sleep interval-ms)
-            (recur next-counter))))
-      (println "done")
-      (.close r))
+          (println (str (util/progress-format @progress-counter all-lines-num @interval-counter interval-ms "lines/s") ", acc-loss: " (float @tmp-loss)))
+          (reset! tmp-loss 0)
+          (reset! interval-counter 0)
+          (Thread/sleep interval-ms)
+          (recur)))
+      (println "done"))
     :done))
 
 (defn init-w2v-model

@@ -63,23 +63,25 @@
         neg-cum (uniform->cum-uniform wc-unif)
         tmp-loss (atom 0)
         cache-size 100000
-        local-counter (atom 0)
+        interval-counter (atom 0)
+        progress-counter (atom 0)
         done? (atom false)]
     (with-open [r (reader train-path)]
-      (when (> skip-lines 0)
-        (print (str "skipping " skip-lines " lines ..."))
-        (loop [skip skip-lines]
-          (when (> skip 0)
-            (.readLine r)
-            (recur (dec skip))))
-        (println "done"))
+      (print (str "skipping " skip-lines " lines ..."))
+      (loop [skip skip-lines]
+        (when (> skip 0)
+          (.readLine r)
+          (swap! progress-counter inc)
+          (recur (dec skip))))
+      (println "done")
       (dotimes [w workers]
         (go (loop [negatives (samples neg-cum (* negative cache-size))]
               (if-let [line (.readLine r)]
-                (let [progress (/ @local-counter all-lines-num)
+                (let [progress (/ @progress-counter all-lines-num)
                       learning-rate (max (- initial-learning-rate (* initial-learning-rate progress)) min-learning-rate)
                       rnnlm-pair (tok->rnnlm-pairs wc line)]
-                  (swap! local-counter inc)
+                  (swap! interval-counter inc)
+                  (swap! progress-counter inc)
                   (if (= :skip rnnlm-pair)
                     (recur negatives)
                     (let [neg-pool-num (* negative 10); (count (:x rnnlm-pair)))
@@ -109,20 +111,18 @@
                                (samples neg-cum (* negative cache-size))
                                rest-negatives)))))
                 (reset! done? true)))))
-      (loop [counter 0, snapshot-counter 0]
+      (loop [snapshot-counter 0]
         (when-not @done?
-          (let [c @local-counter
-                next-counter (+ counter c)]
-            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float (/ @tmp-loss c)))); loss per 1 word
-            (reset! tmp-loss 0)
-            (reset! local-counter 0)
-            (when (and snapshot-path (not (zero? snapshot-counter)) (zero? (rem snapshot-counter snapshot)))
-              (let [spath (str snapshot-path "-SNAPSHOT-" snapshot-counter)]
-                (println (str "saving " spath))
-                (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)
-                (println "saved "spath)))
-            (Thread/sleep interval-ms)
-            (recur next-counter (inc snapshot-counter)))))
+          (println (str (util/progress-format @progress-counter all-lines-num @interval-counter interval-ms "lines/s") ", loss: " (float (/ @tmp-loss (inc @interval-counter))))); loss per 1 word, and avoiding zero divide
+          (reset! tmp-loss 0)
+          (reset! interval-counter 0)
+          (when (and snapshot-path (not (zero? snapshot-counter)) (zero? (rem snapshot-counter snapshot)))
+            (let [spath (str snapshot-path "-SNAPSHOT-" snapshot-counter)]
+              (println (str "saving " spath))
+              (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)
+              (println "saved "spath)))
+          (Thread/sleep interval-ms)
+          (recur (inc snapshot-counter))))
       (println "finished learning")))
   model)
 
