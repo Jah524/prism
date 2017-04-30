@@ -14,7 +14,8 @@ See demonstration section and [examples](/src/examples) for more detail.
 
 ## Usage
 
-`git clone https://github.com/Jah524/prism.git` and you can find how to do with prism at [project wiki](https://github.com/Jah524/prism/wiki)
+`git clone https://github.com/Jah524/prism.git` and `lein repl`.
+You can find how to do with prism at [project wiki](https://github.com/Jah524/prism/wiki)
 
 If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
