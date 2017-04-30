@@ -47,7 +47,7 @@
 (defn train-rnnlm!
   [model train-path & [option]]
   (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate
-                skip-lines snapshot snapshot-path]
+                skip-lines snapshot model-path]
          :or {interval-ms 60000 ;; 1 minutes
               workers 4
               negative 5
@@ -65,6 +65,7 @@
         cache-size 100000
         interval-counter (atom 0)
         progress-counter (atom 0)
+        snapshot-num (atom 1)
         done? (atom false)]
     (with-open [r (reader train-path)]
       (print (str "skipping " skip-lines " lines ..."))
@@ -111,18 +112,18 @@
                                (samples neg-cum (* negative cache-size))
                                rest-negatives)))))
                 (reset! done? true)))))
-      (loop [snapshot-counter 0]
+      (loop [loop-counter 0]
         (when-not @done?
           (println (str (util/progress-format @progress-counter all-lines-num @interval-counter interval-ms "lines/s") ", loss: " (float (/ @tmp-loss (inc @interval-counter))))); loss per 1 word, and avoiding zero divide
           (reset! tmp-loss 0)
           (reset! interval-counter 0)
-          (when (and snapshot-path (not (zero? snapshot-counter)) (zero? (rem snapshot-counter snapshot)))
-            (let [spath (str snapshot-path "-SNAPSHOT-" snapshot-counter)]
+          (when (and model-path (not (zero? snapshot)) (not (zero? loop-counter)) (zero? (rem loop-counter snapshot)))
+            (let [spath (str model-path "-SNAPSHOT-" @snapshot-num)]
               (println (str "saving " spath))
               (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)
-              (println "saved "spath)))
+              (swap! snapshot-num inc)))
           (Thread/sleep interval-ms)
-          (recur (inc snapshot-counter))))
+          (recur (inc loop-counter))))
       (println "finished learning")))
   model)
 
@@ -147,7 +148,7 @@
         _(println "done")
         model (init-rnnlm-model wc hidden-size option)
         model-path     (str export-path ".rnnlm")]
-    (train-rnnlm! model training-path (assoc option :snapshot-path model-path))
+    (train-rnnlm! model training-path (assoc option :model-path model-path))
     (let [m (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit)]
       (print (str "Saving RNNLM model as " model-path " ... "))
       (util/save-model m model-path)
@@ -159,7 +160,7 @@
   (print "loading model ...")
   (let [model (lstm/load-model model-path (:matrix-kit option))
         _(println " done")
-        updated-model (train-rnnlm! model training-path option)]
+        updated-model (train-rnnlm! model training-path (assoc option :model-path model-path))]
     (println (str "Saving RNNLM model as " model-path))
     (util/save-model updated-model model-path)
     model))
