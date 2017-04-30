@@ -47,13 +47,13 @@
 (defn train-rnnlm!
   [model train-path & [option]]
   (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate
-                skip-line snapshot snapshot-path]
+                skip-lines snapshot snapshot-path]
          :or {interval-ms 60000 ;; 1 minutes
               workers 4
               negative 5
               initial-learning-rate 0.015
               min-learning-rate 0.001
-              skip-line 0
+              skip-lines 0
               snapshot 60 ;  1 hour when interval-ms is set 60000
               }} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
@@ -66,9 +66,12 @@
         local-counter (atom 0)
         done? (atom false)]
     (with-open [r (reader train-path)]
-      (when (> skip-line 0)
-        (print (str "skipping " skip-line " lines ..."))
-        (loop [skip skip-line] (when (> skip 0) (.readLine r) (recur (dec skip-line))))
+      (when (> skip-lines 0)
+        (print (str "skipping " skip-lines " lines ..."))
+        (loop [skip skip-lines]
+          (when (> skip 0)
+            (.readLine r)
+            (recur (dec skip))))
         (println "done"))
       (dotimes [w workers]
         (go (loop [negatives (samples neg-cum (* negative cache-size))]
