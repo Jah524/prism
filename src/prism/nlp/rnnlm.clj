@@ -50,7 +50,7 @@
          :or {interval-ms 60000 ;; 1 minutes
               workers 4
               negative 5
-              initial-learning-rate 0.025
+              initial-learning-rate 0.015
               min-learning-rate 0.001
               snapshot 60}} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
@@ -105,7 +105,7 @@
             (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float @tmp-loss)))
             (reset! tmp-loss 0)
             (reset! local-counter 0)
-            (when (and snapshot-path (not (zero? snapshot-counter)) (not (zero? (rem snapshot-counter snapshot))))
+            (when (and snapshot-path (not (zero? snapshot-counter)) (zero? (rem snapshot-counter snapshot)))
               (let [spath (str snapshot-path "-SNAPSHOT-" snapshot-counter)]
                 (println (str "saving " spath))
                 (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)))
@@ -171,5 +171,5 @@
 
 (defn text-similarity
   [model words1 words2 l2?]
-  (util/similarity (text-vector model words1) (text-vector model words2) l2?))
+  (util/similarity (:matrix-kit model) (text-vector model words1) (text-vector model words2) l2?))
 
