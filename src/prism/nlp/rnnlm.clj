@@ -4,6 +4,7 @@
     [clojure.string :as str]
     [clojure.java.io :refer [reader]]
     [clojure.core.async :refer [go]]
+    [clj-time.local :as l]
     [prism.nn.lstm :as lstm];:refer [lstm-activation init-model train!]]
     [prism.util :as util]
     [prism.sampling :refer [uniform->cum-uniform samples]]
@@ -46,15 +47,18 @@
 (defn train-rnnlm!
   [model train-path & [option]]
   (let [{:keys [interval-ms workers negative initial-learning-rate min-learning-rate
-                snapshot snapshot-path]
+                skip-line snapshot snapshot-path]
          :or {interval-ms 60000 ;; 1 minutes
               workers 4
               negative 5
               initial-learning-rate 0.015
               min-learning-rate 0.001
-              snapshot 60}} option
+              skip-line 0
+              snapshot 60 ;  1 hour when interval-ms is set 60000
+              }} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
         {:keys [wc em input-type]} model
+        _(println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
         wc-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wc "<unk>"))
         neg-cum (uniform->cum-uniform wc-unif)
         tmp-loss (atom 0)
@@ -62,6 +66,10 @@
         local-counter (atom 0)
         done? (atom false)]
     (with-open [r (reader train-path)]
+      (when (> skip-line 0)
+        (print (str "skipping " skip-line " lines ..."))
+        (loop [skip skip-line] (when (> skip 0) (.readLine r) (recur (dec skip-line))))
+        (println "done"))
       (dotimes [w workers]
         (go (loop [negatives (samples neg-cum (* negative cache-size))]
               (if-let [line (.readLine r)]
@@ -102,13 +110,14 @@
         (when-not @done?
           (let [c @local-counter
                 next-counter (+ counter c)]
-            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float @tmp-loss)))
+            (println (str (util/progress-format counter all-lines-num c interval-ms "lines/s") ", loss: " (float (/ @tmp-loss c)))); loss per 1 word
             (reset! tmp-loss 0)
             (reset! local-counter 0)
             (when (and snapshot-path (not (zero? snapshot-counter)) (zero? (rem snapshot-counter snapshot)))
               (let [spath (str snapshot-path "-SNAPSHOT-" snapshot-counter)]
                 (println (str "saving " spath))
-                (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)))
+                (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)
+                (println "saved "spath)))
             (Thread/sleep interval-ms)
             (recur next-counter (inc snapshot-counter)))))
       (println "finished learning")))
@@ -144,7 +153,9 @@
 
 (defn resume-train
   [training-path model-path option]
-  (let [model (util/load-model model-path)
+  (print "loading model ...")
+  (let [model (lstm/load-model model-path (:matrix-kit option))
+        _(println " done")
         updated-model (train-rnnlm! model training-path option)]
     (println (str "Saving RNNLM model as " model-path))
     (util/save-model updated-model model-path)
