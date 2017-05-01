@@ -8,6 +8,7 @@
                    :native  :native
                    :all     (constantly true)}
   :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.clojure/clojurescript "1.9.521"]
                  [uncomplicate/neanderthal "0.9.0"]
                  [clj-time "0.13.0"]
                  [com.taoensso/nippy "2.13.0"]
@@ -16,4 +17,17 @@
                  [incanter "1.5.7"]
                  [com.googlecode.efficient-java-matrix-library/core "0.26"]
                  [thinktopic/think.tsne "0.1.1"]
-                 ])
+                 [http-kit "2.1.16"]
+                 [compojure "1.5.1"]
+                 [ring "1.5.0"]
+                 [org.clojure/tools.cli "0.3.5"]
+                 ]
+  :plugins [[lein-cljsbuild "1.1.1"]]
+  :cljsbuild {:builds [{:id "tsne"
+                        :source-paths ["src/server/cljs/tsne"]
+                        :compiler {:output-to  "resources/public/js/tsne.js"
+                                   :output-dir "resources/public/js/tsne"
+                                   :optimizations :advanced
+                                   :externs ["server/externs/jquery-1.9.js"
+                                             "server/externs/vue.js"
+                                             "server/externs/plotly.js"]}}]})
