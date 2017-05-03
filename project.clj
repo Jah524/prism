@@ -3,7 +3,7 @@
   :url "https://github.com/Jah524/prism"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :jvm-opts ["-Xmx14G" "-Xms4096m" "-server"]
+  :jvm-opts ["-Xmx12G" "-Xms4096m" "-server"]
   :test-selectors {:default (complement :native)
                    :native  :native
                    :all     (constantly true)}
@@ -21,6 +21,7 @@
                  [compojure "1.5.1"]
                  [ring "1.5.0"]
                  [org.clojure/tools.cli "0.3.5"]
+                 [cljs-ajax "0.5.9"]
                  ]
   :plugins [[lein-cljsbuild "1.1.1"]]
   :cljsbuild {:builds [{:id "tsne"
