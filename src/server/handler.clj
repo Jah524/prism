@@ -28,23 +28,26 @@
               item-vec (condp = @model-type
                          "word2vec" (->> items (mapv (fn [item] {:item item :v (w2v/word2vec @model item)})))
                          "rnnlm" :fixme
-                         :else (throw (Exception. "model has gone, you need to relaunch server")))
-              target-items (->> item-vec (remove (fn [{:keys [v]}] (nil? v))) (map :item))
-              skipped (->> item-vec (filter (fn [{:keys [v]}] (nil? v))))
-              input-matrix (->> item-vec
-                                (keep (fn [{:keys [item v]}]
-                                        (when (contains? (set target-items) item)
-                                          v)))
-                                object-array)]
-          (when-not (= (count target-items) (count input-matrix)) (throw (Exception. "items and matrices have to be same lenght")))
-          (json/write-str {:skipped skipped
-                           :result (mapv (fn [item [x y]] {:item item :x x :y y})
-                                         target-items
-                                         (map seq (tsne/tsne input-matrix 2
-;;                                                              :tsne-algorithm :parallel-bht
-                                                             :tsne-algorithm :bht
-                                                             :perplexity perplexity
-                                                             :iters iters)))})))
+                         :model-has-gone)]
+          (if (= item-vec :model-has-gone)
+            (do (println "you need to restart server, model informations (atoms) are changed to nil by reloader") (json/write-str {:condition "model-has-gone"}))
+            (let [target-items (->> item-vec (remove (fn [{:keys [v]}] (nil? v))) (map :item))
+                  skipped (->> item-vec (filter (fn [{:keys [v]}] (nil? v))))
+                  input-matrix (->> item-vec
+                                    (keep (fn [{:keys [item v]}]
+                                            (when (contains? (set target-items) item)
+                                              v)))
+                                    object-array)]
+              (when-not (= (count target-items) (count input-matrix)) (throw (Exception. "items and matrices have to be same lenght")))
+              (json/write-str {:skipped skipped
+                               :condition "ok"
+                               :result (mapv (fn [item [x y]] {:item item :x x :y y})
+                                             target-items
+                                             (map seq (tsne/tsne input-matrix 2
+                                                                 ;;                                                              :tsne-algorithm :parallel-bht
+                                                                 :tsne-algorithm :bht
+                                                                 :perplexity perplexity
+                                                                 :iters iters)))})))))
   (route/not-found "404 not found"))
 
 (def app

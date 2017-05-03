@@ -17,20 +17,22 @@
        [:div {:class "col-sm-1"}]
        [:div {:class "col-sm-10"}
         [:h1 {:style "text-align:center"} "Visualization with t-sne"]
-        [:div {:id "tsne-plot"}]]]
+        [:div {:id "tsne-plot" :style "height:420px;"}]]]
       [:div {:id "items" :class "row" :v-cloak ""}
        [:div {:class "col-sm-1"}]
        [:div {:class "col-sm-10"}
         [:form
          [:h3 "Items"]
-         [:h4 "Skipped items"]
-         [:div {:v-for "skipped in skipped_items"}
-          "{{skipped.item}}"]
-         [:h4 "add item"]
-         [:div {:class "input-group"}
-          [:span {:class "input-group-btn"}
-           [:input {:id "add-item" :class "form-control" :v-model "item" :placeholder "word or tokens"}]
-           [:div {:class "btn btn-primary" :v-on:click "add_item(item)" } "add"]]]
+         [:div {:class "row"}
+          [:div {:class "col-sm-6"}
+           [:h4 "add items from file"]
+           [:input {:type "file" :id "file-upload"}]]
+          [:div {:class "col-sm-6"}
+           [:h4 "add item as you like"]
+           [:div {:class "input-group"}
+            [:span {:class "input-group-btn"}
+             [:input {:id "add-item" :class "form-control" :v-model "item" :placeholder "word or tokens"}]
+             [:div {:class "btn btn-primary" :v-on:click "add_item(item)" } "add"]]]]]
          [:h3 "t-sne parameters"]
          [:div {:class "row"}
           [:div {:class "col-sm-6"}
@@ -45,9 +47,14 @@
                      :placeholder "number of t-sne iterations" :v-model.number "iters"}]]]]
          [:div {:style "text-align:center;margin: 18px 0px;"} "and"]
          [:div {:class "btn btn-success btn-block" :v-on:click "fetch_data()"} "fetch data and redraw"]
-         [:h3 "Items"]
-;;          [:div {:v-for "item in item_list"}
-;;           "{{item.item}}"]
+         [:div {:class "row"}
+          [:div {:class "col-sm-6"}
+           [:h4 "All items"]
+           [:div {:v-for "item in item_list"}
+            "{{item}}"]]
+          [:div {:class "col-sm-6"}
+           [:h4 "Skipped items"]
+           [:div {:v-for "skipped in skipped_items"} "{{skipped.item}}"]]]
 ]]]]
      [:script {:type "text/javascript" :src "https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"}]
      [:script {:src "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
