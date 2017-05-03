@@ -7,7 +7,6 @@
 
 (defn text-embedding->plotly-data
   [{:strs [item x y]}]
-  (println item x y)
   {:x [x]
    :y [y]
    :text [item]
@@ -17,14 +16,12 @@
    :mode "markers+text"
    :textposition "bottom"})
 
-(def word-set (atom #{}))
 
 (def vm
   (js/Vue.
     (clj->js
-      {:el "#items"
-       :data {:test "あばば"
-              :plot_area (.getElementById js/document "tsne-plot")
+      {:el "#main"
+       :data {:btn_text "get word position and redraw"
               :perplexity 5.0
               :iters 1000
               :item ""
@@ -41,13 +38,14 @@
                   :update_plot
                   (fn []
                     (this-as me
-                             (.newPlot js/Plotly (aget me "plot_area")
+                             (.newPlot js/Plotly (.getElementById js/document "tsne-plot")
                                        (->> (aget me "item_list_plot") js->clj (mapv #(text-embedding->plotly-data %)) clj->js)
-                                       (clj->js {}))))
+                                       (clj->js {:height 600}))))
                   :fetch_data
                   (fn []
                     (this-as me
                              (let [items (->> (js->clj (aget me "item_list")))]
+                               (aset me "btn_text" "fetching data ...")
                                (POST "/"
                                      {:params {:items items
                                                :perplexity (aget me "perplexity")
@@ -59,7 +57,6 @@
                                                        target  (aget me "item_list_plot")
                                                        skipped-items (aget me "skipped_items")]
                                                    (when (= condition "model-has-gone") (.alert js/window "model has gone, you need to restart server"))
-                                                   (println result)
                                                    ;; add result of words
                                                    (.splice target 0 (count target))
                                                    (->> result
@@ -70,6 +67,7 @@
                                                    (->> skipped
                                                         (map #(.push skipped-items (clj->js %)))
                                                         dorun))
+                                                 (aset me "btn_text" "get word position and redraw")
                                                  ((aget me "update_plot")))
                                       :error-handler (fn [{:keys [status status-text]}]
                                                        (println (str "error has occured " status ":" status-text)))}))))}
@@ -79,7 +77,6 @@
                     (.change (js/$ "#file-upload")
                              (fn [e] (let [file (first (array-seq (aget e "target" "files")))
                                            reader (js/FileReader.)]
-                                       (println (clj->js file))
                                        (.readAsText reader file)
                                        (aset reader "onload"
                                              (fn []

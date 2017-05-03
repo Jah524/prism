@@ -12,20 +12,20 @@
      [:title "Visualization"]
      ]
     [:body
-     [:div {:id "main"}
+     [:h1 {:style "text-align:center"} "Visualization with t-sne"]
+     [:div {:id "main" :v-cloak ""}
       [:div {:class "row"}
        [:div {:class "col-sm-1"}]
        [:div {:class "col-sm-10"}
-        [:h1 {:style "text-align:center"} "Visualization with t-sne"]
-        [:div {:id "tsne-plot" :style "height:420px;"}]]]
-      [:div {:id "items" :class "row" :v-cloak ""}
+        [:div {:id "tsne-plot"}]]]
+      [:div {:id "items" :class "row"}
        [:div {:class "col-sm-1"}]
        [:div {:class "col-sm-10"}
         [:form
-         [:h3 "Items"]
+         [:h2 "Items"]
          [:div {:class "row"}
           [:div {:class "col-sm-6"}
-           [:h4 "add items from file"]
+           [:h4 "add items by file"]
            [:input {:type "file" :id "file-upload"}]]
           [:div {:class "col-sm-6"}
            [:h4 "add item as you like"]
@@ -33,7 +33,7 @@
             [:span {:class "input-group-btn"}
              [:input {:id "add-item" :class "form-control" :v-model "item" :placeholder "word or tokens"}]
              [:div {:class "btn btn-primary" :v-on:click "add_item(item)" } "add"]]]]]
-         [:h3 "t-sne parameters"]
+         [:h2 "t-sne parameters"]
          [:div {:class "row"}
           [:div {:class "col-sm-6"}
            [:div {:class "input-group"}
@@ -46,7 +46,8 @@
             [:input {:type "number" :class "form-control" :id "iters" :aria-describedby "iters-desc"
                      :placeholder "number of t-sne iterations" :v-model.number "iters"}]]]]
          [:div {:style "text-align:center;margin: 18px 0px;"} "and"]
-         [:div {:class "btn btn-success btn-block" :v-on:click "fetch_data()"} "fetch data and redraw"]
+         [:div {:class "btn btn-success btn-block btn-lg" :v-on:click "fetch_data()"} "{{btn_text}}"]
+         [:hr]
          [:div {:class "row"}
           [:div {:class "col-sm-6"}
            [:h4 "All items"]
