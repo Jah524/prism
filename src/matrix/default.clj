@@ -1,7 +1,9 @@
 (ns matrix.default
   (require [clojure.pprint :refer [pprint]]))
 
-(defn sum
+(defn sum []:fixme)
+
+(defn plus
   ([^floats v1]
    v1)
   ([^floats v1 ^floats v2]
@@ -11,7 +13,7 @@
          _ (dotimes [x n] (aset ^floats ret x (float (+ (aget ^floats v1 x) (aget ^floats v2 x)))))]
      ret))
   ([^floats v1 ^floats v2 & more]
-   (reduce #(sum %1 %2) (sum v1 v2) more)))
+   (reduce #(plus %1 %2) (plus v1 v2) more)))
 
 (defn merger!
   "takes matrices or vectors and return sum of each element"
@@ -26,7 +28,7 @@
             (aset ^floats v! y (float (+ (aget ^floats v y) (aget ^floats v! y)))))))
       m!)
     (= (type m) (Class/forName "[F")); if default vector
-    (sum m m!)))
+    (plus m m!)))
 
 
 (defn minus
@@ -129,6 +131,7 @@
 (def default-matrix-kit
   {:type :default
    :sum sum
+   :plus plus
    :merger! merger!
    :minus minus
    :times times

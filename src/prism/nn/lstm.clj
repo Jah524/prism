@@ -10,7 +10,7 @@
 (defn partial-state-sparse
   "lstm states of each part caused by input"
   [model x-input sparses unit-num]
-  (let [{:keys [scal sum]} (:matrix-kit model)]
+  (let [{:keys [scal plus]} (:matrix-kit model)]
     (->> x-input
          (mapv (fn [item]
                  (cond (set? x-input)
@@ -20,13 +20,13 @@
                        (let [[sparse-k v] item
                              {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse-k)]
                          [(scal v block-w) (scal v input-gate-w) (scal v forget-gate-w) (scal v output-gate-w)]))))
-         (apply mapv sum))))
+         (apply mapv plus))))
 
 (defn lstm-activation
   [model x-input recurrent-input-list previous-cell-state]
   (let [{:keys [hidden matrix-kit]} model
         lstm-layer hidden
-        {:keys [gemv sum times sigmoid tanh alter-vec]} matrix-kit
+        {:keys [gemv plus times sigmoid tanh alter-vec]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole unit-num
@@ -38,11 +38,11 @@
                                                            (mapv #(gemv % x-input) lstm-mat)))
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
         [block-r' input-gate-r' forget-gate-r' output-gate-r'] (mapv #(gemv % recurrent-input-list) lstm-mat-r)
-        block       (sum block' block-r' block-bias)
-        input-gate  (sum input-gate' input-gate-r' input-gate-bias    (times input-gate-peephole  previous-cell-state))
-        forget-gate (sum forget-gate' forget-gate-r' forget-gate-bias (times forget-gate-peephole previous-cell-state))
-        output-gate (sum output-gate' output-gate-r' output-gate-bias (times output-gate-peephole previous-cell-state))
-        cell-state  (sum (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
+        block       (plus block' block-r' block-bias)
+        input-gate  (plus input-gate' input-gate-r' input-gate-bias    (times input-gate-peephole  previous-cell-state))
+        forget-gate (plus forget-gate' forget-gate-r' forget-gate-bias (times forget-gate-peephole previous-cell-state))
+        output-gate (plus output-gate' output-gate-r' output-gate-bias (times output-gate-peephole previous-cell-state))
+        cell-state  (plus (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
                          (times (alter-vec forget-gate sigmoid) previous-cell-state))
         lstm  (times (alter-vec output-gate sigmoid) (alter-vec cell-state tanh))]
     {:activation lstm
@@ -84,7 +84,7 @@
   [model hidden-size propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
    peephole-w-input-gate peephole-w-forget-gate peephole-w-output-gate]
   (let [{:keys [matrix-kit]} model
-        {:keys [sum times alter-vec sigmoid tanh]} matrix-kit
+        {:keys [plus times alter-vec sigmoid tanh]} matrix-kit
         _dog (derivative (:output-gate lstm-state) :sigmoid matrix-kit)
         _cell-state (:cell-state lstm-state)
         output-gate-delta (times _dog (alter-vec _cell-state tanh) propagated-delta)
@@ -94,7 +94,7 @@
         _csd:t+1 (:cell-state-delta self-delta:t+1)
         _igd:t+1 (:input-gate-delta self-delta:t+1)
         _fgd:t+1 (:forget-gate-delta self-delta:t+1)
-        cell-state-delta (sum (times (alter-vec _og sigmoid) _dcs propagated-delta)
+        cell-state-delta (plus (times (alter-vec _og sigmoid) _dcs propagated-delta)
                               (times (alter-vec _fg:t+1 sigmoid) _csd:t+1)
                               (times peephole-w-input-gate _igd:t+1)
                               (times peephole-w-forget-gate _fgd:t+1)
@@ -174,15 +174,15 @@
   {:forget-gate (make-vector unit-num)})
 
 (defn merge-param
-  [sum merger! acc param-delta]
+  [plus merger! acc param-delta]
   (if (nil? acc)
     param-delta
     (merge-with #(cond
                    (map? %1); if each value is sparses
                    (merge-with (fn [accw dw] ;for each items
                                  (if (map? accw)
-                                   (merge-with (fn [a b] (sum a b)) accw dw);sprase w of each gates
-                                   (sum accw dw)));w also bias
+                                   (merge-with (fn [a b] (plus a b)) accw dw);sprase w of each gates
+                                   (plus accw dw)));w also bias
                                %1 %2)
                    :else ;if hidden weight map or bias
                    (merger! %2 %1))
@@ -192,7 +192,7 @@
 (defn bptt
   [model activation output-items-seq]
   (let [{:keys [output hidden matrix-kit]} model
-        {:keys [make-vector scal sum merger! transpose gemv]} matrix-kit
+        {:keys [make-vector scal plus merger! transpose gemv]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden]
@@ -228,10 +228,10 @@
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
                                                                 (scal delta w))))
-                                                       (apply sum)))
+                                                       (apply plus)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (sum propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (plus propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
@@ -252,15 +252,15 @@
                                                                 (gemv (transpose w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                         (apply sum))]
+                                                         (apply plus))]
           (recur (rest output-items-seq)
                  propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (cons output-delta output-loss)
-                 (merge-param sum merger! output-acc output-param-delta)
-                 (merge-param sum merger! hidden-acc lstm-param-delta)))
+                 (merge-param plus merger! output-acc output-param-delta)
+                 (merge-param plus merger! hidden-acc lstm-param-delta)))
         :else
         {:param-loss  {:output-delta output-acc
                        :hidden-delta hidden-acc}

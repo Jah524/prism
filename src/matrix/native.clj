@@ -3,13 +3,15 @@
     [uncomplicate.neanderthal.core :as c]
     [uncomplicate.neanderthal.native :refer [dv dge dtr]]))
 
-(defn sum
+(defn sum []:fixme)
+
+(defn plus
   ([v1]
    v1)
   ([v1 v2]
    (c/axpy v1 v2))
   ([v1 v2 & more]
-   (reduce #(sum %1 %2) (sum v1 v2) more)))
+   (reduce #(plus %1 %2) (plus v1 v2) more)))
 
 (defn merger!
   [m m!]
@@ -85,6 +87,7 @@
 (def native-matrix-kit
   {:type :native
    :sum sum
+   :plus plus
    :merger! merger!
    :minus minus
    :times times

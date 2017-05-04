@@ -26,7 +26,7 @@
 
 (defn decoder-lstm-activation [decoder x-input recurrent-input-list encoder-input previous-cell-state]
   (let [{:keys [hidden matrix-kit input-type]} decoder
-        {:keys [sum times gemv alter-vec tanh sigmoid]} matrix-kit
+        {:keys [plus times gemv alter-vec tanh sigmoid]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole unit-num
@@ -42,11 +42,11 @@
         lstm-mat-e  [block-we input-gate-we forget-gate-we output-gate-we]
         [block-e' input-gate-e' forget-gate-e' output-gate-e'] (mapv #(gemv % encoder-input) lstm-mat-e)
         ;; state of each gates
-        block       (sum block'       block-r'       block-e'       block-bias)
-        input-gate  (sum input-gate'  input-gate-r'  input-gate-e'  input-gate-bias  (times input-gate-peephole  previous-cell-state))
-        forget-gate (sum forget-gate' forget-gate-r' forget-gate-e' forget-gate-bias (times forget-gate-peephole previous-cell-state))
-        output-gate (sum output-gate' output-gate-r' forget-gate-e' output-gate-bias (times output-gate-peephole previous-cell-state))
-        cell-state  (sum (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
+        block       (plus block'       block-r'       block-e'       block-bias)
+        input-gate  (plus input-gate'  input-gate-r'  input-gate-e'  input-gate-bias  (times input-gate-peephole  previous-cell-state))
+        forget-gate (plus forget-gate' forget-gate-r' forget-gate-e' forget-gate-bias (times forget-gate-peephole previous-cell-state))
+        output-gate (plus output-gate' output-gate-r' forget-gate-e' output-gate-bias (times output-gate-peephole previous-cell-state))
+        cell-state  (plus (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
                          (times (alter-vec forget-gate sigmoid) previous-cell-state))
         lstm (times (alter-vec output-gate sigmoid) (alter-vec cell-state tanh))]
     {:activation lstm
@@ -158,7 +158,7 @@
 (defn encoder-bptt
   [encoder encoder-activation propagated-delta-from-decoder]
   (let [{:keys [hidden matrix-kit]} encoder
-        {:keys [make-vector gemv transpose sum merger!]} matrix-kit
+        {:keys [make-vector gemv transpose plus merger!]} matrix-kit
         {:keys [output hidden]} encoder
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
@@ -185,19 +185,19 @@
                                                                 (gemv (transpose w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                         (apply sum))]
+                                                         (apply plus))]
           (recur propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
                  lstm-part-delta
                  (:state (:hidden (first output-seq)))
-                 (lstm/merge-param sum merger! hidden-acc lstm-param-delta)))
+                 (lstm/merge-param plus merger! hidden-acc lstm-param-delta)))
         {:hidden-delta hidden-acc}))))
 
 
 (defn decoder-bptt
   [decoder decoder-activation encoder-input output-items-seq]
   (let [{:keys [output hidden encoder-size input-size matrix-kit]} decoder
-        {:keys [make-vector scal sum gemv transpose sum merger!]} matrix-kit
+        {:keys [make-vector scal plus gemv transpose plus merger!]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 block-we input-gate-we forget-gate-we output-gate-we
                 input-gate-peephole forget-gate-peephole output-gate-peephole
@@ -244,10 +244,10 @@
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
                                                                 (scal delta w))))
-                                                       (apply sum)))
+                                                       (apply plus)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (sum propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (plus propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
@@ -269,21 +269,21 @@
                                                                 (gemv (transpose w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                         (apply sum))
+                                                         (apply plus))
               propagation-to-encoder (->> (map (fn [w d]
                                                  (gemv (transpose w) d))
                                                [block-we    input-gate-we    forget-gate-we    output-gate-we]
                                                [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                          (apply sum))]
+                                          (apply plus))]
           (recur (rest output-items-seq)
                  propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (cons output-delta output-loss)
-                 (lstm/merge-param sum merger! output-acc output-param-delta)
-                 (lstm/merge-param sum merger! hidden-acc lstm-param-delta)
-                 (sum encoder-delta propagation-to-encoder)))
+                 (lstm/merge-param plus merger! output-acc output-param-delta)
+                 (lstm/merge-param plus merger! hidden-acc lstm-param-delta)
+                 (plus encoder-delta propagation-to-encoder)))
         :else
         {:param-loss {:output-delta output-acc
                       :hidden-delta hidden-acc

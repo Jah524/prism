@@ -10,13 +10,13 @@
   [model sparse-inputs bias]
   (let [{:keys [hidden matrix-kit]} model
         {:keys [w unit-num]} hidden
-        {:keys [sum scal]} matrix-kit]
+        {:keys [plus scal]} matrix-kit]
     (reduce (fn [acc sparse]
               (cond (set? sparse-inputs)
-                    (sum acc (get w sparse))
+                    (plus acc (get w sparse))
                     (map? sparse-inputs)
                     (let [[k v] sparse]
-                      (sum acc (scal v (get w k))))))
+                      (plus acc (scal v (get w k))))))
             bias
             sparse-inputs)))
 
@@ -41,10 +41,10 @@
   (let [{:keys [hidden input-type matrix-kit]} model
         {:keys [w bias unit-num]} hidden
         activation-function (:activation hidden)
-        {:keys [sum gemv matrix-kit-type native-dv]} matrix-kit
+        {:keys [plus gemv matrix-kit-type native-dv]} matrix-kit
         state (if (= :sparse input-type)
                 (hidden-state-by-sparse model x-input bias)
-                (sum (gemv w x-input) bias))
+                (plus (gemv w x-input) bias))
         hidden-activation (activation state activation-function matrix-kit)
         output-activation (output-activation model hidden-activation sparse-outputs)]
     {:activation {:input x-input :hidden hidden-activation :output output-activation}
@@ -93,7 +93,7 @@
         {:keys [activation state]} model-forward
         training-x (:input activation)
         {:keys [pos neg]} training-y   ;used when binary claassification
-        {:keys [scal sum times matrix-kit-type native-dv]} matrix-kit
+        {:keys [scal plus times matrix-kit-type native-dv]} matrix-kit
         output-delta (condp = (:output-type model)
                        :binary-classification
                        (binary-classification-error (:output activation) pos neg)
@@ -104,7 +104,7 @@
                               (map (fn [[item delta]]
                                      (let [w (:w (get output item))]
                                        (scal delta w))))
-                              (apply sum))
+                              (apply plus))
         hidden-delta (times (derivative (:hidden state) (:activation hidden) matrix-kit)
                             propagated-delta)
         hidden-param-delta (if (= :sparse input-type)

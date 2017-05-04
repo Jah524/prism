@@ -7,8 +7,8 @@
 (def y (float-array (range 0 50 10)))
 
 (deftest matrix-test
-  (testing "sum"
-    (is (= (vec (sum x y))
+  (testing "plus"
+    (is (= (vec (plus x y))
            [0.0 11.0 22.0 33.0 44.0])))
   (testing "minus"
     (is (= (vec (minus x y))

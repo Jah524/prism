@@ -1,20 +1,26 @@
 (ns prism.unit)
 
+(comment
+  (defn softmax [matrix-kit v]
+    (let [{:keys [sum]} matrix-kit
+          s (sum v)]
 
-(defn softmax [y-list]
-  (let [n (count y-list)
-        ret (float-array n)
-        m (float (apply max y-list))
-        sum-y (areduce ^floats y-list i acc (float 0) (+ acc (float (Math/exp (- (aget ^floats y-list i) m)))))
-        _ (dotimes [x n] (aset ^floats ret x (float (/ (Math/exp (- (aget ^floats y-list x) m)) sum-y))))]
-    ret))
+
+
+      (let [n (count y-list)
+            ret (float-array n)
+            m (float (apply max y-list))
+            sum-y (areduce ^floats y-list i acc (float 0) (+ acc (float (Math/exp (- (aget ^floats y-list i) m)))))
+            _ (dotimes [x n] (aset ^floats ret x (float (/ (Math/exp (- (aget ^floats y-list x) m)) sum-y))))]
+        ret))))
 
 (defn activation
   [state activate-fn-key matrix-kit]
   (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
     (cond
       (= activate-fn-key :softmax)
-      (softmax state)
+;;       (softmax state)
+      :fixme
       (= activate-fn-key :linear)
       state
       :else
@@ -28,8 +34,8 @@
       (linear-derivative-vector state)
       :else
       (let [f (condp = activate-fn-key
-                   :sigmoid sigmoid-derivative
-                   :tanh    tanh-derivative)]
+                :sigmoid sigmoid-derivative
+                :tanh    tanh-derivative)]
         (alter-vec state f)))))
 
 
