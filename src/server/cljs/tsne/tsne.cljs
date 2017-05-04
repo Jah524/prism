@@ -1,6 +1,6 @@
 (ns server.cljs.tsne.tsne
   (:require
-    [clojure.string :refer [split-lines]]
+    [clojure.string :refer [split split-lines]]
     [ajax.core :refer [POST]]))
 
 (enable-console-print!)
@@ -25,14 +25,14 @@
               :perplexity 5.0
               :iters 1000
               :item ""
-              :item_list [] ; [word1, word2 ...]
+              :item_list [] ; word2vec: [[word1], [word2] ...] or rnnlm: [[word1 word2] [word3 word4 word5]]
               :item_list_plot [] ; [{:item word1 :x 123 :y 42} ...]
               :skipped_items []}
        :methods {
                   :add_item (fn [item]
                               (this-as
                                 me
-                                (.push (aget me "item_list") item)
+                                (.push (aget me "item_list") (clj->js (split item #" ")))
                                 (aset me "item" "")
                                 ))
                   :update_plot
@@ -40,7 +40,7 @@
                     (this-as me
                              (.newPlot js/Plotly (.getElementById js/document "tsne-plot")
                                        (->> (aget me "item_list_plot") js->clj (mapv #(text-embedding->plotly-data %)) clj->js)
-                                       (clj->js {:height 600}))))
+                                       (clj->js {:height 640}))))
                   :fetch_data
                   (fn []
                     (this-as me
@@ -82,7 +82,7 @@
                                              (fn []
                                                (let [result (aget reader "result")
                                                      lines (split-lines result)]
-                                                 (->> lines (map #(.push (aget me "item_list") %)) dorun))))))))
+                                                 (->> lines (map #(.push (aget me "item_list") (clj->js (split % #" ")))) dorun))))))))
 
                   )})))
 

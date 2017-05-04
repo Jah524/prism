@@ -25,12 +25,13 @@
   (POST "/" {:keys [params body] :as req}
         (let [contents (json/read-str (.readLine (io/reader body)))
               {:strs [items perplexity iters]} contents
+              _(pprint items)
               item-vec (condp = @model-type
-                         "word2vec" (->> items (mapv (fn [item] {:item item :v (w2v/word2vec @model item)})))
-                         "rnnlm" :fixme
+                         "word2vec" (->> items flatten (mapv (fn [item] {:item item :v (w2v/word2vec @model item)})))
+                         "rnnlm" (->> items (mapv (fn [words] {:item (->> words (interpose " ") (apply str)) :v (rnnlm/text-vector @model words)})))
                          :model-has-gone)]
           (if (= item-vec :model-has-gone)
-            (do (println "you need to restart server, model informations (atoms) are changed to nil by reloader") (json/write-str {:condition "model-has-gone"}))
+            (do (println "you need to restart server, model has gone.") (json/write-str {:condition "model-has-gone"}))
             (let [target-items (->> item-vec (remove (fn [{:keys [v]}] (nil? v))) (map :item))
                   skipped (->> item-vec (filter (fn [{:keys [v]}] (nil? v))))
                   input-matrix (->> item-vec
