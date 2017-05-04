@@ -160,9 +160,10 @@
   (print "loading model ...")
   (let [model (lstm/load-model model-path (:matrix-kit option))
         _(println " done")
-        updated-model (train-rnnlm! model training-path (assoc option :model-path model-path))]
+        model (train-rnnlm! model training-path (assoc option :model-path model-path))
+        m (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit)]
     (println (str "Saving RNNLM model as " model-path))
-    (util/save-model updated-model model-path)
+    (util/save-model m model-path)
     model))
 
 (defn load-model
