@@ -1,26 +1,19 @@
 (ns prism.unit)
 
-(comment
-  (defn softmax [matrix-kit v]
-    (let [{:keys [sum]} matrix-kit
-          s (sum v)]
-
-
-
-      (let [n (count y-list)
-            ret (float-array n)
-            m (float (apply max y-list))
-            sum-y (areduce ^floats y-list i acc (float 0) (+ acc (float (Math/exp (- (aget ^floats y-list i) m)))))
-            _ (dotimes [x n] (aset ^floats ret x (float (/ (Math/exp (- (aget ^floats y-list x) m)) sum-y))))]
-        ret))))
+(defn softmax [matrix-kit v]
+  (let [{:keys [sum minus scal alter-vec make-vector exp]} matrix-kit
+;;         m (apply max v)
+;;         normalized-v (minus v (make-vector (repeat (count v) m)))
+        converted-v (alter-vec v exp)
+        s (sum converted-v)]
+    (scal (/ 1 s) converted-v)))
 
 (defn activation
   [state activate-fn-key matrix-kit]
   (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
     (cond
-      (= activate-fn-key :softmax)
+;;       (= activate-fn-key :softmax)
 ;;       (softmax state)
-      :fixme
       (= activate-fn-key :linear)
       state
       :else

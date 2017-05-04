@@ -3,7 +3,8 @@
     [uncomplicate.neanderthal.core :as c]
     [uncomplicate.neanderthal.native :refer [dv dge dtr]]))
 
-(defn sum []:fixme)
+(defn sum [v]
+  (c/sum v))
 
 (defn plus
   ([v1]
@@ -103,6 +104,7 @@
    :make-matrix (fn [input-num hidden-num v] (dge hidden-num input-num v))
    :rewrite-vector! rewrite-vector!
    :rewrite-matrix! rewrite-matrix!
+   :exp (fn ^double [^double x] (Math/exp x))
    :sigmoid (fn ^double [^double x] (/ 1 (+ 1 (Math/exp (-  x)))))
    :sigmoid-derivative (fn ^double [^double x] (let [s (/ 1 (+ 1 (Math/exp (- x))))] (* s (- 1 s))))
    :tanh  (fn ^double [^double x] (Math/tanh x))

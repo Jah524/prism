@@ -1,7 +1,8 @@
 (ns matrix.default
   (require [clojure.pprint :refer [pprint]]))
 
-(defn sum []:fixme)
+(defn sum [^floats v]
+  (areduce v i ret (float 0) (+ ret (aget v i))))
 
 (defn plus
   ([^floats v1]
@@ -85,7 +86,6 @@
         (aset ^objects ret y tmp)))
     ret))
 
-
 (defn gemv
   [^objects matrix ^floats v]
   (let [mn (alength matrix)
@@ -157,6 +157,7 @@
                     mat))
    :rewrite-vector! rewrite-vector!
    :rewrite-matrix! rewrite-matrix!
+   :exp (fn[x](Math/exp x))
    :sigmoid sigmoid
    :sigmoid-derivative (fn [x] (let [s (sigmoid x)] (float (* s (- 1 s)))))
    :tanh tanh
