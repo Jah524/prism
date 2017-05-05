@@ -31,4 +31,12 @@
                                    :optimizations :advanced
                                    :externs ["server/externs/jquery-1.9.js"
                                              "server/externs/vue.js"
+                                             "server/externs/plotly.js"]}}
+                       {:id "word-probability-given-context"
+                        :source-paths ["src/server/cljs/word_probability_given_context"]
+                        :compiler {:output-to  "resources/public/js/word-probability-given-context.js"
+                                   :output-dir "resources/public/js/word-probability-given-context"
+                                   :optimizations :advanced
+                                   :externs ["server/externs/jquery-1.9.js"
+                                             "server/externs/vue.js"
                                              "server/externs/plotly.js"]}}]})

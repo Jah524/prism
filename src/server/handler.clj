@@ -12,20 +12,21 @@
     [org.httpkit.server :refer [run-server]]
     [clojure.core.matrix :as m]
     [think.tsne.core :as tsne]
-    [server.tsne :refer [tsne]]
+    [server.view :refer [tsne word-probability-given-context]]
     [prism.nlp.word2vec :as w2v]
     [prism.nlp.rnnlm :as rnnlm]))
 
+(def m-path (atom nil))
 (def model-type (atom nil))
 (def model (atom nil))
 
 (defroutes app-routes
   (route/resources "/")
   (GET  "/" [] (tsne @model-type))
-  (POST "/" {:keys [params body] :as req}
+  (POST "/"
+        {:keys [params body] :as req}
         (let [contents (json/read-str (.readLine (io/reader body)))
               {:strs [items perplexity iters]} contents
-              _(pprint items)
               item-vec (condp = @model-type
                          "word2vec" (->> items flatten (mapv (fn [item] {:item item :v (w2v/word2vec @model item)})))
                          "rnnlm" (->> items (mapv (fn [words] {:item (->> words (interpose " ") (apply str)) :v (rnnlm/text-vector @model words)})))
@@ -49,6 +50,24 @@
                                                                  :tsne-algorithm :bht
                                                                  :perplexity perplexity
                                                                  :iters iters)))})))))
+  (GET  "/word-probability-given-context" [] (word-probability-given-context))
+  (POST "/word-probability-given-context"
+        {:keys [params body] :as req}
+        (let [contents (json/read-str (.readLine (io/reader body)))
+              {:strs [context-list word-list]} contents
+              {:keys [wc]} @model
+              unk-items (filter #(not (get wc %)) word-list)
+              known-items (filter #(get wc %) word-list)
+              probs (->> context-list
+                         (mapv #(rnnlm/prob-word-given-context @model % known-items)))]
+          (json/write-str {:known-items known-items
+                           :unk-items unk-items
+                           :items (mapv (fn [s p] {:context (->> s (interpose " ") (apply str))
+                                                   :prob p})
+                                        context-list
+                                        probs)})))
+
+
   (route/not-found "404 not found"))
 
 (def app
@@ -100,6 +119,7 @@
     (if (and port type)
       (do
         (println (str "loading " model-path " ..."))
+        (reset! m-path model-path)
         (case type
           "word2vec" (do (reset! model-type "word2vec") (reset! model (w2v/load-embedding model-path nil)))
           "rnnlm"    (do (reset! model-type "rnnlm"   ) (reset! model (rnnlm/load-model model-path nil))))
