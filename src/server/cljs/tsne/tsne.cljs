@@ -21,7 +21,7 @@
   (js/Vue.
     (clj->js
       {:el "#main"
-       :data {:btn_text "get word position and redraw"
+       :data {:btn_text "get word position and draw"
               :perplexity 5.0
               :iters 1000
               :item ""

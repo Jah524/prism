@@ -32,7 +32,7 @@
            [:div {:class "input-group"}
             [:span {:class "input-group-btn"}
              [:input {:id "add-item" :class "form-control" :v-model "item" :placeholder "word or tokens"}]
-             [:div {:class "btn btn-primary" :v-on:click "add_item(item)" } "add"]]]]]
+             [:div {:class "btn btn-primary" :v-on:click "add_item(item)" :v-on:keyup.enter.space "add_item(item)" :tabIndex 0} "add"]]]]]
          [:h2 "t-sne parameters"]
          [:div {:class "row"}
           [:div {:class "col-sm-6"}
@@ -46,7 +46,7 @@
             [:input {:type "number" :class "form-control" :id "iters" :aria-describedby "iters-desc"
                      :placeholder "number of t-sne iterations" :v-model.number "iters"}]]]]
          [:div {:style "text-align:center;margin: 18px 0px;"} "and"]
-         [:div {:class "btn btn-success btn-block btn-lg" :v-on:click "fetch_data()"} "{{btn_text}}"]
+         [:div {:class "btn btn-success btn-block btn-lg" :v-on:click "fetch_data()" :tabIndex 0} "{{btn_text}}"]
          [:hr]
          [:div {:class "row"}
           [:div {:class "col-sm-6"}
@@ -92,14 +92,16 @@
            [:h4 "add context as you like"]
            [:div {:class "input-group"}
             [:span {:class "input-group-btn"}
-             [:input {:id "add-context" :class "form-control" :v-model "context" :placeholder "tokens (e.g. natural language)"}]
-             [:div {:class "btn btn-primary" :v-on:click "add_context(context)" } "add"]]]]]
+             [:input {:id "add-context" :class "form-control" :placeholder "tokens (e.g. natural language)"
+                      :v-model "context"}]
+             [:div {:class "btn btn-primary" :v-on:click "add_context(context)" :v-on:keyup.enter.space "add_context(context)" :tabIndex 0} "add"]]]]]
          [:div {:v-for "context in context_list"} "{{context}}"]
          [:h2 "2. Target word"]
          [:div {:class "input-group"}
           [:span {:class "input-group-btn"}
-           [:input {:id "add-word" :class "form-control" :v-model "word" :placeholder "words (e.g. processing)"}]
-           [:div {:class "btn btn-primary" :v-on:click "add_words(word)" } "add"]]]
+           [:input {:id "add-word" :class "form-control" :placeholder "words (e.g. processing)"
+                    :v-model "word"}]
+           [:div {:class "btn btn-primary" :v-on:click "add_words(word)" :v-on:keyup.enter.space "add_words(word)" :tabIndex 0} "add"]]]
          [:div [:span {:v-for "word in word_list"} "{{word}} "]]
          [:div {:style "text-align:center;margin:12px;"} "and"]
          [:div {:class "btn btn-success btn-block btn-lg" :v-on:click "fetch_data()"} "{{btn_text}}"]]
