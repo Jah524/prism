@@ -69,7 +69,7 @@
         demo-input2 (map make-vector [[1] [1] [1]])
         demo-input3 (map make-vector [[1] [1] [1] [1] [1]])]
     (println "*** dataset ***")
-    (pprint dataset)
+    (pprint (dataset mk))
     (println "\n*** demo1 ***")
     (pprint demo-input1)
     (pprint (last (:activation (last (lstm/sequential-output model demo-input1 [#{"prediction"}])))))
