@@ -1,16 +1,16 @@
 (ns prism.unit)
 
 (defn softmax [matrix-kit v]
-  (let [{:keys [sum minus scal alter-vec make-vector exp]} matrix-kit
+  (let [{:keys [sum minus scal alter-vec make-vector exp clip!]} matrix-kit
 ;;         m (apply max v)
 ;;         normalized-v (minus v (make-vector (repeat (count v) m)))
-        converted-v (alter-vec v exp)
+        converted-v (-> v (alter-vec exp))
         s (sum converted-v)]
     (scal (/ 1 s) converted-v)))
 
 (defn activation
   [state activate-fn-key matrix-kit]
-  (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
+  (let [{:keys [alter-vec sigmoid tanh clip!]} matrix-kit]
     (cond
 ;;       (= activate-fn-key :softmax)
 ;;       (softmax state)
@@ -18,10 +18,10 @@
       state
       :else
       (let [f (condp = activate-fn-key :sigmoid sigmoid :tanh tanh)]
-        (alter-vec state f)))))
+        (alter-vec (clip! 50 state) f)))))
 
 (defn derivative [state activate-fn-key matrix-kit]
-  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative linear-derivative-vector]} matrix-kit]
+  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative linear-derivative-vector clip!]} matrix-kit]
     (cond
       (= activate-fn-key :linear)
       (linear-derivative-vector state)
@@ -29,7 +29,7 @@
       (let [f (condp = activate-fn-key
                 :sigmoid sigmoid-derivative
                 :tanh    tanh-derivative)]
-        (alter-vec state f)))))
+        (alter-vec (clip! 50 state) f)))))
 
 
 (defn binary-classification-error

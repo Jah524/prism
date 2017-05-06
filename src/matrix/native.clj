@@ -65,6 +65,14 @@
   [matrix v]
   (c/mv matrix v))
 
+(defn clip!
+  "v: vector, t: threshould(positive value)"
+  [t v]
+  (let [tmin (- t)]
+    (dotimes [i (c/dim v)]
+      (c/alter! v i (fn ^double [^double x] (cond (> x t) t (< x tmin) tmin :else x)))))
+  v)
+
 (defn rewrite-vector!
   [^double alpha v! v2]
   (c/axpy! alpha v2 v!))
@@ -102,6 +110,7 @@
    :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (vec (take (* input-num hidden-num) (repeatedly model-rand)))))
    :make-vector dv
    :make-matrix (fn [input-num hidden-num v] (dge hidden-num input-num v))
+   :clip! clip!
    :rewrite-vector! rewrite-vector!
    :rewrite-matrix! rewrite-matrix!
    :exp (fn ^double [^double x] (Math/exp x))

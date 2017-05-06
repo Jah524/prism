@@ -98,6 +98,16 @@
       (aset ^floats ret x (float (areduce tmp i ret (float 0) (+ ret (aget ^floats tmp i))))))
     ret))
 
+(defn clip!
+  "v: vector, t: threshould(positive value)"
+  [t v]
+  (let [tmin (- t)]
+    (dotimes [i (alength v)]
+      (let [x (aget ^floats v i)]
+        (aset ^floats v i (float (cond (> x t) t (< x tmin) tmin :else x)))))
+    v))
+
+
 (defn rewrite-vector!
   [alpha ^floats v! ^floats v2]
   (when-not (= (alength v!) (alength v2)) (throw (Exception. "vectors must be same length")))
@@ -155,6 +165,7 @@
                           (aset ^floats tmp y (float (nth v y))))
                         (aset ^objects mat x tmp)))
                     mat))
+   :clip! clip!
    :rewrite-vector! rewrite-vector!
    :rewrite-matrix! rewrite-matrix!
    :exp (fn[x](Math/exp x))
@@ -164,3 +175,4 @@
    :tanh-derivative (fn [x] (let [it (Math/tanh x)] (float (- 1 (* it it)))))
    :linear-derivative-vector (fn [v] (float-array (take (alength v) (repeat 1))))
    :alter-vec alter-vec})
+

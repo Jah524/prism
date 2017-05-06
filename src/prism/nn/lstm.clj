@@ -26,7 +26,7 @@
   [model x-input recurrent-input-list previous-cell-state]
   (let [{:keys [hidden matrix-kit]} model
         lstm-layer hidden
-        {:keys [gemv plus times sigmoid tanh alter-vec]} matrix-kit
+        {:keys [gemv plus times sigmoid tanh alter-vec clip!]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole unit-num
@@ -38,12 +38,12 @@
                                                            (mapv #(gemv % x-input) lstm-mat)))
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
         [block-r' input-gate-r' forget-gate-r' output-gate-r'] (mapv #(gemv % recurrent-input-list) lstm-mat-r)
-        block       (plus block' block-r' block-bias)
-        input-gate  (plus input-gate' input-gate-r' input-gate-bias    (times input-gate-peephole  previous-cell-state))
-        forget-gate (plus forget-gate' forget-gate-r' forget-gate-bias (times forget-gate-peephole previous-cell-state))
-        output-gate (plus output-gate' output-gate-r' output-gate-bias (times output-gate-peephole previous-cell-state))
+        block       (clip! 50 (plus block' block-r' block-bias))
+        input-gate  (clip! 50 (plus input-gate' input-gate-r' input-gate-bias    (times input-gate-peephole  previous-cell-state)))
+        forget-gate (clip! 50 (plus forget-gate' forget-gate-r' forget-gate-bias (times forget-gate-peephole previous-cell-state)))
+        output-gate (clip! 50 (plus output-gate' output-gate-r' output-gate-bias (times output-gate-peephole previous-cell-state)))
         cell-state  (plus (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
-                         (times (alter-vec forget-gate sigmoid) previous-cell-state))
+                          (times (alter-vec forget-gate sigmoid) previous-cell-state))
         lstm  (times (alter-vec output-gate sigmoid) (alter-vec cell-state tanh))]
     {:activation lstm
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
@@ -95,10 +95,10 @@
         _igd:t+1 (:input-gate-delta self-delta:t+1)
         _fgd:t+1 (:forget-gate-delta self-delta:t+1)
         cell-state-delta (plus (times (alter-vec _og sigmoid) _dcs propagated-delta)
-                              (times (alter-vec _fg:t+1 sigmoid) _csd:t+1)
-                              (times peephole-w-input-gate _igd:t+1)
-                              (times peephole-w-forget-gate _fgd:t+1)
-                              (times peephole-w-output-gate output-gate-delta))
+                               (times (alter-vec _fg:t+1 sigmoid) _csd:t+1)
+                               (times peephole-w-input-gate _igd:t+1)
+                               (times peephole-w-forget-gate _fgd:t+1)
+                               (times peephole-w-output-gate output-gate-delta))
         _ig (:input-gate lstm-state)
         _db (derivative (:block lstm-state) :tanh matrix-kit)
         block-delta (times (alter-vec _ig sigmoid) _db cell-state-delta)

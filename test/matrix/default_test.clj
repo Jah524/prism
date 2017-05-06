@@ -40,4 +40,7 @@
           v   (float-array [1 1 1])
           result   [6.0 15.0 24.0, 33.0]]
       (is (= (vec (gemv mat v)) result))))
+  (testing "clip!"
+    (is (= (seq (clip! 25 (float-array [1 -3 -30 30 24 -24.9])))
+           (map float [1 -3 -25 25 24 -24.9]))))
   )
