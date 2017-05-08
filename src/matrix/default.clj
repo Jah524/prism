@@ -4,6 +4,7 @@
 (defn sum [^floats v]
   (areduce v i ret (float 0) (+ ret (aget v i))))
 
+
 (defn plus
   ([^floats v1]
    v1)
@@ -175,4 +176,3 @@
    :tanh-derivative (fn [x] (let [it (Math/tanh x)] (float (- 1 (* it it)))))
    :linear-derivative-vector (fn [v] (float-array (take (alength v) (repeat 1))))
    :alter-vec alter-vec})
-

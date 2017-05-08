@@ -26,7 +26,7 @@
   [model x-input recurrent-input-list previous-cell-state]
   (let [{:keys [hidden matrix-kit]} model
         lstm-layer hidden
-        {:keys [gemv plus times sigmoid tanh alter-vec clip!]} matrix-kit
+        {:keys [gemv plus times sigmoid tanh alter-vec]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole unit-num
@@ -38,10 +38,10 @@
                                                            (mapv #(gemv % x-input) lstm-mat)))
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
         [block-r' input-gate-r' forget-gate-r' output-gate-r'] (mapv #(gemv % recurrent-input-list) lstm-mat-r)
-        block       (clip! 50 (plus block' block-r' block-bias))
-        input-gate  (clip! 50 (plus input-gate' input-gate-r' input-gate-bias    (times input-gate-peephole  previous-cell-state)))
-        forget-gate (clip! 50 (plus forget-gate' forget-gate-r' forget-gate-bias (times forget-gate-peephole previous-cell-state)))
-        output-gate (clip! 50 (plus output-gate' output-gate-r' output-gate-bias (times output-gate-peephole previous-cell-state)))
+        block       (plus block' block-r' block-bias)
+        input-gate  (plus input-gate' input-gate-r' input-gate-bias    (times input-gate-peephole  previous-cell-state))
+        forget-gate (plus forget-gate' forget-gate-r' forget-gate-bias (times forget-gate-peephole previous-cell-state))
+        output-gate (plus output-gate' output-gate-r' output-gate-bias (times output-gate-peephole previous-cell-state))
         cell-state  (plus (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
                           (times (alter-vec forget-gate sigmoid) previous-cell-state))
         lstm  (times (alter-vec output-gate sigmoid) (alter-vec cell-state tanh))]
@@ -51,7 +51,7 @@
 
 (defn lstm-model-output
   [model x-input sparse-outputs previous-hidden-output previous-cell-state]
-  (let [{:keys [activation state]} (lstm-activation model x-input previous-hidden-output previous-cell-state)
+  (let [{:keys [activation state] :as lstm} (lstm-activation model x-input previous-hidden-output previous-cell-state)
         output (if (= :skip sparse-outputs) :skipped (ff/output-activation model activation sparse-outputs))]
     {:activation {:input x-input :hidden activation :output output}
      :state  {:input x-input :hidden state}}))

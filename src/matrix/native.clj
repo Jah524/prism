@@ -120,3 +120,4 @@
    :tanh-derivative (fn ^double [^double x] (let [it (Math/tanh x)] (- 1 (* it it))))
    :linear-derivative-vector (fn [v] (dv (take (c/dim v) (repeat 1))))
    :alter-vec alter-vec})
+

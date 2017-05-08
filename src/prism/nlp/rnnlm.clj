@@ -51,7 +51,7 @@
          :or {interval-ms 60000 ;; 1 minutes
               workers 4
               negative 5
-              initial-learning-rate 0.025
+              initial-learning-rate 0.005
               min-learning-rate 0.001
               skip-lines 0
               snapshot 60 ;  1 hour when interval-ms is set 60000

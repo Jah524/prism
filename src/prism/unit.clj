@@ -4,13 +4,13 @@
   (let [{:keys [sum minus scal alter-vec make-vector exp clip!]} matrix-kit
 ;;         m (apply max v)
 ;;         normalized-v (minus v (make-vector (repeat (count v) m)))
-        converted-v (-> v (alter-vec exp))
+        converted-v (-> (clip! 25 v) (alter-vec exp))
         s (sum converted-v)]
     (scal (/ 1 s) converted-v)))
 
 (defn activation
   [state activate-fn-key matrix-kit]
-  (let [{:keys [alter-vec sigmoid tanh clip!]} matrix-kit]
+  (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
     (cond
 ;;       (= activate-fn-key :softmax)
 ;;       (softmax state)
@@ -18,10 +18,10 @@
       state
       :else
       (let [f (condp = activate-fn-key :sigmoid sigmoid :tanh tanh)]
-        (alter-vec (clip! 50 state) f)))))
+        (alter-vec state f)))))
 
 (defn derivative [state activate-fn-key matrix-kit]
-  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative linear-derivative-vector clip!]} matrix-kit]
+  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative linear-derivative-vector]} matrix-kit]
     (cond
       (= activate-fn-key :linear)
       (linear-derivative-vector state)
@@ -29,7 +29,7 @@
       (let [f (condp = activate-fn-key
                 :sigmoid sigmoid-derivative
                 :tanh    tanh-derivative)]
-        (alter-vec (clip! 50 state) f)))))
+        (alter-vec state f)))))
 
 
 (defn binary-classification-error
