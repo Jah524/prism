@@ -100,12 +100,12 @@
   (let [{:keys [options arguments errors summary] :as args} (parse-opts args cli-options)
         {:keys [help port]} options
         [type model-path] arguments
-        model-exists? (.exists (io/as-file model-path))]
+        model-exists? (and model-path (.exists (io/as-file model-path)))]
     (cond
       help
       {:exit-message (usage summary)}
       (not model-exists?)
-      {:exit-message (str model-path " doesn't exist")}
+      {:exit-message "model doesn't exist"}
       (and (#{"word2vec" "rnnlm"} type)
            model-exists?)
       {:type type :model-path model-path :port port}
@@ -115,7 +115,6 @@
 
 (defn -main [& args]
   (let [{:keys [port type model-path exit-message]} (validate args)]
-    (println port type model-path)
     (if (and port type)
       (do
         (println (str "loading " model-path " ..."))
