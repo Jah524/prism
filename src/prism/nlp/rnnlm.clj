@@ -189,7 +189,7 @@
   [model words1 words2 l2?]
   (util/similarity (:matrix-kit model) (text-vector model words1) (text-vector model words2) l2?))
 
-(defn prob-word-given-context
+(defn word-prob-given-context
   "context is a list of word"
   [model context words]
   (let [wc (:wc model)
@@ -200,8 +200,24 @@
         x-seq (->> context (map #(set [(if (get wc %) % "<unk>")])))]
     {:context-unk context-unk
      :target-unk target-unk
+     :context (mapv first x-seq)
      :items (-> (lstm/sequential-output model x-seq (conj (vec (repeat n :skip)) target-words))
                 last
                 :activation
                 :output)}))
 
+(defn sentence-prob-given-context
+  "sentence is a sequence of words"
+  [model context sentence]
+  (loop [context (vec context),
+         sentence sentence,
+         acc []]
+    (if-let [f (first sentence)]
+      (recur
+        (conj (vec context) f)
+        (rest sentence)
+        (cons (word-prob-given-context model context [f]) acc))
+      {:history acc
+       :log-prob (->> acc
+                      (map #(-> % :items vals first Math/log))
+                      (reduce +))})))

@@ -59,7 +59,7 @@
               unk-items (filter #(not (get wc %)) word-list)
               known-items (filter #(get wc %) word-list)
               probs (->> context-list
-                         (mapv #(rnnlm/prob-word-given-context @model % known-items)))]
+                         (mapv #(rnnlm/word-prob-given-context @model % known-items)))]
           (json/write-str {:known-items known-items
                            :unk-items unk-items
                            :items (mapv (fn [s p] {:context (->> s (interpose " ") (apply str))
