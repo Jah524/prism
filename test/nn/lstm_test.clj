@@ -501,7 +501,6 @@
                          :hidden-size 10
                          :output-type :binary-classification})
           h (:hidden m)]
-      (is (= [3 10 3] (:unit-nums m)))
       (is (not= :sparse (:input-type m)))
       (is (= 10  (count (:block-w h))))
       (is (= 10 (count (:block-wr h))))
@@ -531,8 +530,6 @@
                          :hidden-size 10
                          :output-type :binary-classification})
           h (:hidden m)]
-      (is (= [3 10 3] (:unit-nums m)))
-      (is (= :sparse (:input-type m)))
       (is (= 10 (count (remove zero? (:block-w (get (:sparses h) "X"))))))
       (is (= 10 (count  (:block-wr h))))
       (is (= 10 (count (remove zero? (:input-gate-w (get (:sparses h) "Y"))))))
