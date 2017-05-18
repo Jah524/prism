@@ -65,7 +65,7 @@
                                        dataset-sparse
                                        {:loss-interval 100
                                         :epoc 2000
-                                        :learning-rate 0.005})
+                                        :learning-rate 0.01})
         demo-input1 [{"A" (float 1)}]
         demo-input2 [{"A" (float 1)} {"A" (float 1)}]
         demo-input3 [{"A" (float 1)} {"B" (float 1)} {"C" (float 1)} {"D" (float 1)}]

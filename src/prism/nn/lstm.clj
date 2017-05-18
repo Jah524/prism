@@ -192,7 +192,7 @@
 (defn bptt
   [model activation output-items-seq]
   (let [{:keys [output hidden matrix-kit]} model
-        {:keys [make-vector scal plus merger! transpose gemv]} matrix-kit
+        {:keys [make-vector scal plus merger! transpose gemv clip!]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
                 unit-num]} hidden]
@@ -228,7 +228,8 @@
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
                                                                 (scal delta w))))
-                                                       (apply plus)))
+                                                       (apply plus)
+                                                       (clip! 25)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
                                             (plus propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
