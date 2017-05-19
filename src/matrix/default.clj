@@ -2,7 +2,7 @@
   (require [clojure.pprint :refer [pprint]]
            [clojure.core.matrix :refer [set-current-implementation array matrix esum dot shape add! emul emul! mmul
                                         matrix? vec? emap emap! outer-product transpose ecount]]
-           [clojure.core.matrix.random :refer [randoms]]
+           [clojure.core.matrix.random :refer [randoms sample-normal]]
            [clojure.core.matrix.operators :as o]))
 
 (set-current-implementation :vectorz)
@@ -60,8 +60,7 @@
   (emap f v))
 
 (defn random-array [^Integer n]
-  (->> (take n (randoms))
-       (map #(/ (- (* 16 %) 8) 1000))))
+  (emap #(* 0.08 %) (sample-normal n)))
 
 (def default-matrix-kit
   {:type :default
@@ -89,3 +88,4 @@
    :tanh-derivative (fn [x] (let [it (Math/tanh x)] (float (- 1 (* it it)))))
    :linear-derivative-vector (fn [v] (array (take (ecount v) (repeat 1))))
    :alter-vec alter-vec})
+

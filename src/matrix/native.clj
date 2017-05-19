@@ -105,7 +105,7 @@
    :transpose transpose
    :gemv gemv
    :init-vector (fn [n] (dv (seq (random-array n))))
-   :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (vec (random-array (* input-num hidden-num)))))
+   :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (seq (random-array (* input-num hidden-num)))))
    :make-vector dv
    :make-matrix (fn [input-num hidden-num v] (dge hidden-num input-num v))
    :clip! clip!
