@@ -1,10 +1,12 @@
 (ns nlp.word2vec-test
-  (:require [clojure.test :refer :all]
-            [clojure.string :refer [split]]
-            [clojure.pprint :refer [pprint]]
-            [prism.util :refer [make-wc similarity]]
-            [prism.nlp.word2vec :refer :all]
-            [matrix.default :refer [default-matrix-kit]]))
+  (:require
+    [clojure.test :refer :all]
+    [clojure.string :refer [split]]
+    [clojure.pprint :refer [pprint]]
+    [clojure.core.matrix :refer [clone array]]
+    [prism.util :refer [make-wc similarity]]
+    [prism.nlp.word2vec :refer :all]
+    [matrix.default :refer [default-matrix-kit]]))
 
 (deftest word2ec-test
   (testing "subsampling"
@@ -29,10 +31,10 @@
   (let [target-tok "test/nlp/example.tok"
         wc (make-wc target-tok {:interval-ms 300 :workers 1 :min-count 1})
         w2v (init-w2v-model wc 10 default-matrix-kit)
-        A (aclone (get-in w2v [:hidden :w "A"]))
-        D (aclone (get-in w2v [:hidden :w "D"]))
-        d (aclone (get-in w2v [:hidden :w "d"]))
-        X (aclone (get-in w2v [:hidden :w "X"]))]
+        A (clone (get-in w2v [:hidden :w "A"]))
+        D (clone (get-in w2v [:hidden :w "D"]))
+        d (clone (get-in w2v [:hidden :w "d"]))
+        X (clone (get-in w2v [:hidden :w "X"]))]
     (testing "train-word2vec!"
       (train-word2vec! w2v target-tok {:initial-learning-rate 0.01 :min-learning-rate 0.005 :nagetaive 10 :workers 1 :interval-ms 500 :sample 0.1})
       (is (not= (vec D) (vec (get-in w2v [:hidden :w "D"])))))
@@ -42,10 +44,10 @@
         (is (= (:x (first result)) "D")))))
 
   (testing "most-sim"
-    (let [em {:em {"A" (float-array (range 10))
-                   "B" (float-array (repeat 10 0.3))
-                   "C" (float-array (range 10 20))
-                   "X" (float-array (range 10))}
-               :matrix-kit default-matrix-kit}]
+    (let [em {:em {"A" (array (range 10))
+                   "B" (array (repeat 10 0.3))
+                   "C" (array (range 10 20))
+                   "X" (array (range 10))}
+              :matrix-kit default-matrix-kit}]
       (is (= (most-sim em "X" ["A" "B" "C" ] 3 false)
-             [{:x "A", :sim (float 1)} {:x "C", :sim (float 0.9314063545316458)} {:x "B", :sim (float 0.8429272081702948)}])))))
+             [{:x "A", :sim (float 1)} {:x "C", :sim (float 0.9314063)} {:x "B", :sim (float 0.8429272081702948)}])))))

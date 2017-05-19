@@ -151,7 +151,7 @@
     :or {matrix-kit default/default-matrix-kit}}]
   (let [sparse-input? (= input-type :sparse)
         {:keys [type init-vector init-matrix]} matrix-kit]
-    (println (str "initializing model as " (if (= type :native) "native-array" "float-array") " ..."))
+    (println (str "initializing model as " (if (= type :native) "native-array" "vectorz") " ..."))
     {:matrix-kit matrix-kit
      :weight-type type
      :hidden (-> (if (= input-type :sparse)

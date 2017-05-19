@@ -63,8 +63,8 @@
         {:keys [make-vector]} matrix-kit]
     (loop [x-seq x-seq,
            output-items-seq output-items-seq,
-           previous-hidden-output (make-vector hidden-size),
-           previous-cell-state    (make-vector hidden-size),
+           previous-hidden-output (make-vector (repeat hidden-size 0)),
+           previous-cell-state    (make-vector (repeat hidden-size 0)),
            acc []]
       (if-let [x-list (first x-seq)]
         (let [model-output (lstm-model-output model x-list (first output-items-seq) previous-hidden-output previous-cell-state)
@@ -162,15 +162,15 @@
 
 (defn lstm-delta-zeros
   [make-vector unit-num]
-  {:block-delta       (make-vector unit-num)
-   :input-gate-delta  (make-vector unit-num)
-   :forget-gate-delta (make-vector unit-num)
-   :output-gate-delta (make-vector unit-num)
-   :cell-state-delta  (make-vector unit-num)})
+  {:block-delta       (make-vector (repeat unit-num 0))
+   :input-gate-delta  (make-vector (repeat unit-num 0))
+   :forget-gate-delta (make-vector (repeat unit-num 0))
+   :output-gate-delta (make-vector (repeat unit-num 0))
+   :cell-state-delta  (make-vector (repeat unit-num 0))})
 
 (defn gate-zeros
   [make-vector unit-num]
-  {:forget-gate (make-vector unit-num)})
+  {:forget-gate (make-vector (repeat unit-num 0))})
 
 (defn merge-param
   [plus merger! acc param-delta]
@@ -228,7 +228,7 @@
                                                               (let [w (:w (get output item))]
                                                                 (scal delta w))))
                                                        (apply plus)
-                                                       (clip! 25)))
+                                                       (clip! 100)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
                                             (plus propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
@@ -238,14 +238,14 @@
                                             propagated-output-to-hidden-delta)
               ;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
-              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (make-vector unit-num))
+              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (make-vector (repeat unit-num 0)))
               lstm-part-delta (lstm-part-delta model unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (:activation (first output-seq)))
               self-activation:t-1 (or (:hidden (:activation (second output-seq)))
-                                      (make-vector unit-num));when first output time (last time of bptt
+                                      (make-vector (repeat unit-num 0)));when first output time (last time of bptt
               self-state:t-1      (or (:hidden (:state (second output-seq)))
-                                      {:cell-state (make-vector unit-num)});when first output time (last time of bptt)
+                                      {:cell-state (make-vector (repeat unit-num 0))});when first output time (last time of bptt)
               lstm-param-delta (lstm-param-delta model lstm-part-delta x-input self-activation:t-1 self-state:t-1)
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
@@ -321,7 +321,7 @@
   [{:keys [input-items input-size hidden-size output-type output-items matrix-kit]
     :or {matrix-kit default/default-matrix-kit}}]
   (let [{:keys [type make-vector init-vector init-matrix]} matrix-kit]
-    (println (str "initializing model as " (if (= type :native) "native-array" "float-array") " ..."))
+    (println (str "initializing model as " (if (= type :native) "native-array" "vectorz") " ..."))
     {:matrix-kit matrix-kit
      :weight-type type
      :hidden (let [bwr (init-matrix  hidden-size hidden-size);for recurrent connection

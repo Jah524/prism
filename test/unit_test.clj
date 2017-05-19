@@ -1,10 +1,12 @@
 (ns unit-test
-  (:require [clojure.test :refer :all]
-            [matrix.default :refer [default-matrix-kit]]
-            [prism.unit :refer :all]))
+  (:require
+    [clojure.test :refer :all]
+    [clojure.core.matrix :refer [array]]
+    [matrix.default :refer [default-matrix-kit]]
+    [prism.unit :refer :all]))
 
 (deftest unit-test
   (testing "softmax"
-    (is (= (vec (softmax default-matrix-kit (float-array (range 10))))
-           (map float [7.8013414E-5 2.1206244E-4 5.764455E-4 0.0015669414 0.004259388 0.011578218 0.031472858 0.0855521 0.23255472 0.6321493]))))
+    (is (= (mapv float (softmax default-matrix-kit (array (range 4))))
+           (map float [0.032058604 0.087144315 0.23688282 0.6439143]))))
   )

@@ -1,6 +1,7 @@
 (ns nn.feedforward-test
   (:require [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]
+            [clojure.core.matrix :refer [mget array matrix ecount]]
             [matrix.default :refer [default-matrix-kit]]
             [prism.nn.feedforward :refer :all]))
 
@@ -10,10 +11,10 @@
    :output-type :prediction
    :hidden {:unit-num 3
             :activation :sigmoid
-            :w (object-array [(float-array [1]) (float-array [1]) (float-array [1])])
-            :bias (float-array [1 1 1])}
-   :output {"prediction" {:w (float-array (take 3 (repeat 0.1)))
-                          :bias (float-array [1])}}})
+            :w (matrix [[1] [1] [1]])
+            :bias (array [1 1 1])}
+   :output {"prediction" {:w (array (take 3 (repeat 0.1)))
+                          :bias (array [1])}}})
 
 
 (def sample-model2 ;3->2->3
@@ -22,14 +23,14 @@
    :output-type :prediction
    :hidden {:unit-num 2
             :activation :sigmoid
-            :w (object-array [(float-array [0.1 0.1 0.1]) (float-array [0.2 0.2 0.2])])
-            :bias (float-array [1 1])}
-   :output {"prediction1" {:w (float-array (take 2 (repeat 1)))
-                           :bias (float-array [1])}
-            "prediction2" {:w (float-array (take 2 (repeat 1)))
-                           :bias (float-array [1])}
-            "prediction3" {:w (float-array (take 2 (repeat 1)))
-                           :bias (float-array [1])}}})
+            :w (matrix [[0.1 0.1 0.1] [0.2 0.2 0.2]])
+            :bias (array [1 1])}
+   :output {"prediction1" {:w (array (take 2 (repeat 1)))
+                           :bias (array [1])}
+            "prediction2" {:w (array (take 2 (repeat 1)))
+                           :bias (array [1])}
+            "prediction3" {:w (array (take 2 (repeat 1)))
+                           :bias (array [1])}}})
 
 
 (def sample-model2:sparse ;3->2->3
@@ -38,14 +39,14 @@
    :output-type :prediction
    :hidden {:unit-num 2
             :activation :sigmoid
-            :w {"natural" (float-array [0.1 0.2]) "language" (float-array [0.1 0.2]) "processing" (float-array [0.1 0.2])}
-            :bias (float-array [1 1])}
-   :output {"prediction1" {:w (float-array (take 2 (repeat 1)))
-                           :bias (float-array [1])}
-            "prediction2" {:w (float-array (take 2 (repeat 1)))
-                           :bias (float-array [1])}
-            "prediction3" {:w (float-array (take 2 (repeat 1)))
-                           :bias (float-array [1])}}})
+            :w {"natural" (array [0.1 0.2]) "language" (array [0.1 0.2]) "processing" (array [0.1 0.2])}
+            :bias (array [1 1])}
+   :output {"prediction1" {:w (array (take 2 (repeat 1)))
+                           :bias (array [1])}
+            "prediction2" {:w (array (take 2 (repeat 1)))
+                           :bias (array [1])}
+            "prediction3" {:w (array (take 2 (repeat 1)))
+                           :bias (array [1])}}})
 
 (deftest feedforward-test
   (testing "hidden-state-by-sparse"
@@ -80,7 +81,7 @@
           {:keys [input hidden output]} activation]
       (is (= input {"language" 1}))
       (is (= (vec hidden) (map float [0.7502601 0.76852477])))
-      (is (= (vec (:hidden state)) (map float [1.1 1.2])))
+      (is (= (mapv float (:hidden state)) (map float [1.1 1.2])))
       (is (= (reduce (fn [acc [k v]](assoc acc k (float v))) {} output)
              {"prediction1" (float 2.518785) "prediction3" (float 2.518785)})))
 
@@ -102,12 +103,12 @@
           {hidden-w-delta :w-delta hidden-bias-delta :bias-delta} hidden-delta
           {output-w-delta :w-delta output-bias-delta :bias-delta} (get output-delta "prediction")]
       (is (= loss {"prediction" (float 0.71422774)}))
-      (is (= (map vec hidden-w-delta)
-             (take 3 (repeat [(float 0.0064532845)]))))
+      (is (= (map #(map float %) hidden-w-delta)
+             (take 3 (repeat [(float 0.006453284)]))))
       (is (= (vec hidden-bias-delta)
-             (take 3 (repeat (float 0.0032266423)))))
+             (take 3 (repeat (double 0.00322664200591678)))))
       (is (= (vec output-w-delta)
-             (take 3 (repeat (float 0.6803549)))))
+             (take 3 (repeat (double 0.680354867004688)))))
       (is (= (vec output-bias-delta)
              [(float 0.71422774)]))))
 
@@ -121,16 +122,16 @@
           {w-delta3 :w-delta bias-delta3 :bias-delta} (get output-delta "prediction3")]
       (is (= loss {"prediction1" (float -0.5187849), "prediction2" (float -1.5187849), "prediction3" (float -0.5187849)}))
       (is (= (vec (get (:w-delta hidden-delta) "language"))
-             (map float [-0.47898382 -0.45476127])))
+             (map double [-0.4789838322238946 -0.45476128583309716])))
       (is (= (vec (:bias-delta hidden-delta))
-             (map float [-0.47898382 -0.45476127])))
+             (map double [-0.4789838322238946 -0.45476128583309716])))
       (is (= (vec w-delta1)
              (vec w-delta3)
-             (map float [-0.3892236 -0.39869902])))
-      (is (= (vec w-delta2) (map float [-1.1394837 -1.1672238])))
+             (map double [-0.38922360403651624 -0.3986990289803174])))
+      (is (= (vec w-delta2) (map double [-1.139483718706316 -1.1672237949486401])))
       (is (= (vec bias-delta1)
              (vec bias-delta3)
-             (map float [-0.5187849])))
+             (map float [-0.5187848806381226])))
       (is (= (vec bias-delta2) (map float [-1.5187849])))
       (let [a (:param-loss (back-propagation sample-model2:sparse
                                              (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction2" "prediction3"})
@@ -140,7 +141,7 @@
                                              {"prediction1" 2 "prediction2" 1 "prediction3" 2}))]
         (is (= (vec (get (:w-delta (:hidden-delta a)) "language"))
                (let [it (:w-delta (:hidden-delta b))]
-                 [(aget ^floats it 0 1) (aget ^floats it 1 1)])))
+                 [(mget it 0 1) (mget it 1 1)])))
         (is (= (vec (:bias-delta (:hidden-delta a)))
                (vec (:bias-delta (:hidden-delta b)))))
         (is (= (vec (:w-delta (:output-delta a)))
@@ -150,38 +151,38 @@
 
   (testing "update-model!"
     (let [{:keys [hidden output]} (update-model! sample-model
-                                                 {:hidden-delta {:w-delta (object-array [(float-array [0.1]) (float-array [0.2]) (float-array [0.3])])
-                                                                 :bias-delta (float-array [0.1 0.2 0.3])}
-                                                  :output-delta {"prediction" {:w-delta (float-array [2 2 2])
-                                                                               :bias-delta (float-array [2])}}}
+                                                 {:hidden-delta {:w-delta (matrix [[0.1] [0.2] [0.3]])
+                                                                 :bias-delta (array [0.1 0.2 0.3])}
+                                                  :output-delta {"prediction" {:w-delta (array [2 2 2])
+                                                                               :bias-delta (array [2])}}}
                                                  0.1)]
       (is (= (:activation hidden) :sigmoid))
-      (is (= (map vec (:w hidden)) (->> [1.01 1.02 1.03] (map float) (map (fn[x] [x])))))
-      (is (= (vec (:bias hidden)) (map float [1.01 1.02 1.03])))
+      (is (= (map vec (:w hidden)) (->> [1.01 1.02 1.03] (map double) (map (fn[x] [x])))))
+      (is (= (vec (:bias hidden)) (map double [1.01 1.02 1.03])))
       (let [{:keys [w bias]} (get output "prediction")]
-        (is (= (vec w) (map float [0.3 0.3 0.3])))
-        (is (= (vec bias) [(float 1.2)]))))
+        (is (= (mapv float w) (map float [0.3 0.3 0.3])))
+        (is (= (mapv float bias) [(float 1.2)]))))
     (let [{:keys [hidden output]} (update-model! sample-model2:sparse
-                                                 {:hidden-delta {:w-delta {"natural" (float-array [0.1 0.1])
-                                                                           "language" (float-array [0.1 0.1])
-                                                                           "processing" (float-array [0.1 0.1])}
-                                                                 :bias-delta (float-array [0.1 0.1])}
-                                                  :output-delta {"prediction1" {:w-delta (float-array (take 2 (repeat 0.2)))
-                                                                                :bias-delta (float-array [0.2])}
-                                                                 "prediction2" {:w-delta (float-array (take 2 (repeat 0.2)))
-                                                                                :bias-delta (float-array [0.2])}
-                                                                 "prediction3" {:w-delta (float-array (take 2 (repeat 0.2)))
-                                                                                :bias-delta (float-array [0.2])}}}
+                                                 {:hidden-delta {:w-delta {"natural" (array [0.1 0.1])
+                                                                           "language" (array [0.1 0.1])
+                                                                           "processing" (array [0.1 0.1])}
+                                                                 :bias-delta (array [0.1 0.1])}
+                                                  :output-delta {"prediction1" {:w-delta (array (take 2 (repeat 0.2)))
+                                                                                :bias-delta (array [0.2])}
+                                                                 "prediction2" {:w-delta (array (take 2 (repeat 0.2)))
+                                                                                :bias-delta (array [0.2])}
+                                                                 "prediction3" {:w-delta (array (take 2 (repeat 0.2)))
+                                                                                :bias-delta (array [0.2])}}}
                                                  0.1)]
       (is (= (:activation hidden) :sigmoid))
-      (is (= (vec (get (:w hidden) "natural")) (map float [0.11 0.21000001])))
-      (is (= (vec (get (:w hidden) "language")) (map float [0.11 0.21000001])))
-      (is (= (vec (get (:w hidden) "processing")) (map float [0.11 0.21000001])))
-      (is (= (vec (:bias hidden)) (map float (take 2 (repeat 1.01)))))
+      (is (= (mapv float (get (:w hidden) "natural")) (map float [0.11 0.21])))
+      (is (= (mapv float (get (:w hidden) "language")) (map float [0.11 0.21])))
+      (is (= (mapv float (get (:w hidden) "processing")) (map float [0.11 0.21])))
+      (is (= (mapv float (:bias hidden)) (map float (take 2 (repeat 1.01)))))
       (let [{:keys [w bias]} (get output "prediction1")]
-        (is (= (vec w)
+        (is (= (mapv float w)
                (map float (take 2 (repeat 1.02)))))
-        (is (= (vec bias)
+        (is (= (mapv float bias)
                (map float [1.02]))))))
 
   (testing "init-model"
@@ -196,11 +197,11 @@
       (is (= input-type :dense))
       (is (= output-type :prediction))
       (is (= (:unit-num hidden) 3))
-      (is (= (count (:w hidden)) 3))
-      (is (= (count (:bias hidden)) 3))
+      (is (= (ecount (:w hidden)) 3))
+      (is (= (ecount (:bias hidden)) 3))
       (let [{:keys [w bias]} (get output "prediction")]
-        (is (= (count w) 3))
-        (is (= (count  bias) 1)))))
+        (is (= (ecount w) 3))
+        (is (= (ecount  bias) 1)))))
 
   (testing "init-model with sparse"
     (let [{:keys [hidden output input-type output-type]}
@@ -215,12 +216,12 @@
       (is (= output-type :binary-classification))
       (is (= (:unit-num hidden) 3))
 
-      (is (= (count (get (:w hidden) "natural")) 3))
-      (is (= (count (get (:w hidden) "language")) 3))
-      (is (= (count (get (:w hidden) "processing")) 3))
-      (is (= (count (get (:w hidden) "?")) 0))
-      (is (= (count (:bias hidden)) 3))
+      (is (= (ecount (get (:w hidden) "natural")) 3))
+      (is (= (ecount (get (:w hidden) "language")) 3))
+      (is (= (ecount (get (:w hidden) "processing")) 3))
+      (is (= (ecount (get (:w hidden) "?")) 1))
+      (is (= (ecount (:bias hidden)) 3))
       (let [{:keys [w bias]} (get output "prediction")]
-        (is (= (count w) 3))
-        (is (= (count bias) 1)))))
+        (is (= (ecount w) 3))
+        (is (= (ecount bias) 1)))))
   )

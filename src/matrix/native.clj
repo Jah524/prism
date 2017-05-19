@@ -1,7 +1,8 @@
 (ns matrix.native
   (:require
     [uncomplicate.neanderthal.core :as c]
-    [uncomplicate.neanderthal.native :refer [dv dge dtr]]))
+    [uncomplicate.neanderthal.native :refer [dv dge dtr]]
+    [matrix.default :refer [random-array]]))
 
 (defn sum [v]
   (c/sum v))
@@ -90,9 +91,6 @@
       (c/alter! tmp i f))
     tmp))
 
-(defn ^double model-rand []
-  (double (/ (- (rand 16) 8) 1000)))
-
 (def native-matrix-kit
   {:type :native
    :sum sum
@@ -106,8 +104,8 @@
    :outer outer
    :transpose transpose
    :gemv gemv
-   :init-vector (fn [n] (dv (take n (repeatedly model-rand))))
-   :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (vec (take (* input-num hidden-num) (repeatedly model-rand)))))
+   :init-vector (fn [n] (dv (seq (random-array n))))
+   :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (vec (random-array (* input-num hidden-num)))))
    :make-vector dv
    :make-matrix (fn [input-num hidden-num v] (dge hidden-num input-num v))
    :clip! clip!

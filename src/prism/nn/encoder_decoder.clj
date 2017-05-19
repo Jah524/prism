@@ -9,10 +9,10 @@
 (defn encoder-forward [encoder x-seq]
   (let [{:keys [hidden matrix-kit]} encoder
         {:keys [make-vector]} matrix-kit
-         hidden-size (:unit-num hidden)]
+        hidden-size (:unit-num hidden)]
     (loop [x-seq x-seq,
-           previous-activation (make-vector hidden-size),
-           previous-cell-state (make-vector hidden-size),
+           previous-activation (make-vector (repeat hidden-size 0)),
+           previous-cell-state (make-vector (repeat hidden-size 0)),
            acc []]
       (if-let [x-input (first x-seq)]
         (let [model-output (lstm/lstm-activation encoder x-input previous-activation previous-cell-state)
@@ -47,7 +47,7 @@
         forget-gate (plus forget-gate' forget-gate-r' forget-gate-e' forget-gate-bias (times forget-gate-peephole previous-cell-state))
         output-gate (plus output-gate' output-gate-r' forget-gate-e' output-gate-bias (times output-gate-peephole previous-cell-state))
         cell-state  (plus (times (alter-vec block tanh) (alter-vec input-gate sigmoid))
-                         (times (alter-vec forget-gate sigmoid) previous-cell-state))
+                          (times (alter-vec forget-gate sigmoid) previous-cell-state))
         lstm (times (alter-vec output-gate sigmoid) (alter-vec cell-state tanh))]
     {:activation lstm
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
@@ -81,12 +81,12 @@
   [decoder x-seq encoder-input output-items-seq]
   (let [{:keys [hidden matrix-kit input-size]} decoder
         {:keys [make-vector]} matrix-kit
-         hidden-size (:unit-num hidden)]
+        hidden-size (:unit-num hidden)]
     (loop [x-seq x-seq,
            output-items-seq output-items-seq,
-           previous-hidden-output (make-vector hidden-size),
-           previous-input         (make-vector input-size),
-           previous-cell-state    (make-vector hidden-size),
+           previous-hidden-output (make-vector (repeat hidden-size 0)),
+           previous-input         (make-vector (repeat input-size 0)),
+           previous-cell-state    (make-vector (repeat hidden-size 0)),
            acc []]
       (if-let [x-list (first x-seq)]
         (let [decoder-output (decoder-activation-time-fixed decoder x-list (first output-items-seq)
@@ -171,14 +171,14 @@
            hidden-acc nil]
       (if (first output-seq)
         (let [lstm-state (:state (:hidden (first output-seq)))
-              cell-state:t-1 (or (:cell-state (:state (:hidden (second output-seq)))) (make-vector unit-num))
+              cell-state:t-1 (or (:cell-state (:state (:hidden (second output-seq)))) (make-vector (repeat unit-num 0)))
               lstm-part-delta (lstm/lstm-part-delta encoder unit-num propagated-hidden-to-hidden-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                     input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (first output-seq))
               self-activation:t-1 (or (:activation (:hidden (second output-seq)))
-                                      (make-vector unit-num));when first output time (last time of bptt
+                                      (make-vector (repeat unit-num 0)));when first output time (last time of bptt
               self-state:t-1      (or (:state (:hidden (second output-seq)))
-                                      {:cell-state (make-vector unit-num)});when first output time (last time of bptt)
+                                      {:cell-state (make-vector (repeat unit-num 0))});when first output time (last time of bptt)
               lstm-param-delta (lstm/lstm-param-delta encoder lstm-part-delta x-input self-activation:t-1 self-state:t-1)
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
@@ -211,7 +211,7 @@
            output-loss [],
            output-acc nil,
            hidden-acc nil,
-           encoder-delta (float-array encoder-size)]
+           encoder-delta (make-vector (repeat encoder-size 0))]
       (cond
         (and (= :skip (first output-items-seq)) (nil? propagated-hidden-to-hidden-delta))
         (recur (rest output-items-seq)
@@ -230,7 +230,7 @@
                              (binary-classification-error (:output (:activation (first output-seq))) pos neg)
                              :prediction
                              (prediction-error  (:output (:activation (first output-seq))) (first output-items-seq)))
-              previous-decoder-input (if-let [it (:input (:activation (second output-seq)))] it (make-vector input-size))
+              previous-decoder-input (if-let [it (:input (:activation (second output-seq)))] it (make-vector (repeat input-size 0)))
               output-param-delta (decoder-output-param-delta decoder
                                                              output-delta
                                                              unit-num
@@ -254,15 +254,15 @@
                                             propagated-output-to-hidden-delta)
               ;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
-              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (make-vector unit-num))
+              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (make-vector (repeat unit-num 0)))
               lstm-part-delta (lstm/lstm-part-delta decoder
                                                     unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                     input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (:activation (first output-seq)))
               self-activation:t-1 (or (:hidden (:activation (second output-seq)))
-                                      (make-vector unit-num));when first output time (last time of bptt
+                                      (make-vector (repeat unit-num 0)));when first output time (last time of bptt
               self-state:t-1      (or (:hidden (:state      (second output-seq)))
-                                      {:cell-state (make-vector unit-num)});when first output time (last time of bptt)
+                                      {:cell-state (make-vector (repeat unit-num 0))});when first output time (last time of bptt)
               lstm-param-delta (decoder-lstm-param-delta decoder lstm-part-delta x-input self-activation:t-1 encoder-input self-state:t-1)
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
@@ -384,7 +384,11 @@
                    :input-gate-we  (init-matrix encoder-hidden-size decoder-hidden-size)
                    :forget-gate-we (init-matrix encoder-hidden-size decoder-hidden-size)
                    :output-gate-we (init-matrix encoder-hidden-size decoder-hidden-size))]
-    (assoc decoder :hidden d-hidden :output d-output :encoder-size encoder-hidden-size)))
+    (assoc decoder
+      :hidden d-hidden
+      :output d-output
+      :input-size input-size
+      :encoder-size encoder-hidden-size)))
 
 (defn init-encoder-decoder-model
   [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size matrix-kit]
@@ -394,6 +398,8 @@
                                      (dissoc :output-items)
                                      (assoc
                                        :hidden-size encoder-hidden-size
+                                       :input-size input-size
                                        :input-type :dense)))]
-    {:encoder encoder :decoder (init-decoder param)}))
+    {:encoder encoder
+     :decoder (init-decoder param)}))
 
