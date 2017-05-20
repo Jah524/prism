@@ -320,19 +320,19 @@
 (defn init-model
   [{:keys [input-items input-size hidden-size output-type output-items matrix-kit]
     :or {matrix-kit default/default-matrix-kit}}]
-  (let [{:keys [type make-vector init-vector init-matrix]} matrix-kit]
+  (let [{:keys [type make-vector init-vector init-matrix init-orthogonal-matrix]} matrix-kit]
     (println (str "initializing model as " (if (= type :native) "native-array" "vectorz") " ..."))
     {:matrix-kit matrix-kit
      :weight-type type
-     :hidden (let [bwr (init-matrix  hidden-size hidden-size);for recurrent connection
+     :hidden (let [bwr (init-orthogonal-matrix hidden-size);for recurrent connection
                    bb  (init-vector hidden-size)
-                   iwr (init-matrix  hidden-size hidden-size)
+                   iwr (init-orthogonal-matrix hidden-size)
                    ib  (init-vector hidden-size)
                    ip  (init-vector hidden-size)
-                   fwr (init-matrix  hidden-size hidden-size)
+                   fwr (init-orthogonal-matrix hidden-size)
                    fb  (make-vector (take hidden-size (repeat (float 1))))
                    fp  (init-vector hidden-size)
-                   owr (init-matrix  hidden-size hidden-size)
+                   owr (init-orthogonal-matrix hidden-size)
                    ob  (init-vector hidden-size)
                    op  (init-vector hidden-size)
                    template {:unit-num hidden-size
