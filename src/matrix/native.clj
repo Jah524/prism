@@ -2,7 +2,7 @@
   (:require
     [uncomplicate.neanderthal.core :as c]
     [uncomplicate.neanderthal.native :refer [dv dge dtr]]
-    [matrix.default :refer [random-array]]))
+    [matrix.default :refer [random-array orthogonal-init]]))
 
 (defn sum [v]
   (c/sum v))
@@ -91,6 +91,9 @@
       (c/alter! tmp i f))
     tmp))
 
+(defn orthogonal-init-native [n]
+  (dge n n (apply concat (orthogonal-init n))))
+
 (def native-matrix-kit
   {:type :native
    :sum sum
@@ -106,6 +109,7 @@
    :gemv gemv
    :init-vector (fn [n] (dv (seq (random-array n))))
    :init-matrix (fn [input-num hidden-num] (dge hidden-num input-num (seq (random-array (* input-num hidden-num)))))
+   :init-orthogonal-matrix orthogonal-init-native
    :make-vector dv
    :make-matrix (fn [input-num hidden-num v] (dge hidden-num input-num v))
    :clip! clip!

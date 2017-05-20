@@ -1,7 +1,7 @@
 (ns matrix.default-test
   (:require
     [clojure.test :refer :all]
-    [clojure.core.matrix :refer [array matrix set-current-implementation]]
+    [clojure.core.matrix :refer [array matrix set-current-implementation row-count ecount]]
     [clojure.core.matrix.operators :as o]
     [matrix.default :refer :all]))
 
@@ -11,7 +11,8 @@
 (def y (array (range 0 50 10)))
 
 (deftest matrix-test
-  (let [{:keys [sum plus minus scal times dot outer transpose gemv clip! sigmoid transpose alter-vec rewrite-vector!]} default-matrix-kit]
+  (let [{:keys [sum plus minus scal times dot outer transpose gemv clip! sigmoid transpose alter-vec rewrite-vector!
+                init-orthogonal-matrix]} default-matrix-kit]
     (testing "sum"
       (is (= (sum (array (range 10)))
              (float 45))))
@@ -58,5 +59,8 @@
     (testing "alter-vec"
       (is (= (seq (alter-vec x sigmoid))
              (mapv float [0.5,0.7310585975646973,0.8807970881462097,0.9525741338729858,0.9820137619972229]))))
-
+    (testing "init-orthogonal-matrix"
+      (let [result (init-orthogonal-matrix 5)]
+        (is (= (ecount result) 25))
+        (is (= (row-count result) 5))))
     ))
