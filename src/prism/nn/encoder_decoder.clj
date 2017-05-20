@@ -379,7 +379,7 @@
                                              :previous-input-w (init-vector embedding-size))))
                          {}
                          output)
-        d-hidden (assoc hidden
+        d-hidden (assoc hidden ;encoder connection
                    :block-we       (init-matrix encoder-hidden-size decoder-hidden-size)
                    :input-gate-we  (init-matrix encoder-hidden-size decoder-hidden-size)
                    :forget-gate-we (init-matrix encoder-hidden-size decoder-hidden-size)
