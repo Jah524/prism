@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]
+    [prism.unit :refer [activation derivative error]]
     [prism.util :as util]))
 
 
@@ -190,7 +190,7 @@
 
 (defn bptt
   [model activation output-items-seq]
-  (let [{:keys [output hidden matrix-kit]} model
+  (let [{:keys [output hidden matrix-kit output-type]} model
         {:keys [make-vector scal plus merger! transpose gemv clip!]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole
@@ -215,12 +215,7 @@
                nil
                nil)
         (first output-seq)
-        (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
-              output-delta (condp = (:output-type model)
-                             :binary-classification
-                             (binary-classification-error (:output (:activation (first output-seq))) pos neg)
-                             :prediction
-                             (prediction-error (:output (:activation (first output-seq))) (first output-items-seq)))
+        (let [output-delta (error output-type (:output (:activation (first output-seq))) (first output-items-seq))
               output-param-delta (ff/output-param-delta model output-delta unit-num (:hidden (:activation (first output-seq))))
               propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
                                                   (->> output-delta

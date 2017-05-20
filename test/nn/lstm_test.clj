@@ -366,7 +366,8 @@
                                           [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
           {hd :hidden-delta od :output-delta} param-loss]
       (is (= (count loss) 2))
-      (is (= loss [{"prediction1" (float 0.74250054) "prediction3" (float -0.25749943)} {"prediction2" (float 0.746551) "prediction3" (float -0.25344902)}]))
+      (is (= loss [{"prediction1" (double 0.7425005733966827) "prediction3" (double -0.25749942660331726)}
+                   {"prediction2" (double 0.746550977230072)  "prediction3" (double -0.253449022769928)}]))
       (is (= (row-count (:block-w-delta                 hd)) 10))
       (is (= (row-count (first (:block-w-delta               hd))) 3))
       (is (= (row-count (:block-wr-delta  hd)) 10))
@@ -419,7 +420,7 @@
           {hd :hidden-delta o :output-delta} param-loss
           it (:sparses-delta hd)]
       (is (= (count loss) 2))
-      (is (= loss [{} {"prediction" (float 21.07347)}]))
+      (is (= loss [{} {"prediction" (double 21.07346943800688)}]))
       (is (= (row-count (:block-w-delta (get it "natural"))) 10))
       (is (= (nil? (:block-w-delta (get it "language")))))
       (is (= (row-count (:block-w-delta (get it "processing"))) 10))))

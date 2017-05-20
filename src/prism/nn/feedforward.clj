@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
-    [prism.unit :refer [activation derivative binary-classification-error prediction-error]]
+    [prism.unit :refer [activation multi-class-prob derivative error]]
     [prism.util :as util]))
 
 
@@ -27,7 +27,7 @@
         {:keys [dot sigmoid]} matrix-kit
         activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
     (if (= output-type :multi-class-classification)
-      :FIXME
+      (multi-class-prob matrix-kit input-list output)
       (reduce (fn [acc s]
                 (let [{:keys [w bias]} (get output s)]
                   (assoc acc s (activation-function (+ (dot w input-list)
@@ -92,13 +92,8 @@
         {:keys [unit-num]} hidden
         {:keys [activation state]} model-forward
         training-x (:input activation)
-        {:keys [pos neg]} training-y   ;used when binary claassification
         {:keys [scal plus times matrix-kit-type native-dv]} matrix-kit
-        output-delta (condp = (:output-type model)
-                       :binary-classification
-                       (binary-classification-error (:output activation) pos neg)
-                       :prediction
-                       (prediction-error (:output activation) training-y))
+        output-delta (error output-type (:output activation) training-y)
         output-param-delta (output-param-delta model output-delta unit-num (:hidden activation))
         propagated-delta (->> output-delta
                               (map (fn [[item delta]]

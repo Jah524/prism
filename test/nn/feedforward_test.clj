@@ -102,15 +102,15 @@
           {:keys [output-delta hidden-delta]} param-loss
           {hidden-w-delta :w-delta hidden-bias-delta :bias-delta} hidden-delta
           {output-w-delta :w-delta output-bias-delta :bias-delta} (get output-delta "prediction")]
-      (is (= loss {"prediction" (float 0.71422774)}))
+      (is (= loss {"prediction" (double 0.7142277598381042)}))
       (is (= (map #(map float %) hidden-w-delta)
              (take 3 (repeat [(float 0.006453284)]))))
       (is (= (vec hidden-bias-delta)
-             (take 3 (repeat (double 0.00322664200591678)))))
+             (take 3 (repeat (double 0.0032266421136263185)))))
       (is (= (vec output-w-delta)
-             (take 3 (repeat (double 0.680354867004688)))))
+             (take 3 (repeat (double 0.680354889715825)))))
       (is (= (vec output-bias-delta)
-             [(float 0.71422774)]))))
+             [(double 0.7142277598381042)]))))
 
   (testing "back-propagation with sparse vector"
     (let [{:keys [param-loss loss]} (back-propagation sample-model2:sparse

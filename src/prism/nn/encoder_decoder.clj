@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
-    [prism.unit :refer [binary-classification-error prediction-error]]
+    [prism.unit :refer [error]]
     [prism.nn.lstm :as lstm]))
 
 
@@ -196,7 +196,7 @@
 
 (defn decoder-bptt
   [decoder decoder-activation encoder-input output-items-seq]
-  (let [{:keys [output hidden encoder-size input-size matrix-kit]} decoder
+  (let [{:keys [output-type output hidden encoder-size input-size matrix-kit]} decoder
         {:keys [make-vector scal plus gemv transpose plus merger!]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 block-we input-gate-we forget-gate-we output-gate-we
@@ -224,12 +224,7 @@
                nil
                encoder-delta)
         (first output-seq)
-        (let [{:keys [pos neg]} (first output-items-seq);used when binary claassification
-              output-delta (condp = (:output-type decoder)
-                             :binary-classification
-                             (binary-classification-error (:output (:activation (first output-seq))) pos neg)
-                             :prediction
-                             (prediction-error  (:output (:activation (first output-seq))) (first output-items-seq)))
+        (let [output-delta (error output-type (:output (:activation (first output-seq))) (first output-items-seq))
               previous-decoder-input (if-let [it (:input (:activation (second output-seq)))] it (make-vector (repeat input-size 0)))
               output-param-delta (decoder-output-param-delta decoder
                                                              output-delta

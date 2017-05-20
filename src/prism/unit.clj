@@ -1,6 +1,6 @@
 (ns prism.unit)
 
-(defn softmax [matrix-kit v]
+(defn softmax-original [matrix-kit v]
   (let [{:keys [sum minus scal alter-vec make-vector exp clip!]} matrix-kit
 ;;         m (apply max v)
 ;;         normalized-v (minus v (make-vector (repeat (count v) m)))
@@ -8,12 +8,38 @@
         s (sum converted-v)]
     (scal (/ 1 s) converted-v)))
 
-(defn activation
+(defn- softmax-states
+  [matrix-kit input-list all-output-connection]
+  (let [{:keys [dot make-vector]} matrix-kit]
+    (loop [coll (vec all-output-connection)
+           item-acc [],
+           state-acc []]
+      (if-let [f (first coll)]
+        (let [[item v] f
+              {:keys [w bias]} v
+              state (+ (dot w input-list) (first bias))
+              state (cond (> state 25) 25 (< state -25) -25 :else state)]
+          (recur (rest coll)
+                 (conj item-acc item)
+                 (conj state-acc state)))
+        {:items item-acc :states (make-vector state-acc)}))))
+
+(defn multi-class-prob
+  [matrix-kit input-list all-output-connection]
+  (let [{:keys [sum scal alter-vec exp]} matrix-kit
+        {:keys [items states]} (softmax-states matrix-kit input-list all-output-connection)
+        activations (alter-vec states exp)
+        s (sum activations)
+        a (scal (/ 1 s) activations)]
+    (->> (mapv vector items a)
+         (reduce (fn [acc [item a]]
+                   (assoc acc item a))
+                 {}))))
+
+  (defn activation
   [state activate-fn-key matrix-kit]
   (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
     (cond
-;;       (= activate-fn-key :softmax)
-;;       (softmax state)
       (= activate-fn-key :linear)
       state
       :else
@@ -31,12 +57,23 @@
                 :tanh    tanh-derivative)]
         (alter-vec state f)))))
 
+(defn multi-classification-error
+  [activation expectation]
+  (if (= :skip expectation)
+    {}
+    (->> (dissoc activation expectation)
+         keys
+         (reduce (fn [acc item]
+                   (assoc acc item  (- (get activation item))))
+                 {expectation (- 1 (get activation expectation))}))))
+
 
 (defn binary-classification-error
-  [activation positives negatives]
-  (let [negatives (remove (fn [n] (some #(= % n) positives)) negatives)
-        ps (map (fn [p] [p (float (- 1 (get activation p)))]) positives)
-        ns (map (fn [n] [n (float (- (get activation n)))]) negatives)]
+  [activation expectation]
+  (let [{:keys [pos neg]} expectation
+        neg (remove (fn [n] (some #(= % n) pos)) neg)
+        ps (map (fn [p] [p (- 1 (get activation p))]) pos)
+        ns (map (fn [n] [n (- (get activation n))]) neg)]
     (reduce (fn [acc [k v]] (assoc acc k v)) {} (concat ps ns))))
 
 (defn prediction-error
@@ -45,5 +82,15 @@
     {}
     (->> expectation
          (reduce (fn [acc [item expect-value]]
-                   (assoc acc item (float (- expect-value (get activation item)))))
+                   (assoc acc item (- expect-value (get activation item))))
                  {}))))
+
+(defn error
+  [fn-key activation expectation]
+  (condp = fn-key
+    :multi-class-classification
+    :fixme
+    :binary-classification
+    (binary-classification-error activation expectation)
+    :prediction
+    (prediction-error activation expectation)))

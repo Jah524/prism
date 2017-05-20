@@ -355,7 +355,7 @@
                                                   [:skip {:pos ["prediction2"] :neg ["prediction3"]}])
           {hd :hidden-delta od :output-delta ed :encoder-delta} param-loss
           {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta]} (get od "prediction2")]
-      (is (= loss [{} {"prediction2" (float 0.673144), "prediction3" (float -0.326856)}]))
+      (is (= loss [{} {"prediction2" (double 0.6731440126895905), "prediction3" (double -0.32685598731040955)}]))
       (is (= (row-count (:block-w-delta hd)) 10))
       (is (= (row-count (:block-w-delta   hd))) 10)
       (is (= (row-count (:block-wr-delta  hd))) 10)
@@ -384,7 +384,7 @@
       (is (= (ecount (:peephole-output-gate-delta hd)) 10))
       ;; output
       (is (= (mapv float w-delta)
-             (take 10 (repeat (float -0.048762307)))))
+             (take 10 (repeat (float -0.04876231)))))
       (is (= (mapv float bias-delta) [(float 0.673144)]))
       (is (= (mapv float encoder-w-delta)
              (take 5 (repeat (float -0.0673144)))))
@@ -392,7 +392,7 @@
              (map float [1.346288 0.0 0.0])))
       ;; encoder-delta
       (is (= (mapv float ed)
-             (take 5 (repeat (float -4.5863545E-4)))))))
+             (take 5 (repeat (float -4.5863548E-4)))))))
 
   (testing "encoder-decoder-bptt"
     (let [{:keys [loss param-loss]} (encoder-decoder-bptt sample-encoder-decoder
