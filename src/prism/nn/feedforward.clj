@@ -24,16 +24,16 @@
 (defn output-activation
   [model input-list sparse-outputs]
   (let [{:keys [output-type output matrix-kit sigmoid]} model
-        {:keys [dot sigmoid]} matrix-kit
-        activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
+        {:keys [dot sigmoid]} matrix-kit]
     (if (= output-type :multi-class-classification)
       (multi-class-prob matrix-kit input-list output)
-      (reduce (fn [acc s]
-                (let [{:keys [w bias]} (get output s)]
-                  (assoc acc s (activation-function (+ (dot w input-list)
-                                                       (first bias))))))
-              {}
-              sparse-outputs))))
+      (let [activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
+        (->> sparse-outputs
+             (reduce (fn [acc s]
+                       (let [{:keys [w bias]} (get output s)]
+                         (assoc acc s (activation-function (+ (dot w input-list)
+                                                              (first bias))))))
+                     {}))))))
 
 
 (defn network-output

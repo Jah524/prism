@@ -1,13 +1,5 @@
 (ns prism.unit)
 
-(defn softmax-original [matrix-kit v]
-  (let [{:keys [sum minus scal alter-vec make-vector exp clip!]} matrix-kit
-;;         m (apply max v)
-;;         normalized-v (minus v (make-vector (repeat (count v) m)))
-        converted-v (-> (clip! 25 v) (alter-vec exp))
-        s (sum converted-v)]
-    (scal (/ 1 s) converted-v)))
-
 (defn- softmax-states
   [matrix-kit input-list all-output-connection]
   (let [{:keys [dot make-vector]} matrix-kit]
@@ -36,7 +28,7 @@
                    (assoc acc item a))
                  {}))))
 
-  (defn activation
+(defn activation
   [state activate-fn-key matrix-kit]
   (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
     (cond
@@ -89,7 +81,7 @@
   [fn-key activation expectation]
   (condp = fn-key
     :multi-class-classification
-    :fixme
+    (multi-classification-error activation expectation)
     :binary-classification
     (binary-classification-error activation expectation)
     :prediction

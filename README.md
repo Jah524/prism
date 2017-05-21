@@ -20,7 +20,7 @@ You can find how to do with prism at [project wiki](https://github.com/Jah524/pr
 If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
 ```
-[jah524/prism "0.5.0"]
+[jah524/prism "0.5.1"]
 ```
 
 ## Demonstration
@@ -45,6 +45,12 @@ lein run -m examples.lstm.simple-prediction
 
 ```
 lein run -m examples.lstm.sparse
+```
+
+- multi class classification
+
+```
+lein run -m examples.lstm.multi-class
 ```
 
 ## License
