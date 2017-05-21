@@ -3,7 +3,7 @@
   :url "https://github.com/Jah524/prism"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :jvm-opts ["-Xmx12G" "-Xms4096m" "-server"]
+  :jvm-opts ["-Xmx12G" "-Xms1028m" "-server"]
   :test-selectors {:default (complement :native)
                    :native  :native
                    :all     (constantly true)}
