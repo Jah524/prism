@@ -15,8 +15,8 @@
    :input-type :dense
    :output-type :binary-classification
    :input-size 3
+   :hidden-size 5
    :hidden {:unit-type :lstm
-            :unit-num 5
             :block-w (matrix (partition 3 (take 15 (repeat 0.1))))
             :block-wr (matrix (partition 5 (take 25 (repeat 0.1))))
             :block-bias (array (take 5 (repeat -1)))

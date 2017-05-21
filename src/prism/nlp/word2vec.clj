@@ -150,7 +150,7 @@
   "top-n = 0 represents all words"
   ([model path top-n]
    (let [{:keys [hidden wc matrix-kit]} model
-         word-em (:w hidden)
+         word-em (:sparses hidden)
          considered (set (->> (dissoc wc "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
          word-em (if (or (zero? top-n) (= :all top-n))
                    word-em
@@ -198,7 +198,7 @@
 
 (defn load-embedding
   [em-path matrix-kit]
-  (let [{:keys [make-vector]} (or matrix-kit default/default-matrix-kit)
+  (let [{:keys [make-vector] :as matrix-kit} (or matrix-kit default/default-matrix-kit)
         em (util/load-model em-path)]
     {:matrix-kit matrix-kit
      :em-size (count (second (first em)))
@@ -229,7 +229,7 @@
 (defn most-sim-in-model
   [model word-or-vec n & [limit]]
   (let [{:keys [wc hidden matrix-kit]} model
-        {em :w} hidden
+        {em :sparses} hidden
         limit (or limit (count wc))
         target-word-list (->> wc (sort-by second >) (map first) (take limit))]; sort by frequency
     (most-sim {:em em :matrix-kit matrix-kit} word-or-vec target-word-list n false)))

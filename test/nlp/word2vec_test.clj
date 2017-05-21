@@ -22,10 +22,8 @@
       (is (= 1 (count (ffirst coll))))
       (is (not (zero? (count (second (first coll))))))))
   (testing "init-w2v-model"
-    (let [{:keys [hidden wc input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10 default-matrix-kit)
-          {:keys [unit-num]} hidden]
-      (is (= unit-num 10))
-      (is (= input-type :sparse))
+    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10 default-matrix-kit)]
+      (is (= hidden-size 10))
       (is (= output-type :binary-classification))
       (is (= (count (keys wc)) 3))))
   (let [target-tok "test/nlp/example.tok"
@@ -37,7 +35,8 @@
         X (clone (get-in w2v [:hidden :w "X"]))]
     (testing "train-word2vec!"
       (train-word2vec! w2v target-tok {:initial-learning-rate 0.01 :min-learning-rate 0.005 :nagetaive 10 :workers 1 :interval-ms 500 :sample 0.1})
-      (is (not= (vec D) (vec (get-in w2v [:hidden :w "D"])))))
+      (is (not= (vec D)
+                (vec (get-in w2v [:hidden :sparses "D"])))))
     (testing "most-sim-in-model"
       (let [result (most-sim-in-model w2v "D" 3)
             sims (->> result (map #(get % :x)) set)]

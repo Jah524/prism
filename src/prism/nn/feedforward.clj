@@ -7,18 +7,20 @@
 
 
 (defn hidden-state-by-sparse
-  [model sparse-inputs bias]
+  [model x-input bias]
   (let [{:keys [hidden matrix-kit]} model
-        {:keys [w unit-num]} hidden
+        {:keys [sparses]} hidden
         {:keys [plus scal]} matrix-kit]
-    (reduce (fn [acc sparse]
-              (cond (set? sparse-inputs)
-                    (plus acc (get w sparse))
-                    (map? sparse-inputs)
-                    (let [[k v] sparse]
-                      (plus acc (scal v (get w k))))))
-            bias
-            sparse-inputs)))
+    (->> x-input
+         (reduce (fn [acc item]
+                   (cond (set? x-input)
+                         (let [w (get sparses item)]
+                           (plus acc w))
+                         (map? x-input)
+                         (let [[k v] item
+                               w (get sparses k)]
+                           (plus acc (scal v w)))))
+                 bias))))
 
 
 (defn output-activation
@@ -39,10 +41,10 @@
 (defn network-output
   [model x-input sparse-outputs]
   (let [{:keys [hidden input-type matrix-kit]} model
-        {:keys [w bias unit-num]} hidden
+        {:keys [w bias]} hidden
         activation-function (:activation hidden)
         {:keys [plus gemv matrix-kit-type native-dv]} matrix-kit
-        state (if (= :sparse input-type)
+        state (if (or (set? x-input) (map? x-input))
                 (hidden-state-by-sparse model x-input bias)
                 (plus (gemv w x-input) bias))
         hidden-activation (activation state activation-function matrix-kit)
@@ -72,14 +74,14 @@
 (defn param-delta:sparse
   [model delta sparse-inputs hidden-size]
   (let [{:keys [scal]} (:matrix-kit model)]
-    {:w-delta (reduce (fn [acc sparse]
-                        (cond (set? sparse-inputs)
-                              (assoc acc sparse delta)
-                              (map? sparse-inputs)
-                              (let [[k v] sparse]
-                                (assoc acc k (scal v delta)))))
-                      {}
-                      sparse-inputs)
+    {:sparses-delta (reduce (fn [acc sparse]
+                              (cond (set? sparse-inputs)
+                                    (assoc acc sparse delta)
+                                    (map? sparse-inputs)
+                                    (let [[k v] sparse]
+                                      (assoc acc k (scal v delta)))))
+                            {}
+                            sparse-inputs)
      :bias-delta delta}))
 
 (defn back-propagation
@@ -88,13 +90,12 @@
   In classification model, you put possitive and negative pairs like {:pos #{\"item1\", \"item2\"} :neg #{\"item3\"}}
   "
   [model model-forward training-y]
-  (let [{:keys [output hidden input-type output-type matrix-kit]} model
-        {:keys [unit-num]} hidden
+  (let [{:keys [output hidden hidden-size input-type output-type matrix-kit]} model
         {:keys [activation state]} model-forward
         training-x (:input activation)
         {:keys [scal plus times matrix-kit-type native-dv]} matrix-kit
         output-delta (error output-type (:output activation) training-y)
-        output-param-delta (output-param-delta model output-delta unit-num (:hidden activation))
+        output-param-delta (output-param-delta model output-delta hidden-size (:hidden activation))
         propagated-delta (->> output-delta
                               (map (fn [[item delta]]
                                      (let [w (:w (get output item))]
@@ -102,8 +103,8 @@
                               (apply plus))
         hidden-delta (times (derivative (:hidden state) (:activation hidden) matrix-kit)
                             propagated-delta)
-        hidden-param-delta (if (= :sparse input-type)
-                             (param-delta:sparse model hidden-delta training-x unit-num)
+        hidden-param-delta (if (or (set? training-x) (map? training-x))
+                             (param-delta:sparse model hidden-delta training-x hidden-size)
                              (param-delta model hidden-delta training-x))]
     {:param-loss {:output-delta output-param-delta
                   :hidden-delta hidden-param-delta}
@@ -113,7 +114,6 @@
 (defn update-model! [model param-delta learning-rate]
   (let [{:keys [output hidden input-type matrix-kit]} model
         {:keys [output-delta hidden-delta]} param-delta
-        {:keys [unit-num]} hidden
         {:keys [type rewrite-vector! rewrite-matrix!]} matrix-kit]
     ;; update output
     (->> output-delta
@@ -123,19 +123,18 @@
                   (rewrite-vector! learning-rate w w-delta)
                   ;update output bias
                   (rewrite-vector! learning-rate bias bias-delta))))
-         doall)
+         dorun)
     ;; update hidden
-    (let [{:keys [w bias]} hidden
-          {:keys [w-delta bias-delta]} hidden-delta]
-      (if (= :sparse (:input-type model))
-        (->> w-delta
-             (map (fn [[k v]]
-                    (let [word-w (get w k)]
-                      ;; update hidden w
-                      (rewrite-vector! learning-rate word-w v))))
-             dorun)
-        ;; update hidden w
-        (rewrite-matrix! learning-rate w w-delta))
+    (let [{:keys [sparses w bias]} hidden
+          {:keys [sparses-delta w-delta bias-delta]} hidden-delta]
+      (->> sparses-delta
+           (map (fn [[k v]]
+                  (let [word-w (get sparses k)]
+                    ;; update hidden w
+                    (rewrite-vector! learning-rate word-w v))))
+           dorun)
+      ;; update hidden w
+      (when w-delta (rewrite-matrix! learning-rate w w-delta))
       ;; update hidden bias
       (rewrite-vector! learning-rate bias bias-delta)))
   model)
@@ -144,44 +143,38 @@
 (defn init-model
   [{:keys [input-type input-items input-size hidden-size output-type output-items activation matrix-kit]
     :or {matrix-kit default/default-matrix-kit}}]
-  (let [sparse-input? (= input-type :sparse)
-        {:keys [type init-vector init-matrix]} matrix-kit]
+  (let [{:keys [type init-vector init-matrix]} matrix-kit]
     (println (str "initializing model as " (if (= type :native) "native-array" "vectorz") " ..."))
     {:matrix-kit matrix-kit
-     :weight-type type
-     :hidden (-> (if (= input-type :sparse)
-                   (let [sparses (reduce (fn [acc sparse]
-                                           (assoc acc sparse (init-vector hidden-size)))
-                                         {}
-                                         input-items)]
-                     {:w sparses})
-                   {:w (init-matrix input-size hidden-size)})
-                 (assoc
-                   :bias (init-vector hidden-size)
-                   :unit-num hidden-size
-                   :activation activation))
+     :hidden {:sparses (reduce (fn [acc sparse]
+                                 (assoc acc sparse (init-vector hidden-size)))
+                               {}
+                               input-items)
+              :w (when input-size (init-matrix input-size hidden-size))
+              :bias (init-vector hidden-size)
+              :activation activation}
      :output (reduce (fn [acc sparse]
                        (assoc acc sparse {:w    (init-vector hidden-size)
                                           :bias (init-vector 1)}))
                      {}
                      output-items)
-     :input-type input-type
-     :output-type output-type
-     :unit-nums [(if sparse-input? (count input-items) input-size) hidden-size (count output-items)]}))
+     :input-size  input-size
+     :hidden-size hidden-size
+     :input-type  input-type
+     :output-type output-type}))
 
 (defn convert-model
   [model new-matrix-kit]
-  (let [{:keys [hidden output input-type unit-nums]} model
-        [input-num hidden-num] unit-nums
+  (let [{:keys [hidden output input-type input-size hidden-size]} model
         {:keys [make-vector make-matrix] :as matrix-kit} (or new-matrix-kit default/default-matrix-kit)]
     (assoc model
       :matrix-kit matrix-kit
-      :hidden (let [{:keys [w bias]} hidden]
+      :hidden (let [{:keys [w bias sparse]} hidden]
                 (-> hidden
                     (assoc
-                      :w (if (= input-type :sparse)
-                           (reduce (fn [acc [word em]] (assoc acc word (make-vector (seq em)))) {} w)
-                           (make-matrix input-num hidden-num (apply concat (seq w))))
+                      :sparse (reduce (fn [acc [word em]]
+                                        (assoc acc word (make-vector (seq em)))) {} w)
+                      :w (make-matrix input-size hidden-size (apply concat (seq w)))
                       :bias (make-vector (seq bias)))))
       :output (reduce (fn [acc [item {:keys [w bias]}]]
                         (assoc acc item {:w (make-vector (seq w)) :bias (make-vector (seq bias))}))

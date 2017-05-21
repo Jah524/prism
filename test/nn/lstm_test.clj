@@ -10,9 +10,9 @@
 (def sample-w-network
   {:matrix-kit default-matrix-kit
    :input-size 3
+   :hidden-size 10
    :output-type :binary-classification
    :hidden {:unit-type :lstm
-            :unit-num 10
             :layer-type :hidden
             :block-w (matrix (partition 3 (take 30 (repeat 0.1))))
             :block-wr (matrix (partition 10 (take 100 (repeat 0.1))))
@@ -40,6 +40,7 @@
 (def sample-w-network-sparse
   {:matrix-kit default-matrix-kit
    :output-type :binary-classification
+   :hidden-size 10
    :hidden {:sparses {"natural" {:block-w (array (take 10 (repeat 0.1)))
                                  :input-gate-w  (array (take 10 (repeat 0.1)))
                                  :forget-gate-w (array (take 10 (repeat 0.1)))
@@ -52,7 +53,6 @@
                                     :input-gate-w  (array (take 10 (repeat 0.1)))
                                     :forget-gate-w (array (take 10 (repeat 0.1)))
                                     :output-gate-w (array (take 10 (repeat 0.1)))}}
-            :unit-num 10
             :block-wr (matrix (partition 10 (take 100 (repeat 0.1))))
             :block-bias (array (take 10 (repeat -1)))
             :input-gate-wr  (matrix (partition 10 (take 100 (repeat 0.1))))
@@ -75,7 +75,7 @@
 (def sample-w-network-prediction
   {:matrix-kit default-matrix-kit
    :output-type :prediction
-   :unit-nums [3 10 1]
+   :hidden-size 10
    :hidden {:sparses {"natural" {:block-w (array (take 10 (repeat 0.1)))
                                  :input-gate-w  (array (take 10 (repeat 0.1)))
                                  :forget-gate-w (array (take 10 (repeat 0.1)))
@@ -88,7 +88,6 @@
                                     :input-gate-w  (array (take 10 (repeat 0.1)))
                                     :forget-gate-w (array (take 10 (repeat 0.1)))
                                     :output-gate-w (array (take 10 (repeat 0.1)))}}
-            :unit-num 10
             :block-wr (matrix (partition 10 (take 100 (take 100 (repeat 0.1)))))
             :block-bias (array (take 10 (repeat -1)))
             :input-gate-wr  (matrix (partition 10 (take 100 (take 100 (repeat 0.1)))))
@@ -107,15 +106,15 @@
 (deftest lstm-test
   (testing "partial-state-sparse with set"
     (let [{:keys [hidden]} sample-w-network-sparse]
-      (is (= (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
+      (is (= (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden)) (map vec))
              (take 4 (repeat (take 10 (repeat (double 0.1)))))))))
   (testing "partial-state-sparse with map"
     (let [{:keys [hidden]} sample-w-network-sparse]
-      (is (= (->> (partial-state-sparse sample-w-network-sparse {"language" 1} (:sparses hidden) (:unit-num hidden)) (map vec))
-             (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))
+      (is (= (->> (partial-state-sparse sample-w-network-sparse {"language" 1} (:sparses hidden)) (map vec))
+             (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden)) (map vec))
              (take 4 (repeat (take 10 (repeat (double 0.1)))))))
-      (is (not= (->> (partial-state-sparse sample-w-network-sparse {"language" 2} (:sparses hidden) (:unit-num hidden)) (map vec))
-                (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden) (:unit-num hidden)) (map vec))))))
+      (is (not= (->> (partial-state-sparse sample-w-network-sparse {"language" 2} (:sparses hidden)) (map vec))
+                (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden)) (map vec))))))
   (testing "lstm-activation"
     (let [result (lstm-activation sample-w-network
                                   (float-array (take 3 (repeat 2)))
@@ -171,7 +170,7 @@
                                     (float-array [1 0 -10]); as x-input
                                     #{"prediction1" "prediction2" "prediction3"}
                                     (float-array (take 10 (repeat 0)))
-                                    (float-array (take (:unit-num (:hidden sample-w-network)) (repeat 0) )))
+                                    (float-array (take (:hidden-size sample-w-network) (repeat 0) )))
           f  (get-in result [:state :input])
           ss (get-in result [:state :hidden])]
       (is (= (vec f) (map float [1 0 -10])))
@@ -286,8 +285,7 @@
                                   (float-array (take 10 (repeat 1)))
                                   (float-array (take 10 (repeat 1)))
                                   (float-array (take 10 (repeat 1)))
-                                  (float-array (take 10 (repeat 1)))
-                                  (:unit-num (:hidden sample-w-network)))
+                                  (float-array (take 10 (repeat 1))))
               (get "processing"))]
       (is (= (vec block-w-delta)       (take 10 (repeat (float 1)))))
       (is (= (vec input-gate-w-delta)  (take 10 (repeat (float 1)))))
@@ -352,7 +350,7 @@
 
 
   (testing "lstm-delta-zeros"
-    (let [result (lstm-delta-zeros (:make-vector default-matrix-kit) (:unit-num (:hidden sample-w-network)))]
+    (let [result (lstm-delta-zeros (:make-vector default-matrix-kit) (:hidden-size sample-w-network))]
       (is (= (ecount (:block-delta result))  10))
       (is (= (ecount (:input-gate-delta result)) 10))
       (is (= (ecount (:forget-gate-delta result)) 10))

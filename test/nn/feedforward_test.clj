@@ -5,14 +5,16 @@
             [matrix.default :refer [default-matrix-kit]]
             [prism.nn.feedforward :refer :all]))
 
+
 (def sample-model ;1->3->1
   {:matrix-kit default-matrix-kit
+   :input-size 1
+   :hidden-size 3
    :input-type  :dense
    :output-type :prediction
-   :hidden {:unit-num 3
-            :activation :sigmoid
-            :w (matrix [[1] [1] [1]])
-            :bias (array [1 1 1])}
+   :hidden {:w (matrix [[1] [1] [1]])
+            :bias (array [1 1 1])
+            :activation :sigmoid}
    :output {"prediction" {:w (array (take 3 (repeat 0.1)))
                           :bias (array [1])}}})
 
@@ -21,10 +23,11 @@
   {:matrix-kit default-matrix-kit
    :input-type  :dense
    :output-type :prediction
-   :hidden {:unit-num 2
-            :activation :sigmoid
-            :w (matrix [[0.1 0.1 0.1] [0.2 0.2 0.2]])
-            :bias (array [1 1])}
+   :input-size 3
+   :hidden-size 2
+   :hidden {:w (matrix [[0.1 0.1 0.1] [0.2 0.2 0.2]])
+            :bias (array [1 1])
+            :activation :sigmoid}
    :output {"prediction1" {:w (array (take 2 (repeat 1)))
                            :bias (array [1])}
             "prediction2" {:w (array (take 2 (repeat 1)))
@@ -37,10 +40,11 @@
   {:matrix-kit default-matrix-kit
    :input-type  :sparse
    :output-type :prediction
-   :hidden {:unit-num 2
-            :activation :sigmoid
-            :w {"natural" (array [0.1 0.2]) "language" (array [0.1 0.2]) "processing" (array [0.1 0.2])}
-            :bias (array [1 1])}
+   :input-size 3
+   :hidden-size 2
+   :hidden {:sparses {"natural" (array [0.1 0.2]) "language" (array [0.1 0.2]) "processing" (array [0.1 0.2])}
+            :bias (array [1 1])
+            :activation :sigmoid}
    :output {"prediction1" {:w (array (take 2 (repeat 1)))
                            :bias (array [1])}
             "prediction2" {:w (array (take 2 (repeat 1)))
@@ -52,12 +56,11 @@
   (testing "hidden-state-by-sparse"
     (are [arg expect] (= (vec (hidden-state-by-sparse
                                 {:matrix-kit default-matrix-kit
-                                 :hidden {:w {"natural"    (float-array [0 1])
-                                              "language"   (float-array [2 3])
-                                              "processing" (float-array [4 5])}
-                                          :unit-num 2}}
+                                 :hidden {:sparses {"natural"    (array [0 1])
+                                                    "language"   (array [2 3])
+                                                    "processing" (array [4 5])}}}
                                 arg
-                                (float-array (repeat 2 0))))
+                                (array (repeat 2 0))))
                          expect)
          {"natural"    1.0} [0.0 1.0]
          {"natural"   -2.0} [0.0 -2.0]
@@ -67,7 +70,7 @@
          {"natural" 2 "processing" -1} [-4.0 -3.0]))
 
   (testing "network-output with dense model"
-    (let [result (network-output sample-model (float-array [2]) #{"prediction"})
+    (let [result (network-output sample-model (array [2]) #{"prediction"})
           {:keys [activation state]} result
           {:keys [input hidden output]} activation]
       (is (= (vec input) [(float 2)]))
@@ -121,7 +124,7 @@
           {w-delta2 :w-delta bias-delta2 :bias-delta} (get output-delta "prediction2")
           {w-delta3 :w-delta bias-delta3 :bias-delta} (get output-delta "prediction3")]
       (is (= loss {"prediction1" (float -0.5187849), "prediction2" (float -1.5187849), "prediction3" (float -0.5187849)}))
-      (is (= (vec (get (:w-delta hidden-delta) "language"))
+      (is (= (vec (get (:sparses-delta hidden-delta) "language"))
              (map double [-0.4789838322238946 -0.45476128583309716])))
       (is (= (vec (:bias-delta hidden-delta))
              (map double [-0.4789838322238946 -0.45476128583309716])))
@@ -139,7 +142,7 @@
             b (:param-loss (back-propagation sample-model2
                                              (network-output sample-model2 (float-array [0 1 0]) #{"prediction1" "prediction2" "prediction3"})
                                              {"prediction1" 2 "prediction2" 1 "prediction3" 2}))]
-        (is (= (vec (get (:w-delta (:hidden-delta a)) "language"))
+        (is (= (vec (get (:sparses-delta (:hidden-delta a)) "language"))
                (let [it (:w-delta (:hidden-delta b))]
                  [(mget it 0 1) (mget it 1 1)])))
         (is (= (vec (:bias-delta (:hidden-delta a)))
@@ -163,9 +166,9 @@
         (is (= (mapv float w) (map float [0.3 0.3 0.3])))
         (is (= (mapv float bias) [(float 1.2)]))))
     (let [{:keys [hidden output]} (update-model! sample-model2:sparse
-                                                 {:hidden-delta {:w-delta {"natural" (array [0.1 0.1])
-                                                                           "language" (array [0.1 0.1])
-                                                                           "processing" (array [0.1 0.1])}
+                                                 {:hidden-delta {:sparses-delta {"natural" (array [0.1 0.1])
+                                                                                 "language" (array [0.1 0.1])
+                                                                                 "processing" (array [0.1 0.1])}
                                                                  :bias-delta (array [0.1 0.1])}
                                                   :output-delta {"prediction1" {:w-delta (array (take 2 (repeat 0.2)))
                                                                                 :bias-delta (array [0.2])}
@@ -175,9 +178,9 @@
                                                                                 :bias-delta (array [0.2])}}}
                                                  0.1)]
       (is (= (:activation hidden) :sigmoid))
-      (is (= (mapv float (get (:w hidden) "natural")) (map float [0.11 0.21])))
-      (is (= (mapv float (get (:w hidden) "language")) (map float [0.11 0.21])))
-      (is (= (mapv float (get (:w hidden) "processing")) (map float [0.11 0.21])))
+      (is (= (mapv float (get (:sparses hidden) "natural")) (map float [0.11 0.21])))
+      (is (= (mapv float (get (:sparses hidden) "language")) (map float [0.11 0.21])))
+      (is (= (mapv float (get (:sparses hidden) "processing")) (map float [0.11 0.21])))
       (is (= (mapv float (:bias hidden)) (map float (take 2 (repeat 1.01)))))
       (let [{:keys [w bias]} (get output "prediction1")]
         (is (= (mapv float w)
@@ -186,7 +189,7 @@
                (map float [1.02]))))))
 
   (testing "init-model"
-    (let [{:keys [hidden output input-type output-type]}
+    (let [{:keys [hidden output input-type output-type hidden-size]}
           (init-model {:input-type :dense
                        :input-items nil
                        :input-size 1
@@ -196,7 +199,7 @@
                        :activation :sigmoid})]
       (is (= input-type :dense))
       (is (= output-type :prediction))
-      (is (= (:unit-num hidden) 3))
+      (is (= hidden-size 3))
       (is (= (ecount (:w hidden)) 3))
       (is (= (ecount (:bias hidden)) 3))
       (let [{:keys [w bias]} (get output "prediction")]
@@ -204,22 +207,19 @@
         (is (= (ecount  bias) 1)))))
 
   (testing "init-model with sparse"
-    (let [{:keys [hidden output input-type output-type]}
-          (init-model {:input-type :sparse
-                       :input-items #{"natural" "language" "processing"}
+    (let [{:keys [hidden output input-type output-type hidden-size]}
+          (init-model {:input-items #{"natural" "language" "processing"}
                        :input-size nil
                        :hidden-size 3
                        :output-type :binary-classification
                        :output-items #{"prediction"}
                        :activation :sigmoid})]
-      (is (= input-type :sparse))
       (is (= output-type :binary-classification))
-      (is (= (:unit-num hidden) 3))
-
-      (is (= (ecount (get (:w hidden) "natural")) 3))
-      (is (= (ecount (get (:w hidden) "language")) 3))
-      (is (= (ecount (get (:w hidden) "processing")) 3))
-      (is (= (ecount (get (:w hidden) "?")) 1))
+      (is (= hidden-size 3))
+      (is (= (ecount (get (:sparses hidden) "natural")) 3))
+      (is (= (ecount (get (:sparses hidden) "language")) 3))
+      (is (= (ecount (get (:sparses hidden) "processing")) 3))
+      (is (= (ecount (get (:sparses hidden) "?")) 1))
       (is (= (ecount (:bias hidden)) 3))
       (let [{:keys [w bias]} (get output "prediction")]
         (is (= (ecount w) 3))

@@ -9,7 +9,7 @@
 
 (defn partial-state-sparse
   "lstm states of each part caused by input"
-  [model x-input sparses unit-num]
+  [model x-input sparses]
   (let [{:keys [scal plus]} (:matrix-kit model)]
     (->> x-input
          (mapv (fn [item]
@@ -24,15 +24,15 @@
 
 (defn lstm-activation
   [model x-input recurrent-input-list previous-cell-state]
-  (let [{:keys [hidden matrix-kit]} model
+  (let [{:keys [hidden hidden-size matrix-kit]} model
         lstm-layer hidden
         {:keys [gemv plus times sigmoid tanh alter-vec]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
-                output-gate-wr output-gate-bias output-gate-peephole peephole unit-num
+                output-gate-wr output-gate-bias output-gate-peephole peephole
                 sparses]} lstm-layer
         [block' input-gate' forget-gate' output-gate'] (if (or (set? x-input) (map? x-input))
-                                                         (partial-state-sparse model x-input sparses unit-num)
+                                                         (partial-state-sparse model x-input sparses)
                                                          (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} lstm-layer
                                                                lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
                                                            (mapv #(gemv % x-input) lstm-mat)))
@@ -58,8 +58,7 @@
 
 (defn sequential-output
   [model x-seq output-items-seq]
-  (let [{:keys [hidden matrix-kit]} model
-        hidden-size (:unit-num hidden)
+  (let [{:keys [hidden hidden-size matrix-kit]} model
         {:keys [make-vector]} matrix-kit]
     (loop [x-seq x-seq,
            output-items-seq output-items-seq,
@@ -111,7 +110,7 @@
      :forget-gate-delta forget-gate-delta :input-gate-delta input-gate-delta}))
 
 (defn param-delta-sparse
-  [model x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num]
+  [model x-input block-delta input-gate-delta forget-gate-delta output-gate-delta]
   (let [{:keys [scal]} (:matrix-kit model)]
     (reduce (fn [acc sparse]
               (cond (set? x-input)
@@ -130,9 +129,9 @@
 
 (defn lstm-param-delta
   [model lstm-part-delta x-input self-activation:t-1 self-state:t-1]
-  (let [{:keys [hidden  matrix-kit]} model
+  (let [{:keys [hidden hidden-size matrix-kit]} model
         {:keys [outer times]} matrix-kit
-        {:keys [sparses unit-num]} hidden
+        {:keys [sparses]} hidden
         {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
         block-wr-delta       (outer block-delta self-activation:t-1)
         input-gate-wr-delta  (outer input-gate-delta self-activation:t-1)
@@ -150,7 +149,7 @@
                   :peephole-input-gate-delta peephole-input-gate :peephole-forget-gate-delta peephole-forget-gate
                   :peephole-output-gate-delta peephole-output-gate}
         param-delta (if (or (set? x-input) (map? x-input))
-                      (-> template (assoc :sparses-delta (param-delta-sparse model x-input block-delta input-gate-delta forget-gate-delta output-gate-delta unit-num)))
+                      (-> template (assoc :sparses-delta (param-delta-sparse model x-input block-delta input-gate-delta forget-gate-delta output-gate-delta)))
                       (let [block-w-delta        (outer block-delta x-input)
                             input-gate-w-delta   (outer input-gate-delta x-input)
                             forget-gate-w-delta  (outer forget-gate-delta x-input)
@@ -161,16 +160,16 @@
     param-delta))
 
 (defn lstm-delta-zeros
-  [make-vector unit-num]
-  {:block-delta       (make-vector (repeat unit-num 0))
-   :input-gate-delta  (make-vector (repeat unit-num 0))
-   :forget-gate-delta (make-vector (repeat unit-num 0))
-   :output-gate-delta (make-vector (repeat unit-num 0))
-   :cell-state-delta  (make-vector (repeat unit-num 0))})
+  [make-vector hidden-size]
+  {:block-delta       (make-vector (repeat hidden-size 0))
+   :input-gate-delta  (make-vector (repeat hidden-size 0))
+   :forget-gate-delta (make-vector (repeat hidden-size 0))
+   :output-gate-delta (make-vector (repeat hidden-size 0))
+   :cell-state-delta  (make-vector (repeat hidden-size 0))})
 
 (defn gate-zeros
-  [make-vector unit-num]
-  {:forget-gate (make-vector (repeat unit-num 0))})
+  [make-vector hidden-size]
+  {:forget-gate (make-vector (repeat hidden-size 0))})
 
 (defn merge-param
   [plus merger! acc param-delta]
@@ -190,17 +189,16 @@
 
 (defn bptt
   [model activation output-items-seq]
-  (let [{:keys [output hidden matrix-kit output-type]} model
+  (let [{:keys [output hidden hidden-size matrix-kit output-type]} model
         {:keys [make-vector scal plus merger! transpose gemv clip!]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
-                input-gate-peephole forget-gate-peephole output-gate-peephole
-                unit-num]} hidden]
+                input-gate-peephole forget-gate-peephole output-gate-peephole]} hidden]
     ;looping latest to old
     (loop [output-items-seq (reverse output-items-seq),
            propagated-hidden-to-hidden-delta nil,
            output-seq (reverse activation),
-           self-delta:t+1 (lstm-delta-zeros make-vector unit-num),
-           lstm-state:t+1 (gate-zeros make-vector unit-num),
+           self-delta:t+1 (lstm-delta-zeros make-vector hidden-size),
+           lstm-state:t+1 (gate-zeros make-vector hidden-size),
            output-loss [],
            output-acc nil,
            hidden-acc nil]
@@ -209,14 +207,14 @@
         (recur (rest output-items-seq)
                nil
                (rest output-seq)
-               (lstm-delta-zeros unit-num)
-               (gate-zeros unit-num)
+               (lstm-delta-zeros hidden-size)
+               (gate-zeros hidden-size)
                output-loss
                nil
                nil)
         (first output-seq)
         (let [output-delta (error output-type (:output (:activation (first output-seq))) (first output-items-seq))
-              output-param-delta (ff/output-param-delta model output-delta unit-num (:hidden (:activation (first output-seq))))
+              output-param-delta (ff/output-param-delta model output-delta hidden-size (:hidden (:activation (first output-seq))))
               propagated-output-to-hidden-delta (when-not (= :skip (first output-items-seq))
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
@@ -233,14 +231,14 @@
                                             propagated-output-to-hidden-delta)
               ;hidden delta
               lstm-state (:hidden (:state (first output-seq)))
-              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (make-vector (repeat unit-num 0)))
-              lstm-part-delta (lstm-part-delta model unit-num summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
+              cell-state:t-1 (or (:cell-state (:hidden (:state (second output-seq)))) (make-vector (repeat hidden-size 0)))
+              lstm-part-delta (lstm-part-delta model hidden-size summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (:activation (first output-seq)))
               self-activation:t-1 (or (:hidden (:activation (second output-seq)))
-                                      (make-vector (repeat unit-num 0)));when first output time (last time of bptt
+                                      (make-vector (repeat hidden-size 0)));when first output time (last time of bptt
               self-state:t-1      (or (:hidden (:state (second output-seq)))
-                                      {:cell-state (make-vector (repeat unit-num 0))});when first output time (last time of bptt)
+                                      {:cell-state (make-vector (repeat hidden-size 0))});when first output time (last time of bptt)
               lstm-param-delta (lstm-param-delta model lstm-part-delta x-input self-activation:t-1 self-state:t-1)
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
@@ -330,8 +328,7 @@
                    owr (init-orthogonal-matrix hidden-size)
                    ob  (init-vector hidden-size)
                    op  (init-vector hidden-size)
-                   template {:unit-num hidden-size
-                             :block-wr       bwr   :block-bias           bb
+                   template {:block-wr       bwr   :block-bias           bb
                              :input-gate-wr  iwr   :input-gate-bias      ib
                              :forget-gate-wr fwr   :forget-gate-bias     fb
                              :output-gate-wr owr   :output-gate-bias     ob
@@ -353,28 +350,28 @@
                      {}
                      output-items)
      :input-size input-size
+     :hidden-size hidden-size
      :output-type output-type}))
 
 (defn convert-model
   [model new-matrix-kit]
-  (let [{:keys [hidden output unit-nums]} model
-        [input-num hidden-num] unit-nums
+  (let [{:keys [hidden output input-size hidden-size]} model
         {:keys [make-vector make-matrix] :as matrix-kit} (or new-matrix-kit default/default-matrix-kit)]
     (assoc model
       :matrix-kit matrix-kit
       :hidden (let [{:keys [sparses block-w input-gate-w forget-gate-w output-gate-w
-                            unit-num block-wr block-bias input-gate-wr input-gate-bias
+                            block-wr block-bias input-gate-wr input-gate-bias
                             forget-gate-wr forget-gate-bias output-gate-wr　output-gate-bias
                             input-gate-peephole　forget-gate-peephole　output-gate-peephole]} hidden
-                    bwr (make-matrix unit-num unit-num (apply concat (seq block-wr)))
+                    bwr (make-matrix hidden-size hidden-size (apply concat (seq block-wr)))
                     bb  (make-vector (seq block-bias))
-                    iwr (make-matrix unit-num unit-num (apply concat (seq input-gate-wr)))
+                    iwr (make-matrix hidden-size hidden-size (apply concat (seq input-gate-wr)))
                     ib  (make-vector (seq input-gate-bias))
                     ip  (make-vector (seq input-gate-peephole))
-                    fwr (make-matrix unit-num unit-num (apply concat (seq forget-gate-wr)))
+                    fwr (make-matrix hidden-size hidden-size (apply concat (seq forget-gate-wr)))
                     fb  (make-vector (seq forget-gate-bias))
                     fp  (make-vector (seq forget-gate-peephole))
-                    owr (make-matrix unit-num unit-num (apply concat (seq output-gate-wr)))
+                    owr (make-matrix hidden-size hidden-size (apply concat (seq output-gate-wr)))
                     ob  (make-vector (seq output-gate-bias))
                     op  (make-vector (seq output-gate-peephole))
                     template (assoc hidden
@@ -392,10 +389,10 @@
                                         :output-gate-w (make-vector (seq output-gate-w))}))
                                    {}
                                    sparses)
-                  :block-w       (make-matrix input-num hidden-num (apply concat (seq block-w)))
-                  :input-gate-w  (make-matrix input-num hidden-num (apply concat (seq input-gate-w)))
-                  :forget-gate-w (make-matrix input-num hidden-num (apply concat (seq forget-gate-w)))
-                  :output-gate-w (make-matrix input-num hidden-num (apply concat (seq output-gate-w)))))
+                  :block-w       (make-matrix input-size hidden-size (apply concat (seq block-w)))
+                  :input-gate-w  (make-matrix input-size hidden-size (apply concat (seq input-gate-w)))
+                  :forget-gate-w (make-matrix input-size hidden-size (apply concat (seq forget-gate-w)))
+                  :output-gate-w (make-matrix input-size hidden-size (apply concat (seq output-gate-w)))))
       :output (reduce (fn [acc [item {:keys [w bias]}]]
                         (assoc acc item {:w (make-vector (seq w)) :bias (make-vector (seq bias))}))
                       {}

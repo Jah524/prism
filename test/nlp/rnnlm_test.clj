@@ -8,9 +8,8 @@
 
 (deftest rnnlm-test
   (testing "init-rnnlm-model"
-    (let [{:keys [hidden wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10 default/default-matrix-kit)
-          {:keys [unit-num]} hidden]
-      (is (= unit-num 10))
+    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10 default/default-matrix-kit)]
+      (is (= hidden-size 10))
       (is (= output-type :binary-classification))
       (is (= (count (keys wc)) 4))))
   (testing "convert-rare-word-to-unk"
