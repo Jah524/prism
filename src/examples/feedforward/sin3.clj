@@ -14,8 +14,7 @@
 
 
 (defn train-sgd [model training-list learning-rate]
-  (loop [model model,
-         training-list training-list,
+  (loop [training-list training-list,
          n 0,
          acc-loss 0]
     (if-let [training-pair (first training-list)]
@@ -24,8 +23,8 @@
             {:keys [param-loss loss]} (ff/back-propagation model forward y)
             diff (get loss "sin-prediction")
             loss (* diff diff 0.5)] ; sum-of-squares-error
-        (recur (ff/update-model! model param-loss learning-rate)
-               (rest training-list)
+        (ff/update-model! model param-loss learning-rate)
+        (recur (rest training-list)
                (inc n)
                (+ acc-loss loss)))
       {:loss (/ acc-loss n) :model model})))
