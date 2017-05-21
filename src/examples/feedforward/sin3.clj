@@ -43,8 +43,7 @@
 
 (defn example-train [matrix-kit]
   (let [mk (or matrix-kit default-matrix-kit)
-        model (train (ff/init-model {:input-type :dense
-                                     :input-items nil
+        model (train (ff/init-model {:input-items nil
                                      :input-size 1
                                      :hidden-size 3
                                      :output-type :prediction

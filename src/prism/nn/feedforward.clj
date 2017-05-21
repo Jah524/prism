@@ -40,7 +40,7 @@
 
 (defn network-output
   [model x-input sparse-outputs]
-  (let [{:keys [hidden input-type matrix-kit]} model
+  (let [{:keys [hidden matrix-kit]} model
         {:keys [w bias]} hidden
         activation-function (:activation hidden)
         {:keys [plus gemv matrix-kit-type native-dv]} matrix-kit
@@ -90,7 +90,7 @@
   In classification model, you put possitive and negative pairs like {:pos #{\"item1\", \"item2\"} :neg #{\"item3\"}}
   "
   [model model-forward training-y]
-  (let [{:keys [output hidden hidden-size input-type output-type matrix-kit]} model
+  (let [{:keys [output hidden hidden-size output-type matrix-kit]} model
         {:keys [activation state]} model-forward
         training-x (:input activation)
         {:keys [scal plus times matrix-kit-type native-dv]} matrix-kit
@@ -112,7 +112,7 @@
 
 
 (defn update-model! [model param-delta learning-rate]
-  (let [{:keys [output hidden input-type matrix-kit]} model
+  (let [{:keys [output hidden matrix-kit]} model
         {:keys [output-delta hidden-delta]} param-delta
         {:keys [type rewrite-vector! rewrite-matrix!]} matrix-kit]
     ;; update output
@@ -141,7 +141,7 @@
 
 
 (defn init-model
-  [{:keys [input-type input-items input-size hidden-size output-type output-items activation matrix-kit]
+  [{:keys [input-items input-size hidden-size output-type output-items activation matrix-kit]
     :or {matrix-kit default/default-matrix-kit}}]
   (let [{:keys [type init-vector init-matrix]} matrix-kit]
     (println (str "initializing model as " (if (= type :native) "native-array" "vectorz") " ..."))
@@ -160,12 +160,11 @@
                      output-items)
      :input-size  input-size
      :hidden-size hidden-size
-     :input-type  input-type
      :output-type output-type}))
 
 (defn convert-model
   [model new-matrix-kit]
-  (let [{:keys [hidden output input-type input-size hidden-size]} model
+  (let [{:keys [hidden output input-size hidden-size]} model
         {:keys [make-vector make-matrix] :as matrix-kit} (or new-matrix-kit default/default-matrix-kit)]
     (assoc model
       :matrix-kit matrix-kit

@@ -56,7 +56,6 @@
         {:keys [make-vector]} mk
         model (train-with-demo-dataset (lstm/init-model {:input-items  nil
                                                          :output-items #{"prediction"}
-                                                         :input-type :dense
                                                          :input-size 1
                                                          :hidden-size 2
                                                          :output-type :prediction

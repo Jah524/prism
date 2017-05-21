@@ -57,7 +57,7 @@
               snapshot 60 ;  1 hour when interval-ms is set 60000
               }} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
-        {:keys [wc em input-type]} model
+        {:keys [wc em]} model
         _(println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
         wc-unif (reduce #(assoc %1 (first %2) (float (Math/pow (second %2) (/ 3 4)))) {} (dissoc wc "<unk>"))
         neg-cum (uniform->cum-uniform wc-unif)
@@ -131,8 +131,7 @@
 (defn init-rnnlm-model
   [wc hidden-size {:keys [matrix-kit] :or {matrix-kit default/default-matrix-kit}}]
   (let [wc-set (conj (set (keys wc)) "<eos>")]
-    (-> (lstm/init-model {:input-type :sparse
-                          :input-items wc-set
+    (-> (lstm/init-model {:input-items wc-set
                           :input-size nil
                           :hidden-size hidden-size
                           :output-type :binary-classification

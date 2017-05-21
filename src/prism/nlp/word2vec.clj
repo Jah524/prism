@@ -135,8 +135,7 @@
 (defn init-w2v-model
   [wc hidden-size {:keys [matrix-kit] :or {matrix-kit default/default-matrix-kit}}]
   (let [wc-set (set (keys wc))]
-    (-> (ff/init-model {:input-type :sparse
-                        :input-items wc-set
+    (-> (ff/init-model {:input-items wc-set
                         :input-size nil
                         :hidden-size hidden-size
                         :output-type :binary-classification

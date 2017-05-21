@@ -24,7 +24,7 @@
 
 
 (defn decoder-lstm-activation [decoder x-input recurrent-input-list encoder-input previous-cell-state]
-  (let [{:keys [hidden hidden-size matrix-kit input-type]} decoder
+  (let [{:keys [hidden hidden-size matrix-kit]} decoder
         {:keys [plus times gemv alter-vec tanh sigmoid]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
@@ -123,10 +123,9 @@
 
 (defn decoder-lstm-param-delta
   [decoder lstm-part-delta x-input self-activation:t-1 encoder-input self-state:t-1]
-  (let [{:keys [hidden matrix-kit input-type]} decoder
+  (let [{:keys [hidden matrix-kit]} decoder
         {:keys [outer times]} matrix-kit
         {:keys [sparses]} hidden
-        sparse? (= input-type :sparse)
         {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta]
     {:block-w-delta        (outer block-delta x-input)
      :input-gate-w-delta   (outer input-gate-delta x-input)
@@ -361,8 +360,7 @@
   (let [{:keys [init-vector init-matrix]} matrix-kit
         decoder (lstm/init-model (assoc param
                                    :encoder-size encoder-hidden-size
-                                   :hidden-size decoder-hidden-size
-                                   :input-type :dense))
+                                   :hidden-size decoder-hidden-size))
         {:keys [output hidden]} decoder
         d-output (reduce (fn [acc [word param]]
                            (assoc acc word (assoc param
@@ -390,8 +388,7 @@
                                      (dissoc :output-items)
                                      (assoc
                                        :hidden-size encoder-hidden-size
-                                       :input-size input-size
-                                       :input-type :dense)))]
+                                       :input-size input-size)))]
     {:encoder encoder
      :decoder (init-decoder param)}))
 

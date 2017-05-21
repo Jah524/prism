@@ -197,7 +197,6 @@
                        :output-type :prediction
                        :output-items #{"prediction"}
                        :activation :sigmoid})]
-      (is (= input-type :dense))
       (is (= output-type :prediction))
       (is (= hidden-size 3))
       (is (= (ecount (:w hidden)) 3))
