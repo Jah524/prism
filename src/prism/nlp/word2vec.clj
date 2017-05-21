@@ -201,7 +201,7 @@
   (let [{:keys [make-vector]} (or matrix-kit default/default-matrix-kit)
         em (util/load-model em-path)]
     {:matrix-kit matrix-kit
-     :em-size (count (first em))
+     :em-size (count (second (first em)))
      :em  (reduce (fn [acc [word em]] (assoc acc word (make-vector (seq em))))
                   {}
                   em)}))
