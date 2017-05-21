@@ -1,5 +1,8 @@
 (ns prism.sampling
-  (:require [clojure.pprint :refer [pprint]]))
+  (:require
+    [clojure.pprint :refer [pprint]]
+    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix.random :refer [randoms]]))
 
 (defn uniform->cum-uniform [uniform-dist]
   (->> (sort-by second > uniform-dist)
@@ -31,5 +34,5 @@
 
 (defn samples [cum-dist sample-num]
   (let [m (second (last cum-dist))]
-    (shuffle (uniform-sampling cum-dist (repeatedly sample-num #(rand (dec m)))))))
+    (shuffle (uniform-sampling cum-dist (o/* (take sample-num (randoms)) (dec m))))))
 
