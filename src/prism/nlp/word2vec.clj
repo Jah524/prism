@@ -198,12 +198,13 @@
 
 (defn load-embedding
   [em-path matrix-kit]
-  {:matrix-kit matrix-kit
-   :em (let [{:keys [make-vector]} (or matrix-kit default/default-matrix-kit)
-             em (util/load-model em-path)]
-         (reduce (fn [acc [word em]] (assoc acc word (make-vector (seq em))))
-                 {}
-                 em))})
+  (let [{:keys [make-vector]} (or matrix-kit default/default-matrix-kit)
+        em (util/load-model em-path)]
+    {:matrix-kit matrix-kit
+     :em-size (count (first em))
+     :em  (reduce (fn [acc [word em]] (assoc acc word (make-vector (seq em))))
+                  {}
+                  em)}))
 
 (defn word2vec [embedding word]
   (get (:em embedding) word))
