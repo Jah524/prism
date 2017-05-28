@@ -43,7 +43,7 @@
   (let [{:keys [hidden matrix-kit]} model
         {:keys [w bias]} hidden
         activation-function (:activation hidden)
-        {:keys [plus gemv matrix-kit-type native-dv]} matrix-kit
+        {:keys [plus gemv]} matrix-kit
         state (if (or (set? x-input) (map? x-input))
                 (hidden-state-by-sparse model x-input bias)
                 (plus (gemv w x-input) bias))

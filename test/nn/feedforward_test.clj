@@ -69,7 +69,7 @@
          {"processing" 1.0} [4.0 5.0]
          {"natural" 2 "processing" -1} [-4.0 -3.0]))
 
-  (testing "network-output with dense model"
+  (testing "network-output with dense input"
     (let [result (network-output sample-model (array [2]) #{"prediction"})
           {:keys [activation state]} result
           {:keys [input hidden output]} activation]
@@ -78,7 +78,7 @@
       (is (= (vec (:hidden state)) [3.0 3.0 3.0]))
       (is (= (reduce (fn[acc [k v]](assoc acc k (float v))) {} output) {"prediction" (float 1.2857722491025925)}))))
 
-  (testing "network-output with sparse model"
+  (testing "network-output with sparse input"
     (let [result (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction3"})
           {:keys [activation state]} result
           {:keys [input hidden output]} activation]

@@ -4,7 +4,8 @@
                                         matrix? vec? emap emap! outer-product transpose ecount]]
            [clojure.core.matrix.random :refer [sample-normal]]
            [clojure.core.matrix.operators :as o]
-           [clojure.core.matrix.linear :refer [svd]]))
+           [clojure.core.matrix.linear :refer [svd]]
+           [clojure.core.matrix.stats :refer [mean sd]]))
 
 (set-current-implementation :vectorz)
 
@@ -36,6 +37,10 @@
    (emul v1 v2))
   ([v1 v2 & more]
    (reduce #(times %1 %2) (times v1 v2) more)))
+
+(defn divide
+  [v1 v2]
+  (o// v1 v2))
 
 (defn outer
   [v1 v2]
@@ -75,6 +80,7 @@
    :merger! merger!
    :minus minus
    :times times
+   :divide divide
    :scal scal
    :dot dot
    :outer outer
@@ -94,5 +100,6 @@
    :tanh tanh
    :tanh-derivative (fn [x] (let [it (Math/tanh x)] (float (- 1 (* it it)))))
    :linear-derivative-vector (fn [v] (array :vectorz (take (ecount v) (repeat 1))))
-   :alter-vec alter-vec})
-
+   :alter-vec alter-vec
+   :mean mean
+   :sd sd})

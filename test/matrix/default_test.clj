@@ -12,7 +12,7 @@
 
 (deftest matrix-test
   (let [{:keys [sum plus minus scal times dot outer transpose gemv clip! sigmoid transpose alter-vec rewrite-vector!
-                init-orthogonal-matrix]} default-matrix-kit]
+                init-orthogonal-matrix mean sd]} default-matrix-kit]
     (testing "sum"
       (is (= (sum (array (range 10)))
              (float 45))))
@@ -63,4 +63,10 @@
       (let [result (init-orthogonal-matrix 5)]
         (is (= (ecount result) 25))
         (is (= (row-count result) 5))))
+    (testing "mean"
+      (is (= (mean (array (range 10)))
+             (double 4.5))))
+    (testing "sd"
+      (is (= (sd (array (range 10)))
+             (double 3.0276503540974917))))
     ))

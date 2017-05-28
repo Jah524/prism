@@ -52,7 +52,7 @@
                                      :matrix-kit mk
                                      })
                      (training-sin3 mk)
-                     {:epoc 10000 :loss-interval 1000 :learning-rate 0.01})]
+                     {:epoc 10000 :loss-interval 100 :learning-rate 0.01})]
     (-> (function-plot #(Math/sin %) -3 3)
         (add-function #(get (:output (:activation (ff/network-output model ((:make-vector mk) [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
         (add-function #(nth (seq (:hidden (:activation (ff/network-output model ((:make-vector mk) [%]) #{"sin-prediction"})))) 0) -3 3)

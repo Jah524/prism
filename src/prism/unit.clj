@@ -1,4 +1,5 @@
-(ns prism.unit)
+(ns prism.unit
+  (:require [clojure.pprint :refer [pprint]]))
 
 (defn- softmax-states
   [matrix-kit input-list all-output-connection]
@@ -86,3 +87,28 @@
     (binary-classification-error activation expectation)
     :prediction
     (prediction-error activation expectation)))
+
+
+(defn layer-normalization
+  [matrix-kit alpha gain bias]
+  (let [{:keys [plus minus times scal mean sd]} matrix-kit
+        sigma (sd alpha)
+        normalized-preactivation (scal (/ 1 sigma) (minus alpha (mean alpha)))
+        alpha-bar (times normalized-preactivation gain)]
+    {:state (plus alpha-bar bias)
+     :alpha-bar alpha-bar
+     :normalized-preactivation normalized-preactivation
+     :sigma sigma}))
+
+(defn layer-normalization-delta
+  [matrix-kit gain hidden-delta sigma normalized-preactivation alpha-bar]
+  (let [{:keys [minus times scal mean]} matrix-kit
+        gain-delta (times hidden-delta normalized-preactivation)
+        d1 (times hidden-delta gain)
+        d1-mean (mean d1)
+        tmp-left (minus d1 d1-mean)
+        d2 (times hidden-delta alpha-bar)
+        d2-mean (mean d2)
+        tmp-right  (scal d2-mean normalized-preactivation)]
+    {:gain-delta gain-delta
+     :ln-delta (scal (/ 1 sigma) (minus tmp-left tmp-right))}))
