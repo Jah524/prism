@@ -56,31 +56,70 @@
     {:activation lstm
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
 
+(defn- decoder-softmax-states
+  [matrix-kit decoder-hidden-list encoder-input previous-input all-output-connection]
+  (let [{:keys [dot sum scal make-vector]} matrix-kit]
+    (loop [coll (vec all-output-connection)
+           item-acc [],
+           state-acc []]
+      (if-let [f (first coll)]
+        (let [[item v] f
+              {:keys [w bias encoder-w previous-input-w previous-input-sparses]} v
+              state (+ (dot w decoder-hidden-list)
+                       (first bias)
+                       (dot encoder-w encoder-input)
+                       (if (or (set? previous-input) (map? previous-input))
+                         (->> previous-input
+                              (mapv (fn [item]
+                                      (cond (set? previous-input)
+                                            (sum (:w (get previous-input-sparses item)))
+                                            (map? previous-input)
+                                            (let [[sparse-k v] item]
+                                              (sum (scal v (:w (get previous-input-sparses sparse-k))))))))
+                              (apply +))
+                         (dot previous-input-w previous-input)))
+              state (cond (> state 25) 25 (< state -25) -25 :else state)]
+          (recur (rest coll)
+                 (conj item-acc item)
+                 (conj state-acc state)))
+        {:items item-acc :states (make-vector state-acc)}))))
+
+(defn decoder-multi-class-prob
+  [matrix-kit decoder-hidden-list encoder-input previous-input all-output-connection]
+  (let [{:keys [sum scal alter-vec exp]} matrix-kit
+        {:keys [items states]} (decoder-softmax-states matrix-kit decoder-hidden-list encoder-input previous-input all-output-connection)
+        activations (alter-vec states exp)
+        s (sum activations)
+        a (scal (/ 1 s) activations)]
+    (->> (mapv vector items a)
+         (reduce (fn [acc [item a]]
+                   (assoc acc item a))
+                 {}))))
 
 (defn decoder-output-activation
   [decoder decoder-hidden-list encoder-input previous-input sparse-outputs]
   (let [{:keys [output-type output matrix-kit]} decoder
-        {:keys [sigmoid dot sum scal]} matrix-kit
-        activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
+        {:keys [sigmoid dot sum scal]} matrix-kit]
     (if (= output-type :multi-class-classification)
-      :FIXME
-      (reduce (fn [acc s]
-                (let [{:keys [w bias encoder-w previous-input-w previous-input-sparses]} (get output s)]
-                  (assoc acc s (activation-function (+ (dot w decoder-hidden-list)
-                                                       (first bias)
-                                                       (dot encoder-w encoder-input)
-                                                       (if (or (set? previous-input) (map? previous-input))
-                                                         (->> previous-input
-                                                              (mapv (fn [item]
-                                                                      (cond (set? previous-input)
-                                                                            (sum (:w (get previous-input-sparses item)))
-                                                                            (map? previous-input)
-                                                                            (let [[sparse-k v] item]
-                                                                              (sum (scal v (:w (get previous-input-sparses sparse-k))))))))
-                                                              (apply +))
-                                                         (dot previous-input-w previous-input)))))))
-              {}
-              (vec sparse-outputs)))))
+      (decoder-multi-class-prob matrix-kit decoder-hidden-list encoder-input previous-input output)
+      (let [activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
+        (reduce (fn [acc s]
+                  (let [{:keys [w bias encoder-w previous-input-w previous-input-sparses]} (get output s)]
+                    (assoc acc s (activation-function (+ (dot w decoder-hidden-list)
+                                                         (first bias)
+                                                         (dot encoder-w encoder-input)
+                                                         (if (or (set? previous-input) (map? previous-input))
+                                                           (->> previous-input
+                                                                (mapv (fn [item]
+                                                                        (cond (set? previous-input)
+                                                                              (sum (:w (get previous-input-sparses item)))
+                                                                              (map? previous-input)
+                                                                              (let [[sparse-k v] item]
+                                                                                (sum (scal v (:w (get previous-input-sparses sparse-k))))))))
+                                                                (apply +))
+                                                           (dot previous-input-w previous-input)))))))
+                {}
+                (vec sparse-outputs))))))
 
 
 (defn decoder-activation-time-fixed
