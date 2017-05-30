@@ -86,3 +86,15 @@
     (binary-classification-error activation expectation)
     :prediction
     (prediction-error activation expectation)))
+
+(defn merge-param
+  [plus acc param-delta]
+  (if (nil? acc)
+    param-delta
+    (apply
+      (fn m [acc param-delta]
+        (if (every? map? [acc param-delta])
+          (apply merge-with m [acc param-delta])
+          (do
+            (apply plus [acc param-delta]))))
+      [acc param-delta])))

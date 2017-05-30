@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [activation derivative error]]
+    [prism.unit :refer [activation derivative error merge-param]]
     [prism.util :as util]))
 
 
@@ -170,26 +170,10 @@
   [make-vector hidden-size]
   {:forget-gate (make-vector (repeat hidden-size 0))})
 
-(defn merge-param
-  [plus merger! acc param-delta]
-  (if (nil? acc)
-    param-delta
-    (merge-with #(cond
-                   (map? %1); if each value is sparses
-                   (merge-with (fn [accw dw] ;for each items
-                                 (if (map? accw)
-                                   (merge-with (fn [a b] (plus a b)) accw dw);sprase w of each gates
-                                   (plus accw dw)));w also bias
-                               %1 %2)
-                   :else ;if hidden weight map or bias
-                   (merger! %2 %1))
-                acc
-                param-delta)))
-
 (defn bptt
   [model activation output-items-seq]
   (let [{:keys [output hidden hidden-size matrix-kit output-type]} model
-        {:keys [make-vector scal plus merger! transpose gemv clip!]} matrix-kit
+        {:keys [make-vector scal plus transpose gemv clip!]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole]} hidden]
     ;looping latest to old
@@ -251,8 +235,8 @@
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (cons output-delta output-loss)
-                 (merge-param plus merger! output-acc output-param-delta)
-                 (merge-param plus merger! hidden-acc lstm-param-delta)))
+                 (merge-param plus output-acc output-param-delta)
+                 (merge-param plus hidden-acc lstm-param-delta)))
         :else
         {:param-loss  {:output-delta output-acc
                        :hidden-delta hidden-acc}

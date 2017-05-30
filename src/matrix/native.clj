@@ -15,10 +15,6 @@
   ([v1 v2 & more]
    (reduce #(plus %1 %2) (plus v1 v2) more)))
 
-(defn merger!
-  [m m!]
-  (c/axpy! m m!))
-
 (defn minus
   ([v1 v2]
    (c/axpy (double -1) v2 v1))
@@ -98,7 +94,6 @@
   {:type :native
    :sum sum
    :plus plus
-   :merger! merger!
    :minus minus
    :times times
    :times! times!

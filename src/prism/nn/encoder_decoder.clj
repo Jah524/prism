@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
-    [prism.unit :refer [error]]
+    [prism.unit :refer [error merge-param]]
     [prism.util :as util]
     [prism.nn.lstm :as lstm]))
 
@@ -60,7 +60,7 @@
 (defn decoder-output-activation
   [decoder decoder-hidden-list encoder-input previous-input sparse-outputs]
   (let [{:keys [output-type output matrix-kit]} decoder
-        {:keys [sigmoid dot scal]} matrix-kit
+        {:keys [sigmoid dot sum scal]} matrix-kit
         activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
     (if (= output-type :multi-class-classification)
       :FIXME
@@ -73,10 +73,11 @@
                                                          (->> previous-input
                                                               (mapv (fn [item]
                                                                       (cond (set? previous-input)
-                                                                            (:w (get previous-input-sparses item))
+                                                                            (sum (:w (get previous-input-sparses item)))
                                                                             (map? previous-input)
                                                                             (let [[sparse-k v] item]
-                                                                              (scal v (:w (get previous-input-sparses sparse-k))))))))
+                                                                              (sum (scal v (:w (get previous-input-sparses sparse-k))))))))
+                                                              (apply +))
                                                          (dot previous-input-w previous-input)))))))
               {}
               (vec sparse-outputs)))))
@@ -135,10 +136,10 @@
                                                               {:sparses-delta (->> previous-input
                                                                                    (reduce (fn [acc sparse]
                                                                                              (cond (set? previous-input)
-                                                                                                   (assoc acc sparse {:w-delta delta})
+                                                                                                   (assoc acc sparse {:w-delta (make-vector [delta])})
                                                                                                    (map? previous-input)
                                                                                                    (let [[sparse-k v] sparse]
-                                                                                                     (assoc acc sparse-k {:w-delta (scal v delta)}))))
+                                                                                                     (assoc acc sparse-k {:w-delta (make-vector [(scal v delta)])}))))
                                                                                            {}))}
                                                               {:w (scal delta previous-input)})}))
                  {}))))
@@ -179,7 +180,7 @@
 (defn encoder-bptt
   [encoder encoder-activation propagated-delta-from-decoder]
   (let [{:keys [hidden hidden-size matrix-kit]} encoder
-        {:keys [make-vector gemv transpose plus merger!]} matrix-kit
+        {:keys [make-vector gemv transpose plus]} matrix-kit
         {:keys [output hidden]} encoder
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole]} hidden]
@@ -210,14 +211,13 @@
                  (rest output-seq)
                  lstm-part-delta
                  (:state (:hidden (first output-seq)))
-                 (lstm/merge-param plus merger! hidden-acc lstm-param-delta)))
+                 (merge-param plus hidden-acc lstm-param-delta)))
         {:hidden-delta hidden-acc}))))
-
 
 (defn decoder-bptt
   [decoder decoder-activation encoder-input output-items-seq]
   (let [{:keys [output-type output hidden encoder-size input-size hidden-size matrix-kit]} decoder
-        {:keys [make-vector scal plus gemv transpose plus merger!]} matrix-kit
+        {:keys [make-vector scal plus gemv transpose plus]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 block-we input-gate-we forget-gate-we output-gate-we
                 input-gate-peephole forget-gate-peephole output-gate-peephole]} hidden]
@@ -295,8 +295,8 @@
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (cons output-delta output-loss)
-                 (lstm/merge-param plus merger! output-acc output-param-delta)
-                 (lstm/merge-param plus merger! hidden-acc lstm-param-delta)
+                 (merge-param plus output-acc output-param-delta)
+                 (merge-param plus hidden-acc lstm-param-delta)
                  (plus encoder-delta propagation-to-encoder)))
         :else
         {:param-loss {:output-delta output-acc
@@ -332,7 +332,7 @@
     ;update output connection
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta previous-input-w-delta]}]]
-                (let [{:keys [w bias encoder-w previous-input-w]} (get output item)]
+                (let [{:keys [w bias encoder-w previous-input-w previous-input-sparses]} (get output item)]
                   ; update output params
                   (rewrite-vector! learning-rate bias bias-delta)
                   (rewrite-vector! learning-rate w w-delta)
@@ -342,12 +342,10 @@
                   ; sparse
                   (->> (:sparses-delta previous-input-w-delta)
                        (map (fn [[item {:keys [w-delta]}]]
-                              (let [{:keys [w]} (get (:previous-input-sparses output) item)]
-                                (println "check here fixme");updating w
+                              (let [{:keys [w]} (get previous-input-sparses item)]
                                 (rewrite-vector! learning-rate w w-delta))))
                        dorun)
                   ; dense
-                  (println "check here 4")
                   (when (:w previous-input-w-delta) (rewrite-vector! learning-rate previous-input-w (:w previous-input-w-delta))))))
          dorun)
     ;;; update hidden layer
@@ -363,7 +361,6 @@
                   (rewrite-vector! learning-rate output-gate-w output-gate-w-delta))))
          dorun)
     ; dense
-    (println "check here2")
     (when block-w-delta       (rewrite-matrix! learning-rate block-w block-w-delta))
     (when input-gate-w-delta  (rewrite-matrix! learning-rate input-gate-w input-gate-w-delta))
     (when forget-gate-w-delta (rewrite-matrix! learning-rate forget-gate-w forget-gate-w-delta))
@@ -374,7 +371,6 @@
     (rewrite-matrix! learning-rate forget-gate-wr forget-gate-wr-delta)
     (rewrite-matrix! learning-rate output-gate-wr output-gate-wr-delta)
     ; update encoder connections
-    (println "check here3 whether existas encoder delta")
     (rewrite-matrix! learning-rate block-we block-we-delta)
     (rewrite-matrix! learning-rate input-gate-we input-gate-we-delta)
     (rewrite-matrix! learning-rate forget-gate-we forget-gate-we-delta)
@@ -415,7 +411,7 @@
                                              :previous-input-w (init-vector input-size)
                                              :previous-input-sparses (->> input-items
                                                                           (reduce (fn [acc item]
-                                                                                    (assoc acc item {:w (init-vector decoder-hidden-size)}))
+                                                                                    (assoc acc item {:w (init-vector 1)}))
                                                                                   {})))))
                          {}
                          output)
@@ -460,8 +456,8 @@
                               :previous-input-w (make-vector (seq previous-input-w))
                               :previous-input-sparses (->> previous-input-sparses
                                                            (reduce (fn [acc [item {:keys [w]}]]
-                                                                     {:w (assoc acc item (make-vector (seq w)))}))
-                                                           {})}))
+                                                                     (assoc acc item {:w (make-vector (seq w))}))
+                                                                   {}))}))
                          {}
                          output)
         {:keys [block-we input-gate-we forget-gate-we output-gate-we]} hidden
