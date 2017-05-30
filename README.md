@@ -27,7 +27,7 @@ If you want to work on trained model in your project, add following dependency t
 
 ### Feed Forward
 
-- sin approximation with 3 hidden units
+- approximation of sin function with 3 hidden units
 
 ```
 lein run -m  examples.feedforward.sin3
