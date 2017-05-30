@@ -25,15 +25,14 @@
 (defn lstm-activation
   [model x-input recurrent-input-list previous-cell-state]
   (let [{:keys [hidden hidden-size matrix-kit]} model
-        lstm-layer hidden
         {:keys [gemv plus times sigmoid tanh alter-vec]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole
-                sparses]} lstm-layer
+                sparses]} hidden
         [block' input-gate' forget-gate' output-gate'] (if (or (set? x-input) (map? x-input))
                                                          (partial-state-sparse model x-input sparses)
-                                                         (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} lstm-layer
+                                                         (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} hidden
                                                                lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
                                                            (mapv #(gemv % x-input) lstm-mat)))
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
@@ -381,7 +380,7 @@
                                :output-gate-wr owr   :output-gate-bias     ob
                                :input-gate-peephole  ip  :forget-gate-peephole fp :output-gate-peephole op)]
                 (assoc template
-                  :sparses (reduce (fn [acc [item {:keys[ block-w input-gate-w forget-gate-w output-gate-w]}]]
+                  :sparses (reduce (fn [acc [item {:keys [block-w input-gate-w forget-gate-w output-gate-w]}]]
                                      (assoc acc item
                                        {:block-w       (make-vector (seq block-w))
                                         :input-gate-w  (make-vector (seq input-gate-w))

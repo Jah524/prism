@@ -3,6 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
     [prism.unit :refer [error]]
+    [prism.util :as util]
     [prism.nn.lstm :as lstm]))
 
 
@@ -33,7 +34,11 @@
                 sparses]} hidden
         {:keys [block-w input-gate-w forget-gate-w output-gate-w]} hidden
         lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]
-        [block' input-gate' forget-gate' output-gate'] (mapv #(gemv % x-input) lstm-mat)
+        [block' input-gate' forget-gate' output-gate'] (if (or (set? x-input) (map? x-input))
+                                                         (lstm/partial-state-sparse decoder x-input sparses)
+                                                         (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} hidden
+                                                               lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
+                                                           (mapv #(gemv % x-input) lstm-mat)))
         ;; recurrent-connection
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
         [block-r' input-gate-r' forget-gate-r' output-gate-r'] (mapv #(gemv % recurrent-input-list) lstm-mat-r)
@@ -55,16 +60,24 @@
 (defn decoder-output-activation
   [decoder decoder-hidden-list encoder-input previous-input sparse-outputs]
   (let [{:keys [output-type output matrix-kit]} decoder
-        {:keys [sigmoid dot]} matrix-kit
+        {:keys [sigmoid dot scal]} matrix-kit
         activation-function (condp = output-type :binary-classification sigmoid :prediction identity)]
     (if (= output-type :multi-class-classification)
       :FIXME
       (reduce (fn [acc s]
-                (let [{:keys [w bias encoder-w previous-input-w]} (get output s)]
+                (let [{:keys [w bias encoder-w previous-input-w previous-input-sparses]} (get output s)]
                   (assoc acc s (activation-function (+ (dot w decoder-hidden-list)
                                                        (first bias)
                                                        (dot encoder-w encoder-input)
-                                                       (dot previous-input-w previous-input))))))
+                                                       (if (or (set? previous-input) (map? previous-input))
+                                                         (->> previous-input
+                                                              (mapv (fn [item]
+                                                                      (cond (set? previous-input)
+                                                                            (:w (get previous-input-sparses item))
+                                                                            (map? previous-input)
+                                                                            (let [[sparse-k v] item]
+                                                                              (scal v (:w (get previous-input-sparses sparse-k))))))))
+                                                         (dot previous-input-w previous-input)))))))
               {}
               (vec sparse-outputs)))))
 
@@ -118,7 +131,16 @@
                    (assoc acc item {:w-delta    (scal delta hidden-activation)
                                     :bias-delta (make-vector [delta])
                                     :encoder-w-delta (scal delta encoder-input)
-                                    :previous-input-w-delta (scal delta previous-input)}))
+                                    :previous-input-w-delta (if (or (set? previous-input) (map? previous-input))
+                                                              {:sparses-delta (->> previous-input
+                                                                                   (reduce (fn [acc sparse]
+                                                                                             (cond (set? previous-input)
+                                                                                                   (assoc acc sparse {:w-delta delta})
+                                                                                                   (map? previous-input)
+                                                                                                   (let [[sparse-k v] sparse]
+                                                                                                     (assoc acc sparse-k {:w-delta (scal v delta)}))))
+                                                                                           {}))}
+                                                              {:w (scal delta previous-input)})}))
                  {}))))
 
 (defn decoder-lstm-param-delta
@@ -126,30 +148,32 @@
   (let [{:keys [hidden matrix-kit]} decoder
         {:keys [outer times]} matrix-kit
         {:keys [sparses]} hidden
-        {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta]
-    {:block-w-delta        (outer block-delta x-input)
-     :input-gate-w-delta   (outer input-gate-delta x-input)
-     :forget-gate-w-delta  (outer forget-gate-delta x-input)
-     :output-gate-w-delta  (outer output-gate-delta x-input)
-     ;; reccurent connection
-     :block-wr-delta       (outer block-delta self-activation:t-1)
-     :input-gate-wr-delta  (outer input-gate-delta self-activation:t-1)
-     :forget-gate-wr-delta (outer forget-gate-delta self-activation:t-1)
-     :output-gate-wr-delta (outer output-gate-delta self-activation:t-1)
-     ;; encoder connection
-     :block-we-delta       (outer block-delta encoder-input)
-     :input-gate-we-delta  (outer input-gate-delta encoder-input)
-     :forget-gate-we-delta (outer forget-gate-delta encoder-input)
-     :output-gate-we-delta (outer output-gate-delta encoder-input)
-     ;; bias and peephole
-     :block-bias-delta       block-delta
-     :input-gate-bias-delta  input-gate-delta
-     :forget-gate-bias-delta forget-gate-delta
-     :output-gate-bias-delta output-gate-delta
-     :peephole-input-gate-delta  (times input-gate-delta  (:cell-state self-state:t-1))
-     :peephole-forget-gate-delta (times forget-gate-delta (:cell-state self-state:t-1))
-     :peephole-output-gate-delta (times output-gate-delta (:cell-state self-state:t-1))}))
-
+        {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
+        template {;; reccurent connection
+                   :block-wr-delta       (outer block-delta self-activation:t-1)
+                   :input-gate-wr-delta  (outer input-gate-delta self-activation:t-1)
+                   :forget-gate-wr-delta (outer forget-gate-delta self-activation:t-1)
+                   :output-gate-wr-delta (outer output-gate-delta self-activation:t-1)
+                   ;; encoder connection
+                   :block-we-delta       (outer block-delta encoder-input)
+                   :input-gate-we-delta  (outer input-gate-delta encoder-input)
+                   :forget-gate-we-delta (outer forget-gate-delta encoder-input)
+                   :output-gate-we-delta (outer output-gate-delta encoder-input)
+                   ;; bias and peephole
+                   :block-bias-delta       block-delta
+                   :input-gate-bias-delta  input-gate-delta
+                   :forget-gate-bias-delta forget-gate-delta
+                   :output-gate-bias-delta output-gate-delta
+                   :peephole-input-gate-delta  (times input-gate-delta  (:cell-state self-state:t-1))
+                   :peephole-forget-gate-delta (times forget-gate-delta (:cell-state self-state:t-1))
+                   :peephole-output-gate-delta (times output-gate-delta (:cell-state self-state:t-1))}]
+    (if (or (set? x-input) (map? x-input))
+      (assoc template :sparses-delta (lstm/param-delta-sparse decoder x-input block-delta input-gate-delta forget-gate-delta output-gate-delta))
+      (assoc template
+        :block-w-delta        (outer block-delta x-input)
+        :input-gate-w-delta   (outer input-gate-delta x-input)
+        :forget-gate-w-delta  (outer forget-gate-delta x-input)
+        :output-gate-w-delta  (outer output-gate-delta x-input)))))
 
 
 (defn encoder-bptt
@@ -307,33 +331,55 @@
                 sparse? sparses]} hidden]
     ;update output connection
     (->> output-delta
-         (map (fn [[item {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta]}]]
+         (map (fn [[item {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta previous-input-w-delta]}]]
                 (let [{:keys [w bias encoder-w previous-input-w]} (get output item)]
                   ; update output params
                   (rewrite-vector! learning-rate bias bias-delta)
                   (rewrite-vector! learning-rate w w-delta)
-                  ;; encoder connection
+                  ;; update encoder connection
                   (rewrite-vector! learning-rate encoder-w encoder-w-delta)
-                  ;; previous decoder input
-                  (rewrite-vector! learning-rate previous-input-w previous-input-w-delta))))
+                  ;; update decoder previous input
+                  ; sparse
+                  (->> (:sparses-delta previous-input-w-delta)
+                       (map (fn [[item {:keys [w-delta]}]]
+                              (let [{:keys [w]} (get (:previous-input-sparses output) item)]
+                                (println "check here fixme");updating w
+                                (rewrite-vector! learning-rate w w-delta))))
+                       dorun)
+                  ; dense
+                  (println "check here 4")
+                  (when (:w previous-input-w-delta) (rewrite-vector! learning-rate previous-input-w (:w previous-input-w-delta))))))
          dorun)
-    ; update hidden connections
-    ; update input connections
-    (rewrite-matrix! learning-rate block-w block-w-delta)
-    (rewrite-matrix! learning-rate input-gate-w input-gate-w-delta)
-    (rewrite-matrix! learning-rate forget-gate-w forget-gate-w-delta)
-    (rewrite-matrix! learning-rate output-gate-w output-gate-w-delta)
-    ; update recurrent connections
+    ;;; update hidden layer
+    ;; update input connections
+    ; sparse
+    (->> sparses-delta
+         (map (fn [[word lstm-w-delta]]
+                (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]} lstm-w-delta
+                      {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses word)]
+                  (rewrite-vector! learning-rate block-w block-w-delta)
+                  (rewrite-vector! learning-rate input-gate-w input-gate-w-delta)
+                  (rewrite-vector! learning-rate forget-gate-w forget-gate-w-delta)
+                  (rewrite-vector! learning-rate output-gate-w output-gate-w-delta))))
+         dorun)
+    ; dense
+    (println "check here2")
+    (when block-w-delta       (rewrite-matrix! learning-rate block-w block-w-delta))
+    (when input-gate-w-delta  (rewrite-matrix! learning-rate input-gate-w input-gate-w-delta))
+    (when forget-gate-w-delta (rewrite-matrix! learning-rate forget-gate-w forget-gate-w-delta))
+    (when output-gate-w-delta (rewrite-matrix! learning-rate output-gate-w output-gate-w-delta))
+    ;; update recurrent connections
     (rewrite-matrix! learning-rate block-wr block-wr-delta)
     (rewrite-matrix! learning-rate input-gate-wr input-gate-wr-delta)
     (rewrite-matrix! learning-rate forget-gate-wr forget-gate-wr-delta)
     (rewrite-matrix! learning-rate output-gate-wr output-gate-wr-delta)
     ; update encoder connections
+    (println "check here3 whether existas encoder delta")
     (rewrite-matrix! learning-rate block-we block-we-delta)
     (rewrite-matrix! learning-rate input-gate-we input-gate-we-delta)
     (rewrite-matrix! learning-rate forget-gate-we forget-gate-we-delta)
     (rewrite-matrix! learning-rate output-gate-we output-gate-we-delta)
-    ; update lstm bias and peephole
+    ;; update lstm bias and peephole
     (rewrite-vector! learning-rate block-bias block-bias-delta)
     (rewrite-vector! learning-rate input-gate-bias input-gate-bias-delta)
     (rewrite-vector! learning-rate forget-gate-bias forget-gate-bias-delta)
@@ -354,18 +400,23 @@
 
 
 (defn init-decoder
-  [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size matrix-kit]
+  [{:keys [input-size input-items output-type output-items encoder-hidden-size decoder-hidden-size matrix-kit]
     :or {matrix-kit default/default-matrix-kit}
     :as param}]
   (let [{:keys [init-vector init-matrix]} matrix-kit
         decoder (lstm/init-model (assoc param
+                                   :input-items input-items
                                    :encoder-size encoder-hidden-size
                                    :hidden-size decoder-hidden-size))
         {:keys [output hidden]} decoder
         d-output (reduce (fn [acc [word param]]
                            (assoc acc word (assoc param
                                              :encoder-w (init-vector encoder-hidden-size)
-                                             :previous-input-w (init-vector embedding-size))))
+                                             :previous-input-w (init-vector input-size)
+                                             :previous-input-sparses (->> input-items
+                                                                          (reduce (fn [acc item]
+                                                                                    (assoc acc item {:w (init-vector decoder-hidden-size)}))
+                                                                                  {})))))
                          {}
                          output)
         d-hidden (assoc hidden ;encoder connection
@@ -381,14 +432,48 @@
       :encoder-size encoder-hidden-size)))
 
 (defn init-encoder-decoder-model
-  [{:keys [input-size output-type output-items encoder-hidden-size decoder-hidden-size embedding embedding-size matrix-kit]
+  [{:keys [input-size input-items output-type output-items encoder-hidden-size decoder-hidden-size matrix-kit]
     :or {matrix-kit default/default-matrix-kit}
     :as param}]
   (let [encoder (lstm/init-model (-> param
                                      (dissoc :output-items)
                                      (assoc
+                                       :input-items input-items
                                        :hidden-size encoder-hidden-size
                                        :input-size input-size)))]
     {:encoder encoder
      :decoder (init-decoder param)}))
 
+
+(defn convert-model
+  [model new-matrix-kit]
+  (let [{:keys [encoder decoder]} model
+        {:keys [hidden output encoder-size hidden-size]} decoder
+        {:keys [make-vector make-matrix] :as matrix-kit} (or new-matrix-kit default/default-matrix-kit)
+        converted-encoder (lstm/convert-model encoder matrix-kit)
+        partially-converted-decoder (lstm/convert-model (assoc decoder :output []) matrix-kit)
+        d-output (reduce (fn [acc [word {:keys [w bias encoder-w previous-input-w previous-input-sparses]}]]
+                           (assoc acc word
+                             {:w (make-vector (seq w))
+                              :bias (make-vector (seq bias))
+                              :encoder-w (make-vector (seq encoder-w))
+                              :previous-input-w (make-vector (seq previous-input-w))
+                              :previous-input-sparses (->> previous-input-sparses
+                                                           (reduce (fn [acc [item {:keys [w]}]]
+                                                                     {:w (assoc acc item (make-vector (seq w)))}))
+                                                           {})}))
+                         {}
+                         output)
+        {:keys [block-we input-gate-we forget-gate-we output-gate-we]} hidden
+        d-hidden (assoc hidden
+                   :block-we       (make-matrix encoder-size hidden-size (apply concat (seq block-we)))
+                   :input-gate-we  (make-matrix encoder-size hidden-size (apply concat (seq input-gate-we)))
+                   :forget-gate-we (make-matrix encoder-size hidden-size (apply concat (seq forget-gate-we)))
+                   :output-gate-we (make-matrix encoder-size hidden-size (apply concat (seq forget-gate-we))))]
+    (assoc model
+      :encoder converted-encoder
+      :decoder (assoc decoder :hidden d-hidden :output d-output))))
+
+(defn load-model
+  [target-path matrix-kit]
+  (convert-model (util/load-model target-path) matrix-kit))
