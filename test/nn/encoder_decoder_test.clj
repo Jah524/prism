@@ -273,7 +273,7 @@
                                 (assoc acc item {:w-delta (mapv float w-delta)
                                                  :bias-delta (map float bias-delta)
                                                  :encoder-w-delta (map float encoder-w-delta)
-                                                 :previous-input-w-delta (map float previous-input-w-delta)}))
+                                                 :previous-input-w-delta (seq (:w previous-input-w-delta))}))
                               {}))
           {:strs [A B C]} result]
       (is (= A {:w-delta (map float [0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5])
@@ -388,7 +388,7 @@
       (is (= (mapv float bias-delta) [(float 0.673144)]))
       (is (= (mapv float encoder-w-delta)
              (take 5 (repeat (float -0.0673144)))))
-      (is (= (mapv float previous-input-w-delta)
+      (is (= (map float (:w previous-input-w-delta))
              (map float [1.346288 0.0 0.0])))
       ;; encoder-delta
       (is (= (mapv float ed)
