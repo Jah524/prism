@@ -1,9 +1,9 @@
 (ns examples.lstm.simple-prediction
   (:require
     [clojure.pprint :refer [pprint]]
+    [clojure.core.matrix :refer [array]]
     [clj-time.local  :as l]
-    [prism.nn.lstm :as lstm]
-    [matrix.default :refer [default-matrix-kit]]))
+    [prism.nn.lstm :as lstm]))
 
 (defn train-sgd [model training-list learning-rate]
   (loop [model model,
@@ -40,35 +40,32 @@
 ;;;; ;;;; ;;;; ;;;; ;;;; ;;;; ;;;;
 
 (defn dataset
-  [{:keys [make-vector] :as matrix-kit}]
+  []
   [
-    {:x (map make-vector [[1]])                 :y [{"prediction" 10}]}
-    {:x (map make-vector [[1] [1] [1]])         :y [{"prediction" 10} {"prediction" 20} {"prediction" 30}]}
-    {:x (map make-vector [[1] [2]])             :y [{"prediction" 10} {"prediction" 40}]}
-    {:x (map make-vector [[1] [1] [1] [1] [1]]) :y [:skip :skip {"prediction" 30} :skip {"prediction" 50}]}
+    {:x (map array [[1]])                 :y [{"prediction" 10}]}
+    {:x (map array [[1] [1] [1]])         :y [{"prediction" 10} {"prediction" 20} {"prediction" 30}]}
+    {:x (map array [[1] [2]])             :y [{"prediction" 10} {"prediction" 40}]}
+    {:x (map array [[1] [1] [1] [1] [1]]) :y [:skip :skip {"prediction" 30} :skip {"prediction" 50}]}
     ])
 
 
 (defn demo
   "captures demo model with 2 lstm units"
-  [matrix-kit]
-  (let [mk (or matrix-kit default-matrix-kit)
-        {:keys [make-vector]} mk
-        model (train-with-demo-dataset (lstm/init-model {:input-items  nil
+  []
+  (let [model (train-with-demo-dataset (lstm/init-model {:input-items  nil
                                                          :output-items #{"prediction"}
                                                          :input-size 1
                                                          :hidden-size 2
-                                                         :output-type :prediction
-                                                         :matrix-kit mk})
-                                       (dataset mk)
+                                                         :output-type :prediction})
+                                       (dataset)
                                        {:loss-interval 200
                                         :epoc 2000
                                         :learning-rate 0.01})
-        demo-input1 (map make-vector [[1]])
-        demo-input2 (map make-vector [[1] [1] [1]])
-        demo-input3 (map make-vector [[1] [1] [1] [1] [1]])]
+        demo-input1 (map array [[1]])
+        demo-input2 (map array [[1] [1] [1]])
+        demo-input3 (map array [[1] [1] [1] [1] [1]])]
     (println "*** dataset ***")
-    (pprint (dataset mk))
+    (pprint (dataset))
     (println "\n*** demo1 ***")
     (pprint demo-input1)
     (pprint (last (:activation (last (lstm/sequential-output model demo-input1 [#{"prediction"}])))))
@@ -82,4 +79,4 @@
 
 
 (defn -main []
-  (demo nil))
+  (demo))

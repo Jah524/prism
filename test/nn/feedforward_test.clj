@@ -2,13 +2,11 @@
   (:require [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]
             [clojure.core.matrix :refer [mget array matrix ecount]]
-            [matrix.default :refer [default-matrix-kit]]
             [prism.nn.feedforward :refer :all]))
 
 
 (def sample-model ;1->3->1
-  {:matrix-kit default-matrix-kit
-   :input-size 1
+  {:input-size 1
    :hidden-size 3
    :input-type  :dense
    :output-type :prediction
@@ -20,8 +18,7 @@
 
 
 (def sample-model2 ;3->2->3
-  {:matrix-kit default-matrix-kit
-   :input-type  :dense
+  {:input-type  :dense
    :output-type :prediction
    :input-size 3
    :hidden-size 2
@@ -37,8 +34,7 @@
 
 
 (def sample-model2:sparse ;3->2->3
-  {:matrix-kit default-matrix-kit
-   :input-type  :sparse
+  {:input-type  :sparse
    :output-type :prediction
    :input-size 3
    :hidden-size 2
@@ -55,8 +51,7 @@
 (deftest feedforward-test
   (testing "hidden-state-by-sparse"
     (are [arg expect] (= (vec (hidden-state-by-sparse
-                                {:matrix-kit default-matrix-kit
-                                 :hidden {:sparses {"natural"    (array [0 1])
+                                {:hidden {:sparses {"natural"    (array [0 1])
                                                     "language"   (array [2 3])
                                                     "processing" (array [4 5])}}}
                                 arg
@@ -74,7 +69,7 @@
           {:keys [activation state]} result
           {:keys [input hidden output]} activation]
       (is (= (vec input) [(float 2)]))
-      (is (= (vec hidden) (map float (take 3 (repeat 0.95257413)))))
+      (is (= (vec hidden) (map double (take 3 (repeat 0.9525741268224334)))))
       (is (= (vec (:hidden state)) [3.0 3.0 3.0]))
       (is (= (reduce (fn[acc [k v]](assoc acc k (float v))) {} output) {"prediction" (float 1.2857722491025925)}))))
 
@@ -83,7 +78,7 @@
           {:keys [activation state]} result
           {:keys [input hidden output]} activation]
       (is (= input {"language" 1}))
-      (is (= (vec hidden) (map float [0.7502601 0.76852477])))
+      (is (= (vec hidden) (map double [0.7502601055951177 0.7685247834990175])))
       (is (= (mapv float (:hidden state)) (map float [1.1 1.2])))
       (is (= (reduce (fn [acc [k v]](assoc acc k (float v))) {} output)
              {"prediction1" (float 2.518785) "prediction3" (float 2.518785)})))
@@ -94,7 +89,7 @@
 
 
   (testing "param-delta"
-    (let [r (param-delta {:matrix-kit default-matrix-kit} (float-array (range 4)) (float-array (range 4)))]
+    (let [r (param-delta (float-array (range 4)) (float-array (range 4)))]
       (is (= (map vec (:w-delta r)) [[0.0 0.0 0.0 0.0], [0.0 1.0 2.0 3.0], [0.0 2.0 4.0 6.0], [0.0 3.0 6.0 9.0]]))
       (is (= (vec (:bias-delta r)) [0.0 1.0 2.0 3.0]))))
 
@@ -105,15 +100,15 @@
           {:keys [output-delta hidden-delta]} param-loss
           {hidden-w-delta :w-delta hidden-bias-delta :bias-delta} hidden-delta
           {output-w-delta :w-delta output-bias-delta :bias-delta} (get output-delta "prediction")]
-      (is (= loss {"prediction" (double 0.7142277598381042)}))
+      (is (= loss {"prediction" (double 0.71422776195327)}))
       (is (= (map #(map float %) hidden-w-delta)
-             (take 3 (repeat [(float 0.006453284)]))))
+             (take 3 (repeat [(float 0.006453285)]))))
       (is (= (vec hidden-bias-delta)
-             (take 3 (repeat (double 0.0032266421136263185)))))
+             (take 3 (repeat (double 0.0032266423892525057)))))
       (is (= (vec output-w-delta)
-             (take 3 (repeat (double 0.680354889715825)))))
+             (take 3 (repeat (double 0.6803548866949769)))))
       (is (= (vec output-bias-delta)
-             [(double 0.7142277598381042)]))))
+             [(double 0.71422776195327)]))))
 
   (testing "back-propagation with sparse vector"
     (let [{:keys [param-loss loss]} (back-propagation sample-model2:sparse
@@ -123,19 +118,19 @@
           {w-delta1 :w-delta bias-delta1 :bias-delta} (get output-delta "prediction1")
           {w-delta2 :w-delta bias-delta2 :bias-delta} (get output-delta "prediction2")
           {w-delta3 :w-delta bias-delta3 :bias-delta} (get output-delta "prediction3")]
-      (is (= loss {"prediction1" (float -0.5187849), "prediction2" (float -1.5187849), "prediction3" (float -0.5187849)}))
+      (is (= loss {"prediction1" (double -0.5187848890941353), "prediction2" (double -1.5187848890941353), "prediction3" (double -0.5187848890941353)}))
       (is (= (vec (get (:sparses-delta hidden-delta) "language"))
-             (map double [-0.4789838322238946 -0.45476128583309716])))
+             (map double [-0.4789838750697536 -0.4547612903459302])))
       (is (= (vec (:bias-delta hidden-delta))
-             (map double [-0.4789838322238946 -0.45476128583309716])))
-      (is (= (vec w-delta1)
-             (vec w-delta3)
-             (map double [-0.38922360403651624 -0.3986990289803174])))
-      (is (= (vec w-delta2) (map double [-1.139483718706316 -1.1672237949486401])))
-      (is (= (vec bias-delta1)
-             (vec bias-delta3)
-             (map float [-0.5187848806381226])))
-      (is (= (vec bias-delta2) (map float [-1.5187849])))
+             (map double [-0.4789838750697536 -0.4547612903459302])))
+      (is (= (map float w-delta1)
+             (map float w-delta3)
+             (map float [-0.3892236 -0.39869905])))
+      (is (= (vec w-delta2) (map double [-1.1394837112680352 -1.1672238280726497])))
+      (is (= (map float bias-delta1)
+             (map float bias-delta3)
+             (map float [-0.5187848890941353])))
+      (is (= (vec bias-delta2) (map double [-1.5187848890941353])))
       (let [a (:param-loss (back-propagation sample-model2:sparse
                                              (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction2" "prediction3"})
                                              {"prediction1" 2 "prediction2" 1 "prediction3" 2}))

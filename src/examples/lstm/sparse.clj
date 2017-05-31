@@ -1,8 +1,8 @@
 (ns examples.lstm.sparse
   (:require
     [clojure.pprint :refer [pprint]]
+    [clojure.core.matrix :refer [array]]
     [clj-time.local  :as l]
-    [matrix.default :refer [default-matrix-kit]]
     [prism.nn.lstm :as lstm]))
 
 
@@ -52,15 +52,12 @@
 
 (defn sparse-demo
   "success with 10 lstm units"
-  [matrix-kit]
-  (let [mk (or matrix-kit default-matrix-kit)
-        {:keys [make-vector]} mk
-        model (train-with-demo-dataset (lstm/init-model {:input-items #{"A" "B" "C" "D"}
+  []
+  (let [model (train-with-demo-dataset (lstm/init-model {:input-items #{"A" "B" "C" "D"}
                                                          :output-items #{"prediction"}
                                                          :inupt-size nil
                                                          :hidden-size 10
-                                                         :output-type :prediction
-                                                         :matrix-kit mk})
+                                                         :output-type :prediction})
                                        dataset-sparse
                                        {:loss-interval 100
                                         :epoc 2000
@@ -91,4 +88,4 @@
     ))
 
 (defn -main []
-  (sparse-demo nil))
+  (sparse-demo))

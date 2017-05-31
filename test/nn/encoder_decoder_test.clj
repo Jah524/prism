@@ -5,14 +5,12 @@
     [clojure.core.matrix :refer [set-current-implementation mget array matrix ecount row-count]]
     [prism.nn.lstm  :refer [lstm-activation sequential-output]]
     [nn.lstm-test   :refer [sample-w-network]]
-    [prism.nn.encoder-decoder :refer :all]
-    [matrix.default :refer [default-matrix-kit]]))
+    [prism.nn.encoder-decoder :refer :all]))
 
 
 (def encoder-sample-network
   "assumed 3->5->3 connection"
-  {:matrix-kit default-matrix-kit
-   :input-type :dense
+  {:input-type :dense
    :output-type :binary-classification
    :input-size 3
    :hidden-size 5
@@ -198,7 +196,7 @@
                                       (float-array (take 5 (repeat (float 0.1))))
                                       (float-array (map float [0.2 0.2 0.1]))
                                       #{"prediction1"})
-           {"prediction1" (float 0.33737817)})))
+           {"prediction1" (double 0.33737816391256276)})))
 
   (testing "decoder-activation-time-fixed"
     (let [{:keys [activation state]} (decoder-activation-time-fixed decoder-sample-network
@@ -239,7 +237,7 @@
                                   [:skip #{"prediction1" "prediction2" "prediction3"}])
           {:keys [activation state]} (last result)
           {:keys [hidden output]} activation]
-      (is (= (mapv float hidden) (take 10 (repeat (float -0.07243964)))))
+      (is (= (mapv float hidden) (take 10 (repeat (float -0.07243965)))))
       (is (= (->> output vec (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
              {"prediction2" (float 0.326856) "prediction1" (float 0.326856) "prediction3" (float 0.326856)}))))
   (testing "encoder-decoder-forward"
@@ -249,8 +247,8 @@
                                                              [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
           {:keys [hidden output]} (:activation (last decoder))]
       (is (= (mapv float (:activation (:hidden (last encoder))))
-             (take 5 (repeat (float -0.06823918)))))
-      (is (= (mapv float hidden) (take 10 (repeat (float -0.07979079)))))
+             (take 5 (repeat (float -0.068239175)))))
+      (is (= (mapv float hidden) (take 10 (repeat (float -0.079790786)))))
       (is (= (->> output vec (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
              {"prediction2" (float 0.19276398) "prediction3" (float 0.19276398)}))))
 
@@ -261,8 +259,7 @@
 
 
   (testing "decoder-output-param-delta"
-    (let [result (->> (decoder-output-param-delta {:matrix-kit default-matrix-kit}
-                                                  {"A" 0.5 "B" 0 "C" -0.5}
+    (let [result (->> (decoder-output-param-delta {"A" 0.5 "B" 0 "C" -0.5}
                                                   10
                                                   (array (range 10))
                                                   5
@@ -355,7 +352,7 @@
                                                   [:skip {:pos ["prediction2"] :neg ["prediction3"]}])
           {hd :hidden-delta od :output-delta ed :encoder-delta} param-loss
           {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta]} (get od "prediction2")]
-      (is (= loss [{} {"prediction2" (double 0.6731440126895905), "prediction3" (double -0.32685598731040955)}]))
+      (is (= loss [{} {"prediction2" (double 0.6731440177052013), "prediction3" (double -0.3268559822947987)}]))
       (is (= (row-count (:block-w-delta hd)) 10))
       (is (= (row-count (:block-w-delta   hd))) 10)
       (is (= (row-count (:block-wr-delta  hd))) 10)
@@ -384,15 +381,15 @@
       (is (= (ecount (:peephole-output-gate-delta hd)) 10))
       ;; output
       (is (= (mapv float w-delta)
-             (take 10 (repeat (float -0.04876231)))))
-      (is (= (mapv float bias-delta) [(float 0.673144)]))
+             (take 10 (repeat (float -0.048762314)))))
+      (is (= (mapv float bias-delta) [(float 0.67314404)]))
       (is (= (mapv float encoder-w-delta)
              (take 5 (repeat (float -0.0673144)))))
       (is (= (map float (:w previous-input-w-delta))
-             (map float [1.346288 0.0 0.0])))
+             (map float [1.3462881 0.0 0.0])))
       ;; encoder-delta
       (is (= (mapv float ed)
-             (take 5 (repeat (float -4.5863548E-4)))))))
+             (take 5 (repeat (float -4.586355E-4)))))))
 
   (testing "encoder-decoder-bptt"
     (let [{:keys [loss param-loss]} (encoder-decoder-bptt sample-encoder-decoder

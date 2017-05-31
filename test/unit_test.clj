@@ -1,14 +1,22 @@
 (ns unit-test
   (:require
     [clojure.test :refer :all]
-    [clojure.core.matrix :refer [array]]
-    [matrix.default :refer [default-matrix-kit]]
+    [clojure.core.matrix :refer [array ecount row-count]]
     [prism.unit :refer :all]))
 
 (deftest unit-test
+  (testing "clip!"
+    (is (= (map float (clip! 25 (array [1 -3 -30 30 24 -24.9])))
+           (map float [1 -3 -25 25 24 -24.9]))))
+  (testing "rewrite!"
+    (is (= (map float (rewrite! 0.05 (array (range 10)) (array (repeat 10 1))))
+           (map float [0.05 1.05 2.05 3.05 4.05 5.05 6.05 7.05 8.05 9.05]))))
+  (testing "init-orthogonal-matrix"
+    (let [result (init-orthogonal-matrix 5)]
+      (is (= (ecount result) 25))
+      (is (= (row-count result) 5))))
   (testing "multi-class-prob"
-    (is (= (multi-class-prob default-matrix-kit
-                             (array (range 4))
+    (is (= (multi-class-prob (array (range 4))
                              {"A" {:w (array (repeat 4 0.1)) :bias (array [-1])}
                               "B" {:w (array (repeat 4 0.1)) :bias (array [-1])}
                               "C" {:w (array (repeat 4 0.2)) :bias (array [1])}})

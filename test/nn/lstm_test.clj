@@ -3,13 +3,11 @@
     [clojure.pprint :refer [pprint]]
     [clojure.test :refer :all]
     [clojure.core.matrix :refer [set-current-implementation mget array matrix ecount row-count]]
-    [matrix.default :refer [default-matrix-kit]]
     [prism.nn.feedforward :as ff]
     [prism.nn.lstm :refer :all]))
 
 (def sample-w-network
-  {:matrix-kit default-matrix-kit
-   :input-size 3
+  {:input-size 3
    :hidden-size 10
    :output-type :binary-classification
    :hidden {:unit-type :lstm
@@ -38,8 +36,7 @@
                            :bias (array [-1])}}})
 
 (def sample-w-network-sparse
-  {:matrix-kit default-matrix-kit
-   :output-type :binary-classification
+  {:output-type :binary-classification
    :hidden-size 10
    :hidden {:sparses {"natural" {:block-w (array (take 10 (repeat 0.1)))
                                  :input-gate-w  (array (take 10 (repeat 0.1)))
@@ -73,8 +70,7 @@
                            :bias (array [-1])}}})
 
 (def sample-w-network-prediction
-  {:matrix-kit default-matrix-kit
-   :output-type :prediction
+  {:output-type :prediction
    :hidden-size 10
    :hidden {:sparses {"natural" {:block-w (array (take 10 (repeat 0.1)))
                                  :input-gate-w  (array (take 10 (repeat 0.1)))
@@ -106,15 +102,15 @@
 (deftest lstm-test
   (testing "partial-state-sparse with set"
     (let [{:keys [hidden]} sample-w-network-sparse]
-      (is (= (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden)) (map vec))
+      (is (= (->> (partial-state-sparse #{"language"} (:sparses hidden)) (map vec))
              (take 4 (repeat (take 10 (repeat (double 0.1)))))))))
   (testing "partial-state-sparse with map"
     (let [{:keys [hidden]} sample-w-network-sparse]
-      (is (= (->> (partial-state-sparse sample-w-network-sparse {"language" 1} (:sparses hidden)) (map vec))
-             (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden)) (map vec))
+      (is (= (->> (partial-state-sparse {"language" 1} (:sparses hidden)) (map vec))
+             (->> (partial-state-sparse #{"language"} (:sparses hidden)) (map vec))
              (take 4 (repeat (take 10 (repeat (double 0.1)))))))
-      (is (not= (->> (partial-state-sparse sample-w-network-sparse {"language" 2} (:sparses hidden)) (map vec))
-                (->> (partial-state-sparse sample-w-network-sparse #{"language"} (:sparses hidden)) (map vec))))))
+      (is (not= (->> (partial-state-sparse {"language" 2} (:sparses hidden)) (map vec))
+                (->> (partial-state-sparse #{"language"} (:sparses hidden)) (map vec))))))
   (testing "lstm-activation"
     (let [result (lstm-activation sample-w-network
                                   (float-array (take 3 (repeat 2)))
@@ -145,10 +141,10 @@
           s2 (:state result2)]
       (is (= (vec a)
              (vec a2)
-             (take 10 (repeat (double 0.7082130163908005)))))
+             (take 10 (repeat (double 0.7082130046205605)))))
       (is (= (vec (:lstm s))
              (vec a2)
-             (take 10 (repeat (double 0.7082130163908005)))))
+             (take 10 (repeat (double 0.7082130046205605)))))
       (is (= (vec (:block s))
              (vec (:block s2))
              (take 10 (repeat (double 1.1999999999999997)))))
@@ -179,7 +175,7 @@
       (is (= (mapv float (:input-gate  ss)) (take 10 (repeat (float -1.9)))))
       (is (= (mapv float (:forget-gate ss)) (take 10 (repeat (float -1.9)))))
       (is (= (mapv float (:output-gate  ss)) (take 10 (repeat (float -1.9)))))
-      (is (= (mapv float (:cell-state ss)) (take 10 (repeat (float -0.12441459)))))
+      (is (= (mapv float (:cell-state ss)) (take 10 (repeat (float -0.1244146)))))
       (is (= (mapv float (:hidden (:activation result)))
              (take 10 (repeat (float -0.016104385)))))
       (is (= (->> result :activation :hidden (map float))
@@ -232,9 +228,9 @@
           it2 (vec (:output (:activation (last result2))))]
       (is (not= it1 it2))
       (is (= (->> it1 (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
-             {"prediction2" (float 0.25474387) "prediction1" (float 0.25474387) "prediction3" (float 0.25474387)}))
+             {"prediction2" (float 0.25474384) "prediction1" (float 0.25474384) "prediction3" (float 0.25474384)}))
       (is (= (->> it2 (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
-             {"prediction2" (float 0.254815) "prediction1" (float 0.254815) "prediction3" (float 0.254815)}))))
+             {"prediction2" (float 0.25481504) "prediction1" (float 0.25481504) "prediction3" (float 0.25481504)}))))
 
   (testing "sequential-output in sparse model"
     (let [result1 (sequential-output sample-w-network-sparse
@@ -252,7 +248,7 @@
 
   ;; Back Propagation Through Time ;;
   (testing "output-param-delta"
-    (let [result (->> (ff/output-param-delta {:matrix-kit default-matrix-kit} {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
+    (let [result (->> (ff/output-param-delta {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
                       (reduce (fn [acc [item {:keys [w-delta bias-delta]}]]
                                 (assoc acc item {:w-delta (mapv float w-delta) :bias-delta (map float bias-delta)}))
                               {}))
@@ -262,8 +258,7 @@
       (is (= C {:w-delta (map float [-0.0 -0.5 -1.0 -1.5 -2.0 -2.5 -3.0 -3.5 -4.0 -4.5]) :bias-delta [(float -0.5)]}))))
 
   (testing "lstm-part-delta with peephole, assumed 1 lstm unit"
-    (let [result (lstm-part-delta {:matrix-kit default-matrix-kit}
-                                  1
+    (let [result (lstm-part-delta 1
                                   (float-array [10])
                                   {:input-gate-delta (float-array [2]) :forget-gate-delta (float-array [2]) :cell-state-delta (float-array [2])}
                                   {:output-gate (float-array [1]) :forget-gate (float-array [1]) :input-gate (float-array [1]) :block (float-array [1.2]) :cell-state (float-array[2])}
@@ -272,16 +267,15 @@
                                   (float-array [2])
                                   (float-array [3])
                                   (float-array[4]))]
-      (is (= (mapv float (:output-gate-delta result)) [(float 1.8953933)]))
+      (is (= (mapv float (:output-gate-delta result)) [(float 1.8953931)]))
       (is (= (mapv float (:cell-state-delta result)) [(float 19.56018912189448)]))
       (is (= (mapv float (:block-delta result)) [(float 4.361677)]))
       (is (= (mapv float (:forget-gate-delta result)) [(float 3.8457663)]))
-      (is (= (mapv float (:input-gate-delta result)) [(float 3.206041)]))))
+      (is (= (mapv float (:input-gate-delta result)) [(float 3.2060409)]))))
 
   (testing "param-delta-sparse with set"
     (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]}
-          (-> (param-delta-sparse {:matrix-kit default-matrix-kit}
-                                  #{"processing"}
+          (-> (param-delta-sparse #{"processing"}
                                   (float-array (take 10 (repeat 1)))
                                   (float-array (take 10 (repeat 1)))
                                   (float-array (take 10 (repeat 1)))
@@ -315,9 +309,9 @@
       (is (= (vec (:input-gate-bias-delta result)) (take 10 (repeat (float 1)))))
       (is (= (vec (:forget-gate-bias-delta result)) (take 10 (repeat (float 1)))))
       (is (= (vec (:output-gate-bias-delta result)) (take 10 (repeat (float 1)))))
-      (is (= (mapv float (:peephole-input-gate-delta  result)) (take 10 (repeat (float -0.20586833)))))
-      (is (= (mapv float (:peephole-forget-gate-delta result)) (take 10 (repeat (float -0.20586833)))))
-      (is (= (mapv float (:peephole-output-gate-delta result)) (take 10 (repeat (float -0.20586833)))))))
+      (is (= (mapv float (:peephole-input-gate-delta  result)) (take 10 (repeat (float -0.20586835)))))
+      (is (= (mapv float (:peephole-forget-gate-delta result)) (take 10 (repeat (float -0.20586835)))))
+      (is (= (mapv float (:peephole-output-gate-delta result)) (take 10 (repeat (float -0.20586835)))))))
 
   (testing "lstm-param-delta in sparse model"
     (let [it (sequential-output sample-w-network-sparse [{"language" 1} {"processing" 1}] [:skip #{"prediction1" "prediction2" "prediction3"}])
@@ -350,7 +344,7 @@
 
 
   (testing "lstm-delta-zeros"
-    (let [result (lstm-delta-zeros (:make-vector default-matrix-kit) (:hidden-size sample-w-network))]
+    (let [result (lstm-delta-zeros (:hidden-size sample-w-network))]
       (is (= (ecount (:block-delta result))  10))
       (is (= (ecount (:input-gate-delta result)) 10))
       (is (= (ecount (:forget-gate-delta result)) 10))
@@ -364,8 +358,8 @@
                                           [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
           {hd :hidden-delta od :output-delta} param-loss]
       (is (= (count loss) 2))
-      (is (= loss [{"prediction1" (double 0.7425005733966827) "prediction3" (double -0.25749942660331726)}
-                   {"prediction2" (double 0.746550977230072)  "prediction3" (double -0.253449022769928)}]))
+      (is (= loss [{"prediction1" (double 0.7425005567875662) "prediction3" (double -0.25749944321243373)}
+                   {"prediction2" (double 0.746550968296988)  "prediction3" (double -0.25344903170301203)}]))
       (is (= (row-count (:block-w-delta                 hd)) 10))
       (is (= (row-count (first (:block-w-delta               hd))) 3))
       (is (= (row-count (:block-wr-delta  hd)) 10))
@@ -404,7 +398,7 @@
           {hd :hidden-delta od :output-delta} param-loss
           it (:sparses-delta hd)]
       (is (= (count loss) 2))
-      (is (= loss [{} {"prediction1" (float 0.7452561) "prediction3" (float -0.25474387)}]))
+      (is (= loss [{} {"prediction1" (double 0.7452561474072019) "prediction3" (double -0.25474385259279814)}]))
       (is (= (nil? (:block-w-delta (get it "natural")))))
       (is (= (row-count (:block-w-delta (get it "language"))) 10))
       (is (= (row-count (:block-w-delta (get it "processing"))) 10))))
@@ -418,7 +412,7 @@
           {hd :hidden-delta o :output-delta} param-loss
           it (:sparses-delta hd)]
       (is (= (count loss) 2))
-      (is (= loss [{} {"prediction" (double 21.07346943800688)}]))
+      (is (= loss [{} {"prediction" (double 21.07346944063493)}]))
       (is (= (row-count (:block-w-delta (get it "natural"))) 10))
       (is (= (nil? (:block-w-delta (get it "language")))))
       (is (= (row-count (:block-w-delta (get it "processing"))) 10))))

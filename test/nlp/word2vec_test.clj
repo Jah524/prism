@@ -5,8 +5,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [clone array]]
     [prism.util :refer [make-wc similarity]]
-    [prism.nlp.word2vec :refer :all]
-    [matrix.default :refer [default-matrix-kit]]))
+    [prism.nlp.word2vec :refer :all]))
 
 (deftest word2ec-test
   (testing "subsampling"
@@ -22,13 +21,13 @@
       (is (= 1 (count (ffirst coll))))
       (is (not (zero? (count (second (first coll))))))))
   (testing "init-w2v-model"
-    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10 default-matrix-kit)]
+    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-w2v-model {"A" 12 "B" 345 "C" 42} 10)]
       (is (= hidden-size 10))
       (is (= output-type :binary-classification))
       (is (= (count (keys wc)) 3))))
   (let [target-tok "test/nlp/example.tok"
         wc (make-wc target-tok {:interval-ms 300 :workers 1 :min-count 1})
-        w2v (init-w2v-model wc 10 default-matrix-kit)
+        w2v (init-w2v-model wc 10)
         A (clone (get-in w2v [:hidden :w "A"]))
         D (clone (get-in w2v [:hidden :w "D"]))
         d (clone (get-in w2v [:hidden :w "d"]))
@@ -43,10 +42,9 @@
         (is (= (:x (first result)) "D")))))
 
   (testing "most-sim"
-    (let [em {:em {"A" (array (range 10))
-                   "B" (array (repeat 10 0.3))
-                   "C" (array (range 10 20))
-                   "X" (array (range 10))}
-              :matrix-kit default-matrix-kit}]
+    (let [em {"A" (array (range 10))
+              "B" (array (repeat 10 0.3))
+              "C" (array (range 10 20))
+              "X" (array (range 10))}]
       (is (= (most-sim em "X" ["A" "B" "C" ] 3 false)
              [{:x "A", :sim (float 1)} {:x "C", :sim (float 0.9314063)} {:x "B", :sim (float 0.8429272081702948)}])))))

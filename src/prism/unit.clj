@@ -1,56 +1,98 @@
 (ns prism.unit
-  (:require [clojure.pprint :refer [pprint]]
-            [clojure.core.matrix.operators :as o]
-            [clojure.core.matrix.stats :as s]))
+  (:require
+    [clojure.pprint :refer [pprint]]
+    [clojure.core.matrix :refer [set-current-implementation array matrix esum dot shape add! emul emul! mmul
+                                 matrix? vec? emap emap! outer-product transpose ecount
+                                 matrix array esum dot exp emap sqrt pow]]
+    [clojure.core.matrix.random :refer [sample-normal]]
+    [clojure.core.matrix.linear :refer [svd]]
+    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix.stats :as s]))
+
+(set-current-implementation :vectorz)
+
+
+(defn sigmoid [x] (/ 1 (+ 1 (Math/exp (- x)))))
+(defn sigmoid-derivative [x] (let [s (sigmoid x)] (float (* s (- 1 s)))))
+
+(defn tanh [x] (Math/tanh  x))
+(defn tanh-derivative [x] (let [it (Math/tanh x)] (float (- 1 (* it it)))))
+
+(defn linear-derivative-vector [v] (array :vectorz (take (ecount v) (repeat 1))))
+
+(defn clip!
+  "v: vector, t: threshould(positive value)"
+  [t v]
+  (let [tmin (- t)]
+    (emap! #(cond (> % t) t (< % tmin) tmin :else %) v)))
+
+(defn rewrite!
+  [alpha v! v2]
+  (add! v! (emap! #(* alpha %) v2)))
+
+
+(defn random-array [^Integer n]
+  (emap #(* 0.08 %) (sample-normal n)))
+
+
+(defn init-vector
+  [n]
+  (array :vectorz (random-array n)))
+
+(defn init-matrix
+  [input-num hidden-num]
+  (->> (random-array (* input-num hidden-num)) (partition input-num) matrix))
+
+(defn init-orthogonal-matrix
+  [n]
+  (let [{:keys [U]} (svd (->> (random-array (* n n)) (partition n) matrix))]
+    U))
+
 
 (defn- softmax-states
-  [matrix-kit input-list all-output-connection]
-  (let [{:keys [dot make-vector]} matrix-kit]
-    (loop [coll (vec all-output-connection)
-           item-acc [],
-           state-acc []]
-      (if-let [f (first coll)]
-        (let [[item v] f
-              {:keys [w bias]} v
-              state (+ (dot w input-list) (first bias))
-              state (cond (> state 25) 25 (< state -25) -25 :else state)]
-          (recur (rest coll)
-                 (conj item-acc item)
-                 (conj state-acc state)))
-        {:items item-acc :states (make-vector state-acc)}))))
+  [input-list all-output-connection]
+  (loop [coll (vec all-output-connection)
+         item-acc [],
+         state-acc []]
+    (if-let [f (first coll)]
+      (let [[item v] f
+            {:keys [w bias]} v
+            state (+ (dot w input-list) (first bias))
+            state (cond (> state 25) 25 (< state -25) -25 :else state)]
+        (recur (rest coll)
+               (conj item-acc item)
+               (conj state-acc state)))
+      {:items item-acc :states (array :vectorz state-acc)})))
 
 (defn multi-class-prob
-  [matrix-kit input-list all-output-connection]
-  (let [{:keys [sum scal alter-vec exp]} matrix-kit
-        {:keys [items states]} (softmax-states matrix-kit input-list all-output-connection)
-        activations (alter-vec states exp)
-        s (sum activations)
-        a (scal (/ 1 s) activations)]
+  [input-list all-output-connection]
+  (let [{:keys [items states]} (softmax-states input-list all-output-connection)
+        activations (exp states)
+        s (esum activations)
+        a (o/* (/ 1 s) activations)]
     (->> (mapv vector items a)
          (reduce (fn [acc [item a]]
                    (assoc acc item a))
                  {}))))
 
 (defn activation
-  [state activate-fn-key matrix-kit]
-  (let [{:keys [alter-vec sigmoid tanh]} matrix-kit]
-    (cond
-      (= activate-fn-key :linear)
-      state
-      :else
-      (let [f (condp = activate-fn-key :sigmoid sigmoid :tanh tanh)]
-        (alter-vec state f)))))
+  [state activate-fn-key]
+  (cond
+    (= activate-fn-key :linear)
+    state
+    :else
+    (let [f (condp = activate-fn-key :sigmoid sigmoid :tanh tanh)]
+      (emap f state))))
 
-(defn derivative [state activate-fn-key matrix-kit]
-  (let [{:keys [alter-vec sigmoid-derivative tanh-derivative linear-derivative-vector]} matrix-kit]
-    (cond
-      (= activate-fn-key :linear)
-      (linear-derivative-vector state)
-      :else
-      (let [f (condp = activate-fn-key
-                :sigmoid sigmoid-derivative
-                :tanh    tanh-derivative)]
-        (alter-vec state f)))))
+(defn derivative [state activate-fn-key]
+  (cond
+    (= activate-fn-key :linear)
+    (linear-derivative-vector state)
+    :else
+    (let [f (condp = activate-fn-key
+              :sigmoid sigmoid-derivative
+              :tanh    tanh-derivative)]
+      (emap f state))))
 
 (defn multi-classification-error
   [activation expectation]
@@ -92,7 +134,7 @@
 
 
 (defn merge-param
-  [plus & maps]
+  [& maps]
   (if (nil? (first maps))
     (second maps); when acc is nil
     (apply
@@ -100,25 +142,24 @@
         (if (every? map? maps)
           (apply merge-with m maps)
           (do
-            (apply plus maps))))
+            (apply o/+ maps))))
       maps)))
 
 
 (defn batch-normalization
-  [matrix-kit hidden-size alpha-batch scale shift]
-  (let [{:keys [plus minus times alter-vec mean make-vector make-matrix]} matrix-kit
-        batch-size (count alpha-batch)
-        alpha-batch-matrix (make-matrix hidden-size batch-size (apply concat (seq alpha-batch)))
-        mean-by-dim (mean alpha-batch-matrix)
-        epsilon 0.001
-        sig+ep    (plus (s/variance alpha-batch-matrix) (make-vector (repeat hidden-size epsilon)))
-        sd-by-dim (alter-vec sig+ep (fn ^double [^double x] (Math/sqrt x)))
-        sd-div    (alter-vec sd-by-dim (fn ^double [^double x] (/ 1 x)))]
+  [hidden-size alpha-batch scale shift]
+  (let [batch-size (count alpha-batch)
+        alpha-batch-matrix (->> (apply concat (seq alpha-batch)) (partition hidden-size) matrix)
+        mean-by-dim (s/mean alpha-batch-matrix)
+        epsilon   0.001
+        sig+ep    (o/+ (s/variance alpha-batch-matrix) (array :vectorz (repeat hidden-size epsilon)))
+        sd-by-dim (sqrt sig+ep)
+        sd-div    (o// 1 sd-by-dim)]
     {:preactivation-batch (->> alpha-batch
                                (mapv (fn [alpha]
-                                       (let [alpha-myu (minus alpha mean-by-dim)
-                                             alpha-hat (times sd-div alpha-myu)]
-                                         {:state (plus (times alpha-hat scale) shift)
+                                       (let [alpha-myu (o/- alpha mean-by-dim)
+                                             alpha-hat (o/* sd-div alpha-myu)]
+                                         {:state (o/+ (o/* alpha-hat scale) shift)
                                           :alpha-hat alpha-hat}))))
      :alpha-batch alpha-batch
      :x-mean mean-by-dim
@@ -127,43 +168,40 @@
      :x-sd-div sd-div}))
 
 (defn batch-normalization-with-population
-  [matrix-kit hidden-size pop-mean pop-variance alpha scale shift]
-  (let [{:keys [plus minus times alter-vec make-vector]} matrix-kit
-        epsilon 0.001]
-    (plus (times (minus alpha pop-mean)
-                 (alter-vec (plus pop-variance (make-vector (repeat hidden-size epsilon)))
-                            (fn ^double [^double x] (/ 1 (Math/sqrt x))))
-                 scale)
-          shift)))
+  [hidden-size pop-mean pop-variance alpha scale shift]
+  (let [epsilon 0.001]
+    (o/+ (o/* (o/- alpha pop-mean)
+              (emap (fn [x] (/ 1 (Math/sqrt x))) (o/+ pop-variance (array :vectorz (repeat hidden-size epsilon))))
+              scale)
+         shift)))
 
 (defn batch-normalization-delta
-  [matrix-kit hidden-delta-batch scale bn-forward]
-  (let [{:keys [sum plus minus times scal mean transpose alter-vec]} matrix-kit
-        {:keys [batch-size alpha-batch x-mean sig+ep x-sd x-sd-div alpha-hat preactivation-batch]} bn-forward
-        alpha-hat-delta-batch (->> hidden-delta-batch (mapv (fn [hidden-delta] (times hidden-delta scale))))
-        x-myu-batch (minus alpha-batch x-mean)
-        v-delta (times (->> (mapv (fn [alpha-hat-delta x-myu]
-                                    (times alpha-hat-delta x-myu))
-                                  alpha-hat-delta-batch
-                                  x-myu-batch)
-                            (apply plus))
-                       (scal (/ -1 2)
-                             (alter-vec sig+ep (fn ^double [^double x] (Math/pow x (/ -3 2))))))
-        _v (scal -1 x-sd-div)
-        mean-delta (plus (->> alpha-hat-delta-batch
-                              (mapv (fn [alpha-hat-delta] (times alpha-hat-delta _v)))
-                              (apply plus))
-                         (times v-delta
-                                (->> x-myu-batch
-                                     (mapv (fn [x-myu] (scal -2 x-myu)))
-                                     (apply plus)
-                                     (scal (/ 1 batch-size)))))]
+  [hidden-delta-batch scale bn-forward]
+  (let [{:keys [batch-size alpha-batch x-mean sig+ep x-sd x-sd-div alpha-hat preactivation-batch]} bn-forward
+        alpha-hat-delta-batch (->> hidden-delta-batch (mapv (fn [hidden-delta] (o/* hidden-delta scale))))
+        x-myu-batch (o/- alpha-batch x-mean)
+        v-delta (o/* (->> (mapv (fn [alpha-hat-delta x-myu]
+                                  (o/* alpha-hat-delta x-myu))
+                                alpha-hat-delta-batch
+                                x-myu-batch)
+                          (apply o/+))
+                     (o/* (/ -1 2)
+                          (pow sig+ep (/ -3 2))))
+        _v (o/* -1 x-sd-div)
+        mean-delta (o/+ (->> alpha-hat-delta-batch
+                             (mapv (fn [alpha-hat-delta] (o/* alpha-hat-delta _v)))
+                             (apply o/+))
+                        (o/* v-delta
+                             (->> x-myu-batch
+                                  (mapv (fn [x-myu] (o/* -2 x-myu)))
+                                  (apply o/+)
+                                  (o/* (/ 1 batch-size)))))]
     (mapv (fn [hidden-delta alpha-hat-delta x-myu batch-item]
             (let [{:keys [alpha-hat]} batch-item
-                  scale-delta (times hidden-delta alpha-hat)
-                  bn-delta (plus (times alpha-hat-delta x-sd-div)
-                                 (times v-delta (scal (/ 2 batch-size) x-myu))
-                                 (scal (/ 1 batch-size) mean-delta))]
+                  scale-delta (o/* hidden-delta alpha-hat)
+                  bn-delta (o/+ (o/* alpha-hat-delta x-sd-div)
+                                (o/* v-delta (o/* (/ 2 batch-size) x-myu))
+                                (o/* (/ 1 batch-size) mean-delta))]
               {:scale-delta scale-delta
                :shift-delta hidden-delta
                :bn-delta bn-delta}))
@@ -175,26 +213,24 @@
 
 
 (defn layer-normalization
-  [matrix-kit alpha gain bias]
-  (let [{:keys [plus minus times scal mean sd]} matrix-kit
-        sigma (sd alpha)
-        normalized-preactivation (scal (/ 1 sigma) (minus alpha (mean alpha)))
-        alpha-bar (times normalized-preactivation gain)]
-    {:state (plus alpha-bar bias)
+  [alpha gain bias]
+  (let [sigma (s/sd alpha)
+        normalized-preactivation (o/* (/ 1 sigma) (o/- alpha (s/mean alpha)))
+        alpha-bar (o/* normalized-preactivation gain)]
+    {:state (o/+ alpha-bar bias)
      :alpha-bar alpha-bar
      :normalized-preactivation normalized-preactivation
      :sigma sigma}))
 
 (defn layer-normalization-delta
-  [matrix-kit gain hidden-delta sigma normalized-preactivation alpha-bar]
-  (let [{:keys [minus times scal mean]} matrix-kit
-        gain-delta (times hidden-delta normalized-preactivation)
-        d1 (times hidden-delta gain)
-        d1-mean (mean d1)
-        tmp-left (minus d1 d1-mean)
-        d2 (times hidden-delta alpha-bar)
-        d2-mean (mean d2)
-        tmp-right  (scal d2-mean normalized-preactivation)]
+  [gain hidden-delta sigma normalized-preactivation alpha-bar]
+  (let [gain-delta (o/* hidden-delta normalized-preactivation)
+        d1 (o/* hidden-delta gain)
+        d1-mean (s/mean d1)
+        tmp-left (o/- d1 d1-mean)
+        d2 (o/* hidden-delta alpha-bar)
+        d2-mean (s/mean d2)
+        tmp-right  (o/* d2-mean normalized-preactivation)]
     {:gain-delta gain-delta
-     :ln-delta (scal (/ 1 sigma) (minus tmp-left tmp-right))}))
+     :ln-delta (o/* (/ 1 sigma) (o/- tmp-left tmp-right))}))
 

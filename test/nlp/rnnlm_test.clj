@@ -1,14 +1,13 @@
 (ns nlp.rnnlm-test
   (:require [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]
-            [prism.nlp.rnnlm :refer :all]
-            [matrix.default :as default]))
+            [prism.nlp.rnnlm :refer :all]))
 
 (def sample-wc {"A" 5 "B" 5 "C" 5 "D" 5 "<unk>" 10})
 
 (deftest rnnlm-test
   (testing "init-rnnlm-model"
-    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10 default/default-matrix-kit)]
+    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10)]
       (is (= hidden-size 10))
       (is (= output-type :binary-classification))
       (is (= (count (keys wc)) 4))))

@@ -4,14 +4,10 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :jvm-opts ["-Xmx12G" "-Xms1028m" "-server"]
-  :test-selectors {:default (complement :native)
-                   :native  :native
-                   :all     (constantly true)}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.521"]
                  [net.mikera/vectorz-clj "0.47.0"]
                  [net.mikera/core.matrix "0.60.3"]
-                 [uncomplicate/neanderthal "0.9.0"]
                  [clj-time "0.13.0"]
                  [com.taoensso/nippy "2.13.0"]
                  [org.clojure/data.json "0.2.6"]

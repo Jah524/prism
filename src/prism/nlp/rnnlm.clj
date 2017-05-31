@@ -5,10 +5,10 @@
     [clojure.java.io :refer [reader]]
     [clojure.core.async :refer [go]]
     [clj-time.local :as l]
+    [clojure.core.matrix :refer [array]]
     [prism.nn.lstm :as lstm];:refer [lstm-activation init-model train!]]
     [prism.util :as util]
-    [prism.sampling :refer [uniform->cum-uniform samples]]
-    [matrix.default :as default]))
+    [prism.sampling :refer [uniform->cum-uniform samples]]))
 
 (defn convert-rare-word-to-unk
   [wc word]
@@ -120,7 +120,7 @@
           (when (and model-path (not (zero? snapshot)) (not (zero? loop-counter)) (zero? (rem loop-counter snapshot)))
             (let [spath (str model-path "-SNAPSHOT-" @snapshot-num)]
               (println (str "saving " spath))
-              (util/save-model (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit) spath)
+              (util/save-model model spath)
               (swap! snapshot-num inc)))
           (Thread/sleep interval-ms)
           (recur (inc loop-counter))))
@@ -129,15 +129,14 @@
 
 
 (defn init-rnnlm-model
-  [wc hidden-size {:keys [matrix-kit] :or {matrix-kit default/default-matrix-kit}}]
+  [wc hidden-size]
   (let [wc-set (conj (set (keys wc)) "<eos>")]
     (-> (lstm/init-model {:input-items wc-set
                           :input-size nil
                           :hidden-size hidden-size
                           :output-type :binary-classification
                           :output-items wc-set
-                          :activation :linear
-                          :matrix-kit matrix-kit})
+                          :activation :linear})
         (assoc :wc wc))))
 
 (defn make-rnnlm
@@ -145,37 +144,29 @@
   (let [_(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
-        model (init-rnnlm-model wc hidden-size option)
+        model (init-rnnlm-model wc hidden-size)
         model-path     (str export-path ".rnnlm")]
     (train-rnnlm! model training-path (assoc option :model-path model-path))
-    (let [m (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit)]
-      (print (str "Saving RNNLM model as " model-path " ... "))
-      (util/save-model m model-path)
-      (println "Done"))
+    (print (str "Saving RNNLM model as " model-path " ... "))
+    (util/save-model model model-path)
+    (println "Done")
     model))
 
 (defn resume-train
   [training-path model-path option]
   (print "loading model ...")
-  (let [model (lstm/load-model model-path (:matrix-kit option))
+  (let [model (util/load-model model-path)
         _(println " done")
-        model (train-rnnlm! model training-path (assoc option :model-path model-path))
-        m (dissoc (lstm/convert-model model default/default-matrix-kit) :matrix-kit)]
+        model (train-rnnlm! model training-path (assoc option :model-path model-path))]
     (println (str "Saving RNNLM model as " model-path))
-    (util/save-model m model-path)
+    (util/save-model model model-path)
     model))
 
-(defn load-model
-  [model-path matrix-kit]
-  (lstm/load-model model-path matrix-kit))
-
 (defn text-vector [model words]
-  (let [{:keys [hidden matrix-kit wc]} model
-        {:keys [make-vector]} matrix-kit
-        hidden-size (:unit-num hidden)]
+  (let [{:keys [hidden hidden-size wc]} model]
     (loop [words words,
-           previous-activation (make-vector hidden-size),
-           previous-cell-state (make-vector hidden-size)]
+           previous-activation (array :vectorz (repeat hidden-size 0)),
+           previous-cell-state (array :vectorz (repeat hidden-size 0))]
       (if-let [word (first words)]
         (let [word (if (get wc word) word "<unk>")
               {:keys [activation state]} (lstm/lstm-activation model (set [word]) previous-activation previous-cell-state)]
@@ -186,7 +177,7 @@
 
 (defn text-similarity
   [model words1 words2 l2?]
-  (util/similarity (:matrix-kit model) (text-vector model words1) (text-vector model words2) l2?))
+  (util/similarity (text-vector model words1) (text-vector model words2) l2?))
 
 (defn word-prob-given-context
   "context is a list of word"

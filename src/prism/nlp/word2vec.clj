@@ -7,7 +7,7 @@
     [clj-time.local :as l]
     [clj-time.core  :as t]
     [clojure.data.json :as json]
-    [matrix.default :as default]
+    [clojure.core.matrix :refer [array]]
     [prism.util :refer [l2-normalize similarity] :as util]
     [prism.sampling :refer [uniform->cum-uniform uniform-sampling samples]]
     [prism.nn.feedforward :as ff]))
@@ -133,45 +133,43 @@
     :done))
 
 (defn init-w2v-model
-  [wc hidden-size {:keys [matrix-kit] :or {matrix-kit default/default-matrix-kit}}]
+  [wc hidden-size]
   (let [wc-set (set (keys wc))]
     (-> (ff/init-model {:input-items wc-set
                         :input-size nil
                         :hidden-size hidden-size
                         :output-type :binary-classification
                         :output-items wc-set
-                        :activation :linear
-                        :matrix-kit matrix-kit})
+                        :activation :linear})
         (assoc :wc wc))))
 
 
 (defn save-embedding
   "top-n = 0 represents all words"
-  ([model path top-n]
-   (let [{:keys [hidden wc matrix-kit]} model
-         word-em (:sparses hidden)
-         considered (set (->> (dissoc wc "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
-         word-em (if (or (zero? top-n) (= :all top-n))
-                   word-em
-                   (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} word-em))
-         l2-em (reduce (fn [acc [k v]] (assoc acc k (float-array (seq (l2-normalize matrix-kit v))))) {} word-em)]
-     (util/save-model l2-em path))))
+  [model path top-n]
+  (let [{:keys [hidden wc]} model
+        word-em (:sparses hidden)
+        considered (set (->> (dissoc wc "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
+        word-em (if (or (zero? top-n) (= :all top-n))
+                  word-em
+                  (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} word-em))
+        l2-em (reduce (fn [acc [k v]] (assoc acc k (l2-normalize v))) {} word-em)]
+    (util/save-model l2-em path)))
 
 (defn make-word2vec
   [training-path export-path hidden-size option]
   (let [_(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
-        model (init-w2v-model wc hidden-size option)
+        model (init-w2v-model wc hidden-size)
         model-path     (str export-path ".w2v")
         embedding-path (str export-path ".w2v.em")]
     (train-word2vec! model training-path option)
-    (let [m (ff/convert-model model default/default-matrix-kit)]
-      (println (str "Saving word2vec model as " model-path))
-      (util/save-model (dissoc m :matrix-kit) model-path)
-      (println (str "Saving embedding as " embedding-path))
-      (save-embedding model embedding-path 0)
-      (println "Done"))
+    (println (str "Saving word2vec model as " model-path))
+    (util/save-model model model-path)
+    (println (str "Saving embedding as " embedding-path))
+    (save-embedding model embedding-path 0)
+    (println "Done")
     model))
 
 (defn resume-train
@@ -181,44 +179,26 @@
         model-path     (str model-path ".w2v")
         embedding-path (str model-path "w2v.em")]
     (train-word2vec! model training-path option)
-    (let [m (ff/convert-model model default/default-matrix-kit)]
-      (println (str "Saving word2vec model as " model-path))
-      (util/save-model (dissoc m :matrix-kit) model-path)
-      (println (str "Saving embedding as " embedding-path))
-      (save-embedding model embedding-path)
-      (println "Done")
-      model)))
+    (println (str "Saving word2vec model as " model-path))
+    (util/save-model model model-path)
+    (println (str "Saving embedding as " embedding-path))
+    (save-embedding model embedding-path)
+    (println "Done")
+    model))
 
 ;; work on embedding ;;
-
-(defn load-model
-  [model-path matrix-kit]
-  (ff/load-model model-path matrix-kit))
-
-(defn load-embedding
-  [em-path matrix-kit]
-  (let [{:keys [make-vector] :as matrix-kit} (or matrix-kit default/default-matrix-kit)
-        em (util/load-model em-path)]
-    {:matrix-kit matrix-kit
-     :em-size (count (second (first em)))
-     :em  (reduce (fn [acc [word em]] (assoc acc word (make-vector (seq em))))
-                  {}
-                  em)}))
-
-(defn word2vec [embedding word]
-  (get (:em embedding) word))
 
 (defn most-sim
   "embeddings have to be l2-normalized
   a word doesn't exist in embeddings are not removed"
   [embedding reference target-list n l2]
-  (let [{:keys [em matrix-kit]} embedding]
-    (when-let [reference-vec (if (string? reference) (word2vec embedding reference) reference)]
+  (let [{:keys [em]} embedding]
+    (when-let [reference-vec (if (string? reference) (get embedding reference) reference)]
       (let [targets (->> target-list
                          (keep (fn [x]
-                                 (when-let [vec2 (if (string? x) (word2vec embedding x) x)]
+                                 (when-let [vec2 (if (string? x) (get embedding x) x)]
                                    {:x x
-                                    :sim (float (min 1 (similarity matrix-kit reference-vec vec2 l2)))})))
+                                    :sim (float (min 1 (similarity reference-vec vec2 l2)))})))
                          (sort-by :sim >))]
         (->> (if (= reference (:word (first targets)))
                (rest targets)
@@ -227,9 +207,9 @@
 
 (defn most-sim-in-model
   [model word-or-vec n & [limit]]
-  (let [{:keys [wc hidden matrix-kit]} model
+  (let [{:keys [wc hidden]} model
         {em :sparses} hidden
         limit (or limit (count wc))
         target-word-list (->> wc (sort-by second >) (map first) (take limit))]; sort by frequency
-    (most-sim {:em em :matrix-kit matrix-kit} word-or-vec target-word-list n false)))
+    (most-sim em word-or-vec target-word-list n false)))
 

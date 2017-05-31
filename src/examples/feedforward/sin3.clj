@@ -1,17 +1,16 @@
 (ns examples.feedforward.sin3
-  (:require [clj-time.local  :as l]
-            [incanter.core :refer [view]]
-            [incanter.charts :refer [function-plot add-function set-stroke-color]]
-            [prism.nn.feedforward :as ff]
-            [matrix.default :refer [default-matrix-kit]]))
-
+  (:require
+    [clojure.core.matrix :refer [array]]
+    [clj-time.local  :as l]
+    [incanter.core :refer [view]]
+    [incanter.charts :refer [function-plot add-function set-stroke-color]]
+    [prism.nn.feedforward :as ff]))
 
 
 (defn training-sin3
-  [matrix-kit]
-  (map (fn [x] {:x ((:make-vector matrix-kit) [x])
+  []
+  (map (fn [x] {:x (array :vectorz  [x])
                 :y {"sin-prediction" (Math/sin x)}}) (range -3.0 3.0 0.1)))
-
 
 (defn train-sgd [model training-list learning-rate]
   (loop [training-list training-list,
@@ -41,28 +40,26 @@
           (recur updated-model  (inc e)))
         model))))
 
-(defn example-train [matrix-kit]
-  (let [mk (or matrix-kit default-matrix-kit)
-        model (train (ff/init-model {:input-items nil
+(defn example-train []
+  (let [model (train (ff/init-model {:input-items nil
                                      :input-size 1
                                      :hidden-size 3
                                      :output-type :prediction
                                      :output-items #{"sin-prediction"}
                                      :activation :tanh
-                                     :matrix-kit mk
                                      })
-                     (training-sin3 mk)
+                     (training-sin3)
                      {:epoc 10000 :loss-interval 500 :learning-rate 0.01})]
     (-> (function-plot #(Math/sin %) -3 3)
-        (add-function #(get (:output (:activation (ff/network-output model ((:make-vector mk) [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ff/network-output model ((:make-vector mk) [%]) #{"sin-prediction"})))) 0) -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ff/network-output model ((:make-vector mk) [%]) #{"sin-prediction"})))) 1) -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ff/network-output model ((:make-vector mk) [%]) #{"sin-prediction"})))) 2) -3 3)
+        (add-function #(get (:output (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"})))) 0) -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"})))) 1) -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"})))) 2) -3 3)
         (set-stroke-color java.awt.Color/gray :dataset 2)
         (set-stroke-color java.awt.Color/gray :dataset 3)
         (set-stroke-color java.awt.Color/gray :dataset 4)
         view)))
 
 (defn -main []
-  (example-train nil)
+  (example-train)
   (println "check out sin approximation plot with 3 units in hidden layer"))

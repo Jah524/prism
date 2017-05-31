@@ -2,7 +2,6 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [clj-time.local  :as l]
-    [matrix.default :refer [default-matrix-kit]]
     [prism.nn.lstm :as lstm]))
 
 
@@ -71,15 +70,12 @@
     ])
 
 (defn multiclass-demo
-  [matrix-kit]
-  (let [mk (or matrix-kit default-matrix-kit)
-        {:keys [make-vector]} mk
-        model (train-with-demo-dataset (lstm/init-model {:input-items #{"quarter" "half"}
+  []
+  (let [model (train-with-demo-dataset (lstm/init-model {:input-items #{"quarter" "half"}
                                                          :output-items #{"Spring" "Summer" "Autumn" "Winter"}
                                                          :inupt-size nil
                                                          :hidden-size 4
-                                                         :output-type :multi-class-classification
-                                                         :matrix-kit mk})
+                                                         :output-type :multi-class-classification})
                                        dataset-season
                                        {:loss-interval 500
                                         :epoc 10000
@@ -110,4 +106,4 @@
     ))
 
 (defn -main []
-  (multiclass-demo nil))
+  (multiclass-demo))

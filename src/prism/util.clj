@@ -6,7 +6,8 @@
     [clj-time.local :as l]
     [clj-time.core  :as t]
     [taoensso.nippy :refer [freeze-to-out! thaw-from-in!]]
-    [matrix.default :as default]))
+    [clojure.core.matrix :refer [dot]]
+    [clojure.core.matrix.operators :as o]))
 
 (defn save-model [obj target-path]
   (with-open [w (clojure.java.io/output-stream target-path)]
@@ -16,10 +17,6 @@
   [target-path]
   (with-open [w (clojure.java.io/input-stream target-path)]
     (thaw-from-in! (java.io.DataInputStream. w))))
-
-(defn load-model-with-matrix-kit
-  [target-path convert-model matrix-kit]
-  (convert-model (load-model target-path) matrix-kit))
 
 
 (defn progress-format [done all interval-done interval-ms unit]
@@ -76,15 +73,13 @@
 
 
 (defn l2-normalize
-  [matrix-kit v]
-  (let [{:keys [dot scal]} matrix-kit
-        acc (/ 1 (Math/sqrt (dot v v)))]
-    (scal acc v)))
+  [v]
+  (let [acc (/ 1 (Math/sqrt (dot v v)))]
+    (o/* acc v)))
 
 (defn similarity
   "if you give l2-normalized vectors, l2? have to be true"
-  [matrix-kit v1 v2 l2?]
-  (let [{:keys [dot]} matrix-kit]
-    (if l2?
-      (dot v1 v2)
-      (dot (l2-normalize matrix-kit v1) (l2-normalize matrix-kit v2)))))
+  [v1 v2 l2?]
+  (if l2?
+    (dot v1 v2)
+    (dot (l2-normalize v1) (l2-normalize v2))))
