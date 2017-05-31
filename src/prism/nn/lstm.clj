@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [matrix.default :as default]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [activation derivative error]]
+    [prism.unit :refer [activation derivative error merge-param]]
     [prism.util :as util]))
 
 
@@ -25,15 +25,14 @@
 (defn lstm-activation
   [model x-input recurrent-input-list previous-cell-state]
   (let [{:keys [hidden hidden-size matrix-kit]} model
-        lstm-layer hidden
         {:keys [gemv plus times sigmoid tanh alter-vec]} matrix-kit
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
                 forget-gate-wr forget-gate-bias forget-gate-peephole
                 output-gate-wr output-gate-bias output-gate-peephole peephole
-                sparses]} lstm-layer
+                sparses]} hidden
         [block' input-gate' forget-gate' output-gate'] (if (or (set? x-input) (map? x-input))
                                                          (partial-state-sparse model x-input sparses)
-                                                         (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} lstm-layer
+                                                         (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} hidden
                                                                lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
                                                            (mapv #(gemv % x-input) lstm-mat)))
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
@@ -171,26 +170,10 @@
   [make-vector hidden-size]
   {:forget-gate (make-vector (repeat hidden-size 0))})
 
-(defn merge-param
-  [plus merger! acc param-delta]
-  (if (nil? acc)
-    param-delta
-    (merge-with #(cond
-                   (map? %1); if each value is sparses
-                   (merge-with (fn [accw dw] ;for each items
-                                 (if (map? accw)
-                                   (merge-with (fn [a b] (plus a b)) accw dw);sprase w of each gates
-                                   (plus accw dw)));w also bias
-                               %1 %2)
-                   :else ;if hidden weight map or bias
-                   (merger! %2 %1))
-                acc
-                param-delta)))
-
 (defn bptt
   [model activation output-items-seq]
   (let [{:keys [output hidden hidden-size matrix-kit output-type]} model
-        {:keys [make-vector scal plus merger! transpose gemv clip!]} matrix-kit
+        {:keys [make-vector scal plus transpose gemv clip!]} matrix-kit
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole]} hidden]
     ;looping latest to old
@@ -252,8 +235,8 @@
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (cons output-delta output-loss)
-                 (merge-param plus merger! output-acc output-param-delta)
-                 (merge-param plus merger! hidden-acc lstm-param-delta)))
+                 (merge-param plus output-acc output-param-delta)
+                 (merge-param plus hidden-acc lstm-param-delta)))
         :else
         {:param-loss  {:output-delta output-acc
                        :hidden-delta hidden-acc}
@@ -381,7 +364,7 @@
                                :output-gate-wr owr   :output-gate-bias     ob
                                :input-gate-peephole  ip  :forget-gate-peephole fp :output-gate-peephole op)]
                 (assoc template
-                  :sparses (reduce (fn [acc [item {:keys[ block-w input-gate-w forget-gate-w output-gate-w]}]]
+                  :sparses (reduce (fn [acc [item {:keys [block-w input-gate-w forget-gate-w output-gate-w]}]]
                                      (assoc acc item
                                        {:block-w       (make-vector (seq block-w))
                                         :input-gate-w  (make-vector (seq input-gate-w))

@@ -89,6 +89,19 @@
     (prediction-error activation expectation)))
 
 
+(defn merge-param
+  [plus acc param-delta]
+  (if (nil? acc)
+    param-delta
+    (apply
+      (fn m [acc param-delta]
+        (if (every? map? [acc param-delta])
+          (apply merge-with m [acc param-delta])
+          (do
+            (apply plus [acc param-delta]))))
+      [acc param-delta])))
+
+
 (defn layer-normalization
   [matrix-kit alpha gain bias]
   (let [{:keys [plus minus times scal mean sd]} matrix-kit
@@ -112,3 +125,4 @@
         tmp-right  (scal d2-mean normalized-preactivation)]
     {:gain-delta gain-delta
      :ln-delta (scal (/ 1 sigma) (minus tmp-left tmp-right))}))
+

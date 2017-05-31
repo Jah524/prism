@@ -17,11 +17,6 @@
   ([v1 v2 & more]
    (reduce #(plus %1 %2) (plus v1 v2) more)))
 
-(defn merger!
-  "takes matrices or vectors and return sum of each element"
-  [m m!]
-  (add! m! m))
-
 (defn minus
   ([v1 v2]
    (o/- v1 v2))
@@ -77,7 +72,6 @@
   {:type :default
    :sum esum
    :plus plus
-   :merger! merger!
    :minus minus
    :times times
    :divide divide
