@@ -13,7 +13,7 @@
 
 ### remove
 
-- merger! from matrix/
+- matrix to be more readable
 
 ## [0.5.1] - 2017-5-21
 

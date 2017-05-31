@@ -209,5 +209,6 @@
         (cons (word-prob-given-context model context [f]) acc))
       {:history acc
        :log-prob (->> acc
-                      (map #(-> % :items vals first Math/log))
+                      (keep #(when-let [it (-> % :items vals first)]
+                               (Math/log it)))
                       (reduce +))})))
