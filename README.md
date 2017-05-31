@@ -9,7 +9,7 @@ Now prism is ready to work with following models.
 - Word2Vec by skip-gram with negative-sampling
 - RNNLM with negative-sampling
 
-This library also includes some basic neural network model (e.g. feedforward, LSTM).
+This library also includes some basic neural network model (e.g. feedforward, LSTM, encoder-decoder).
 See demonstration section and [examples](/src/examples) for more detail.
 
 ## Usage
@@ -20,7 +20,7 @@ You can find how to do with prism at [project wiki](https://github.com/Jah524/pr
 If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
 ```
-[jah524/prism "0.5.1"]
+[jah524/prism "0.6.0"]
 ```
 
 ## Demonstration
