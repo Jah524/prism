@@ -1,10 +1,11 @@
 # Change Log
 
-## [0.6.0] - 2017-5-31
+## [0.6.0] - 2017-6-1
 
 ### add
 
-- add encoder-decoder model formally
+- encoder-decoder model formally
+- tentatively add batch normalization of feedforward
 
 ### change
 
