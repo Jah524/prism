@@ -93,7 +93,7 @@
   (let [{:keys [output hidden hidden-size output-type matrix-kit]} model
         {:keys [activation state]} model-forward
         training-x (:input activation)
-        {:keys [scal plus times matrix-kit-type native-dv]} matrix-kit
+        {:keys [scal plus times matrix-kit-type]} matrix-kit
         output-delta (error output-type (:output activation) training-y)
         output-param-delta (output-param-delta model output-delta hidden-size (:hidden activation))
         propagated-delta (->> output-delta

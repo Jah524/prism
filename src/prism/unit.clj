@@ -1,5 +1,7 @@
 (ns prism.unit
-  (:require [clojure.pprint :refer [pprint]]))
+  (:require [clojure.pprint :refer [pprint]]
+            [clojure.core.matrix.operators :as o]
+            [clojure.core.matrix.stats :as s]))
 
 (defn- softmax-states
   [matrix-kit input-list all-output-connection]
@@ -90,16 +92,86 @@
 
 
 (defn merge-param
-  [plus acc param-delta]
-  (if (nil? acc)
-    param-delta
+  [plus & maps]
+  (if (nil? (first maps))
+    (second maps); when acc is nil
     (apply
-      (fn m [acc param-delta]
-        (if (every? map? [acc param-delta])
-          (apply merge-with m [acc param-delta])
+      (fn m [& maps]
+        (if (every? map? maps)
+          (apply merge-with m maps)
           (do
-            (apply plus [acc param-delta]))))
-      [acc param-delta])))
+            (apply plus maps))))
+      maps)))
+
+
+(defn batch-normalization
+  [matrix-kit hidden-size alpha-batch scale shift]
+  (let [{:keys [plus minus times alter-vec mean make-vector make-matrix]} matrix-kit
+        batch-size (count alpha-batch)
+        alpha-batch-matrix (make-matrix hidden-size batch-size (apply concat (seq alpha-batch)))
+        mean-by-dim (mean alpha-batch-matrix)
+        epsilon 0.001
+        sig+ep    (plus (s/variance alpha-batch-matrix) (make-vector (repeat hidden-size epsilon)))
+        sd-by-dim (alter-vec sig+ep (fn ^double [^double x] (Math/sqrt x)))
+        sd-div    (alter-vec sd-by-dim (fn ^double [^double x] (/ 1 x)))]
+    {:preactivation-batch (->> alpha-batch
+                               (mapv (fn [alpha]
+                                       (let [alpha-myu (minus alpha mean-by-dim)
+                                             alpha-hat (times sd-div alpha-myu)]
+                                         {:state (plus (times alpha-hat scale) shift)
+                                          :alpha-hat alpha-hat}))))
+     :alpha-batch alpha-batch
+     :x-mean mean-by-dim
+     :sig+ep sig+ep
+     :x-sd sd-by-dim
+     :x-sd-div sd-div}))
+
+(defn batch-normalization-with-population
+  [matrix-kit hidden-size pop-mean pop-variance alpha scale shift]
+  (let [{:keys [plus minus times alter-vec make-vector]} matrix-kit
+        epsilon 0.001]
+    (plus (times (minus alpha pop-mean)
+                 (alter-vec (plus pop-variance (make-vector (repeat hidden-size epsilon)))
+                            (fn ^double [^double x] (/ 1 (Math/sqrt x))))
+                 scale)
+          shift)))
+
+(defn batch-normalization-delta
+  [matrix-kit hidden-delta-batch scale bn-forward]
+  (let [{:keys [sum plus minus times scal mean transpose alter-vec]} matrix-kit
+        {:keys [batch-size alpha-batch x-mean sig+ep x-sd x-sd-div alpha-hat preactivation-batch]} bn-forward
+        alpha-hat-delta-batch (->> hidden-delta-batch (mapv (fn [hidden-delta] (times hidden-delta scale))))
+        x-myu-batch (minus alpha-batch x-mean)
+        v-delta (times (->> (mapv (fn [alpha-hat-delta x-myu]
+                                    (times alpha-hat-delta x-myu))
+                                  alpha-hat-delta-batch
+                                  x-myu-batch)
+                            (apply plus))
+                       (scal (/ -1 2)
+                             (alter-vec sig+ep (fn ^double [^double x] (Math/pow x (/ -3 2))))))
+        _v (scal -1 x-sd-div)
+        mean-delta (plus (->> alpha-hat-delta-batch
+                              (mapv (fn [alpha-hat-delta] (times alpha-hat-delta _v)))
+                              (apply plus))
+                         (times v-delta
+                                (->> x-myu-batch
+                                     (mapv (fn [x-myu] (scal -2 x-myu)))
+                                     (apply plus)
+                                     (scal (/ 1 batch-size)))))]
+    (mapv (fn [hidden-delta alpha-hat-delta x-myu batch-item]
+            (let [{:keys [alpha-hat]} batch-item
+                  scale-delta (times hidden-delta alpha-hat)
+                  bn-delta (plus (times alpha-hat-delta x-sd-div)
+                                 (times v-delta (scal (/ 2 batch-size) x-myu))
+                                 (scal (/ 1 batch-size) mean-delta))]
+              {:scale-delta scale-delta
+               :shift-delta hidden-delta
+               :bn-delta bn-delta}))
+          hidden-delta-batch
+          alpha-hat-delta-batch
+          x-myu-batch
+          preactivation-batch)))
+
 
 
 (defn layer-normalization
