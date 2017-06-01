@@ -11,7 +11,6 @@
 
 (set-current-implementation :vectorz)
 
-
 (defn sigmoid [x] (/ 1 (+ 1 (Math/exp (- x)))))
 (defn sigmoid-derivative [x] (let [s (sigmoid x)] (float (* s (- 1 s)))))
 

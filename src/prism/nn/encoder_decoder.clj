@@ -34,7 +34,7 @@
         {:keys [block-w input-gate-w forget-gate-w output-gate-w]} hidden
         lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]
         [block' input-gate' forget-gate' output-gate'] (if (or (set? x-input) (map? x-input))
-                                                         (lstm/partial-state-sparse decoder x-input sparses)
+                                                         (lstm/partial-state-sparse x-input sparses)
                                                          (let [{:keys [block-w input-gate-w forget-gate-w output-gate-w]} hidden
                                                                lstm-mat [block-w input-gate-w forget-gate-w output-gate-w]]
                                                            (mapv #(mmul % x-input) lstm-mat)))
@@ -200,7 +200,7 @@
                    :peephole-forget-gate-delta (o/* forget-gate-delta (:cell-state self-state:t-1))
                    :peephole-output-gate-delta (o/* output-gate-delta (:cell-state self-state:t-1))}]
     (if (or (set? x-input) (map? x-input))
-      (assoc template :sparses-delta (lstm/param-delta-sparse decoder x-input block-delta input-gate-delta forget-gate-delta output-gate-delta))
+      (assoc template :sparses-delta (lstm/param-delta-sparse x-input block-delta input-gate-delta forget-gate-delta output-gate-delta))
       (assoc template
         :block-w-delta        (outer-product block-delta x-input)
         :input-gate-w-delta   (outer-product input-gate-delta x-input)
