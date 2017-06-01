@@ -145,7 +145,7 @@
         wc (util/make-wc training-path option)
         _(println "done")
         model (init-rnnlm-model wc hidden-size)
-        model-path     (str export-path ".rnnlm")]
+        model-path export-path]
     (train-rnnlm! model training-path (assoc option :model-path model-path))
     (print (str "Saving RNNLM model as " model-path " ... "))
     (util/save-model model model-path)

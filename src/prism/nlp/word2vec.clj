@@ -162,8 +162,8 @@
         wc (util/make-wc training-path option)
         _(println "done")
         model (init-w2v-model wc hidden-size)
-        model-path     (str export-path ".w2v")
-        embedding-path (str export-path ".w2v.em")]
+        model-path     export-path
+        embedding-path (str export-path ".em")]
     (train-word2vec! model training-path option)
     (println (str "Saving word2vec model as " model-path))
     (util/save-model model model-path)
