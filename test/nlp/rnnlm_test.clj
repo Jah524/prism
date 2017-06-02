@@ -7,7 +7,7 @@
 
 (deftest rnnlm-test
   (testing "init-rnnlm-model"
-    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10)]
+    (let [{:keys [hidden hidden-size wc input-type output-type]} (init-rnnlm-model {"A" 12 "B" 345 "C" 42 "<unk>" 0} 10 :lstm)]
       (is (= hidden-size 10))
       (is (= output-type :binary-classification))
       (is (= (count (keys wc)) 4))))

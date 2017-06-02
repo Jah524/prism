@@ -3,8 +3,8 @@
     [clojure.pprint :refer [pprint]]
     [clojure.test   :refer :all]
     [clojure.core.matrix :refer [set-current-implementation mget array matrix ecount row-count]]
-    [prism.nn.lstm  :refer [lstm-activation sequential-output]]
-    [nn.lstm-test   :refer [sample-w-network]]
+    [prism.nn.rnn.lstm  :refer [lstm-activation forward]]
+    [nn.rnn.lstm-test   :refer [sample-w-network]]
     [prism.nn.encoder-decoder :refer :all]))
 
 
@@ -225,7 +225,7 @@
                                                                 (map array [[2 0 0] [1 0 0]])
                                                                 (array (repeat 5 0))
                                                                 [:skip #{"prediction1" "prediction2" "prediction3"}])))))
-          it2 (vec (:output (:activation (last (sequential-output sample-w-network
+          it2 (vec (:output (:activation (last (forward sample-w-network
                                                                   (map array [[2 0 0] [1 0 0]])
                                                                   [:skip #{"prediction1" "prediction2" "prediction3"}])))))]
       (is (not= it1 it2))

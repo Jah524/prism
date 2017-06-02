@@ -1,9 +1,9 @@
-(ns examples.lstm.sparse
+(ns examples.rnn.sparse
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [array]]
     [clj-time.local  :as l]
-    [prism.nn.lstm :as lstm]))
+    [prism.nn.rnn :as rnn]))
 
 
 (defn train-sgd [model training-list learning-rate]
@@ -13,13 +13,13 @@
          acc-loss 0]
     (if-let [training-pair (first training-list)]
       (let [{x-seq :x y-seq :y} training-pair
-            forward (lstm/sequential-output model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
-            {:keys [loss param-loss]} (lstm/bptt model
-                                                 forward
-                                                 y-seq)
+            forward (rnn/forward model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
+            {:keys [loss param-loss]} (rnn/bptt model
+                                                forward
+                                                y-seq)
             diff (get (last loss) "prediction") ; last time loss
             loss (* diff diff 0.5)] ; sum-of-squares-error
-        (recur (lstm/update-model! model param-loss learning-rate)
+        (recur (rnn/update-model! model param-loss learning-rate)
                (rest training-list)
                (inc n)
                (+ acc-loss loss)))
@@ -32,8 +32,8 @@
         (let [{loss :loss updated-model :model} (train-sgd model (shuffle training-list) learning-rate)]
           (when (= 0 (rem e loss-interval))
             (println (str "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] epoc: " e
-                              ", optimizer: SGD"
-                              ", learning-rate: " learning-rate ", loss: " loss)))
+                          ", optimizer: SGD"
+                          ", learning-rate: " learning-rate ", loss: " loss)))
           (recur updated-model  (inc e)))
         model))))
 
@@ -51,16 +51,17 @@
     ])
 
 (defn sparse-demo
-  "success with 10 lstm units"
-  []
-  (let [model (train-with-demo-dataset (lstm/init-model {:input-items #{"A" "B" "C" "D"}
-                                                         :output-items #{"prediction"}
-                                                         :inupt-size nil
-                                                         :hidden-size 10
-                                                         :output-type :prediction})
+  "success with 10 rnn units"
+  [rnn-type]
+  (let [model (train-with-demo-dataset (rnn/init-model {:input-items #{"A" "B" "C" "D"}
+                                                        :output-items #{"prediction"}
+                                                        :inupt-size nil
+                                                        :hidden-size 10
+                                                        :output-type :prediction
+                                                        :rnn-type rnn-type})
                                        dataset-sparse
                                        {:loss-interval 100
-                                        :epoc 2000
+                                        :epoc 1000
                                         :learning-rate 0.01})
         demo-input1 [{"A" (float 1)}]
         demo-input2 [{"A" (float 1)} {"A" (float 1)}]
@@ -71,21 +72,21 @@
     (pprint dataset-sparse)
     (println "\n*** demo1 ***")
     (println demo-input1)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input1 [#{"prediction"}])))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input1 [#{"prediction"}])))))
     (println "\n*** demo2 ***")
     (println demo-input2)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input2 [:skip #{"prediction"}])))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input2 [:skip #{"prediction"}])))))
     (println "\n*** demo3 ***")
     (println demo-input3)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input3 [:skip :skip :skip #{"prediction"}])))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input3 [:skip :skip :skip #{"prediction"}])))))
     (println "\n*** demo4 ***")
     (println demo-input4)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input4 [:skip :skip #{"prediction"}])))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input4 [:skip :skip #{"prediction"}])))))
     (println "\n*** demo5 ***")
     (println demo-input5)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input5 [:skip :skip :skip #{"prediction"}])))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input5 [:skip :skip :skip #{"prediction"}])))))
     (println)
     ))
 
-(defn -main []
-  (sparse-demo))
+(defn -main [& more]
+  (sparse-demo (keyword (first more))))

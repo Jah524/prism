@@ -1,4 +1,4 @@
-(ns prism.nn.lstm
+(ns prism.nn.rnn.lstm
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [emap esum emul mmul outer-product transpose array dot]]
@@ -54,7 +54,7 @@
     {:activation {:input x-input :hidden activation :output output}
      :state  {:input x-input :hidden state}}))
 
-(defn sequential-output
+(defn forward
   [model x-seq output-items-seq]
   (let [{:keys [hidden hidden-size]} model]
     (loop [x-seq x-seq,
@@ -321,5 +321,6 @@
                    output-items)
    :input-size input-size
    :hidden-size hidden-size
-   :output-type output-type})
+   :output-type output-type
+   :rnn-type :lstm})
 

@@ -1,9 +1,9 @@
-(ns examples.lstm.simple-prediction
+(ns examples.rnn.simple-prediction
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [array]]
     [clj-time.local  :as l]
-    [prism.nn.lstm :as lstm]))
+    [prism.nn.rnn :as rnn]))
 
 (defn train-sgd [model training-list learning-rate]
   (loop [model model,
@@ -12,13 +12,13 @@
          acc-loss 0]
     (if-let [training-pair (first training-list)]
       (let [{x-seq :x y-seq :y} training-pair
-            forward (lstm/sequential-output model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
-            {:keys [loss param-loss]} (lstm/bptt model
-                                                 forward
-                                                 y-seq)
+            forward (rnn/forward model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
+            {:keys [loss param-loss]} (rnn/bptt model
+                                                forward
+                                                y-seq)
             diff (get (last loss) "prediction") ; last time loss
             loss (* diff diff 0.5)] ; sum-of-squares-error
-        (recur (lstm/update-model! model param-loss learning-rate)
+        (recur (rnn/update-model! model param-loss learning-rate)
                (rest training-list)
                (inc n)
                (+ acc-loss loss)))
@@ -50,16 +50,17 @@
 
 
 (defn demo
-  "captures demo model with 2 lstm units"
-  []
-  (let [model (train-with-demo-dataset (lstm/init-model {:input-items  nil
-                                                         :output-items #{"prediction"}
-                                                         :input-size 1
-                                                         :hidden-size 2
-                                                         :output-type :prediction})
+  "captures demo model with 2 rnn units"
+  [rnn-type]
+  (let [model (train-with-demo-dataset (rnn/init-model {:input-items  nil
+                                                        :output-items #{"prediction"}
+                                                        :input-size 1
+                                                        :hidden-size 2
+                                                        :output-type :prediction
+                                                        :rnn-type rnn-type})
                                        (dataset)
                                        {:loss-interval 200
-                                        :epoc 2000
+                                        :epoc 1000
                                         :learning-rate 0.01})
         demo-input1 (map array [[1]])
         demo-input2 (map array [[1] [1] [1]])
@@ -68,15 +69,15 @@
     (pprint (dataset))
     (println "\n*** demo1 ***")
     (pprint demo-input1)
-    (pprint (last (:activation (last (lstm/sequential-output model demo-input1 [#{"prediction"}])))))
+    (pprint (last (:activation (last (rnn/forward model demo-input1 [#{"prediction"}])))))
     (println "\n*** demo2 ***")
     (pprint demo-input2)
-    (pprint (last (:activation (last (lstm/sequential-output model demo-input2 [:skip :skip #{"prediction"}])))))
+    (pprint (last (:activation (last (rnn/forward model demo-input2 [:skip :skip #{"prediction"}])))))
     (println "\n*** demo3 ***")
     (pprint demo-input3)
-    (pprint (last (:activation (last (lstm/sequential-output model demo-input3 [:skip :skip :skip :skip #{"prediction"}])))))
+    (pprint (last (:activation (last (rnn/forward model demo-input3 [:skip :skip :skip :skip #{"prediction"}])))))
     (println)))
 
 
-(defn -main []
-  (demo))
+(defn -main [& more]
+  (demo (keyword (first more))))

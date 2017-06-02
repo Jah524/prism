@@ -1,8 +1,8 @@
-(ns examples.lstm.multi-class
+(ns examples.rnn.multi-class
   (:require
     [clojure.pprint :refer [pprint]]
     [clj-time.local  :as l]
-    [prism.nn.lstm :as lstm]))
+    [prism.nn.rnn :as rnn]))
 
 
 (defn train-sgd [model training-list learning-rate]
@@ -12,13 +12,13 @@
          acc-loss 0]
     (if-let [training-pair (first training-list)]
       (let [{x-seq :x y-seq :y} training-pair
-            forward (lstm/sequential-output model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
-            {:keys [loss param-loss]} (lstm/bptt model
-                                                 forward
-                                                 y-seq)
+            forward (rnn/forward model x-seq (map #(if (= :skip %) :skip (keys %)) y-seq))
+            {:keys [loss param-loss]} (rnn/bptt model
+                                                forward
+                                                y-seq)
             {:strs [Spring Summer Autumn Winter]} (last loss)
             loss (+ (Math/abs Spring) (Math/abs Summer) (Math/abs Autumn) (Math/abs Winter))]
-        (recur (lstm/update-model! model param-loss learning-rate)
+        (recur (rnn/update-model! model param-loss learning-rate)
                (rest training-list)
                (inc n)
                (+ acc-loss loss)))
@@ -70,15 +70,16 @@
     ])
 
 (defn multiclass-demo
-  []
-  (let [model (train-with-demo-dataset (lstm/init-model {:input-items #{"quarter" "half"}
-                                                         :output-items #{"Spring" "Summer" "Autumn" "Winter"}
-                                                         :inupt-size nil
-                                                         :hidden-size 4
-                                                         :output-type :multi-class-classification})
+  [rnn-type]
+  (let [model (train-with-demo-dataset (rnn/init-model {:input-items #{"quarter" "half"}
+                                                        :output-items #{"Spring" "Summer" "Autumn" "Winter"}
+                                                        :inupt-size nil
+                                                        :hidden-size 4
+                                                        :output-type :multi-class-classification
+                                                        :rnn-type rnn-type})
                                        dataset-season
                                        {:loss-interval 500
-                                        :epoc 10000
+                                        :epoc 5000
                                         :learning-rate 0.01})
         demo-input1 [#{"half"}]
         demo-input2 [#{"half"} #{"quarter"}]
@@ -89,21 +90,21 @@
     (pprint dataset-season)
     (println "\n*** demo1 expects Summer ***")
     (println demo-input1)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input1 (repeat (count demo-input1) nil))))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input1 (repeat (count demo-input1) nil))))))
     (println "\n*** demo2 expects Autumn ***")
     (println demo-input2)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input2 (repeat (count demo-input2) nil))))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input2 (repeat (count demo-input2) nil))))))
     (println "\n*** demo3 expects Spring ***")
     (println demo-input3)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input3 (repeat (count demo-input3) nil))))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input3 (repeat (count demo-input3) nil))))))
     (println "\n*** demo4 expects Summer ***")
     (println demo-input4)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input4 (repeat (count demo-input4) nil))))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input4 (repeat (count demo-input4) nil))))))
     (println "\n*** demo5 expects Spring ***")
     (println demo-input5)
-    (pprint (:output (:activation (last (lstm/sequential-output model demo-input5 (repeat (count demo-input5) nil))))))
+    (pprint (:output (:activation (last (rnn/forward model demo-input5 (repeat (count demo-input5) nil))))))
     (println)
     ))
 
-(defn -main []
-  (multiclass-demo))
+(defn -main [& more]
+  (multiclass-demo (keyword (first more))))

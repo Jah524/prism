@@ -6,7 +6,7 @@
     [clojure.core.async :refer [go]]
     [clj-time.local :as l]
     [clojure.core.matrix :refer [array]]
-    [prism.nn.lstm :as lstm];:refer [lstm-activation init-model train!]]
+    [prism.nn.rnn :as rnn]
     [prism.util :as util]
     [prism.sampling :refer [uniform->cum-uniform samples]]))
 
@@ -91,15 +91,15 @@
                           {:keys [x y]} (add-negatives rnnlm-pair negative (shuffle (take (* (count (:x rnnlm-pair)) negative)
                                                                                           (cycle neg-pool))))]
                       (try
-                        (let [forward (lstm/sequential-output model x (map #(apply clojure.set/union (vals %)) y))
-                              {:keys [param-loss loss]} (lstm/bptt model forward y)
+                        (let [forward (rnn/forward model x (map #(apply clojure.set/union (vals %)) y))
+                              {:keys [param-loss loss]} (rnn/bptt model forward y)
                               loss-seq (->> loss
                                             (map #(/ (->> % ; by 1 target and some negatives
                                                           (map (fn [[_ v]] (Math/abs v)))
                                                           (reduce +))
                                                      (inc negative))))];; loss per output-item
                           (swap! tmp-loss #(+ %1 (/ (reduce + loss-seq) (count loss-seq))));; loss per word in line
-                          (lstm/update-model! model param-loss learning-rate))
+                          (rnn/update-model! model param-loss learning-rate))
                         (catch Exception e
                           (do
                             ;; debug purpose
@@ -129,14 +129,15 @@
 
 
 (defn init-rnnlm-model
-  [wc hidden-size]
+  [wc hidden-size rnn-type]
   (let [wc-set (conj (set (keys wc)) "<eos>")]
-    (-> (lstm/init-model {:input-items wc-set
-                          :input-size nil
-                          :hidden-size hidden-size
-                          :output-type :binary-classification
-                          :output-items wc-set
-                          :activation :linear})
+    (-> (rnn/init-model {:input-items wc-set
+                         :input-size nil
+                         :hidden-size hidden-size
+                         :output-type :binary-classification
+                         :output-items wc-set
+                         :activation :linear
+                         :rnn-type rnn-type})
         (assoc :wc wc))))
 
 (defn make-rnnlm
@@ -169,7 +170,7 @@
            previous-cell-state (array :vectorz (repeat hidden-size 0))]
       (if-let [word (first words)]
         (let [word (if (get wc word) word "<unk>")
-              {:keys [activation state]} (lstm/lstm-activation model (set [word]) previous-activation previous-cell-state)]
+              {:keys [activation state]} (rnn/hidden-activation model (set [word]) previous-activation previous-cell-state)]
           (recur (rest words)
                  activation
                  (:cell-state state)))
@@ -191,7 +192,7 @@
     {:context-unk context-unk
      :target-unk target-unk
      :context (mapv first x-seq)
-     :items (-> (lstm/sequential-output model x-seq (conj (vec (repeat n :skip)) target-words))
+     :items (-> (rnn/forward model x-seq (conj (vec (repeat n :skip)) target-words))
                 last
                 :activation
                 :output)}))

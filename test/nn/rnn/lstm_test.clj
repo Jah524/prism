@@ -1,10 +1,10 @@
-(ns nn.lstm-test
+(ns nn.rnn.lstm-test
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.test :refer :all]
     [clojure.core.matrix :refer [set-current-implementation mget array matrix ecount row-count]]
     [prism.nn.feedforward :as ff]
-    [prism.nn.lstm :refer :all]))
+    [prism.nn.rnn.lstm :refer :all]))
 
 (def sample-w-network
   {:input-size 3
@@ -217,13 +217,13 @@
              (mapv float (:cell-state ss2))
              (take 10 (repeat (float -0.20704626)))))))
 
-  (testing "sequential-output"
-    (let [result (sequential-output sample-w-network
-                                    (mapv #(array %) [[0 1 0] [0 1 0] [0 2 0]])
-                                    [:skip :skip #{"prediction1" "prediction2" "prediction3"}])]
+  (testing "forward"
+    (let [result (forward sample-w-network
+                          (mapv #(array %) [[0 1 0] [0 1 0] [0 2 0]])
+                          [:skip :skip #{"prediction1" "prediction2" "prediction3"}])]
       (is (= 3 (count result))))
-    (let [result1 (sequential-output sample-w-network (map array [[1 0 0] [1 0 0]]) [:skip #{"prediction1" "prediction2" "prediction3"}])
-          result2 (sequential-output sample-w-network (map array [[2 0 0] [1 0 0]]) [:skip #{"prediction1" "prediction2" "prediction3"}])
+    (let [result1 (forward sample-w-network (map array [[1 0 0] [1 0 0]]) [:skip #{"prediction1" "prediction2" "prediction3"}])
+          result2 (forward sample-w-network (map array [[2 0 0] [1 0 0]]) [:skip #{"prediction1" "prediction2" "prediction3"}])
           it1 (vec (:output (:activation (last result1))))
           it2 (vec (:output (:activation (last result2))))]
       (is (not= it1 it2))
@@ -232,11 +232,11 @@
       (is (= (->> it2 (reduce (fn [acc [i x]] (assoc acc i (float x))) {}))
              {"prediction2" (float 0.25481504) "prediction1" (float 0.25481504) "prediction3" (float 0.25481504)}))))
 
-  (testing "sequential-output in sparse model"
-    (let [result1 (sequential-output sample-w-network-sparse
+  (testing "forward in sparse model"
+    (let [result1 (forward sample-w-network-sparse
                                      [{"language" (float 1)} {"processing" (float 1)}]
                                      [:skip #{"prediction1" "prediction2" "prediction3"}])
-          result2 (sequential-output sample-w-network
+          result2 (forward sample-w-network
                                      [(float-array [0 1 0]) (float-array [0 0 1])]
                                      [:skip #{"prediction1" "prediction2" "prediction3"}])
           out1 (mapv float (:hidden (:activation (first result1))))
@@ -288,7 +288,7 @@
 
 
   (testing "lstm-param-delta"
-    (let [it (sequential-output sample-w-network (map float-array [[2 1 -1] [-2 0 2]]) [:skip #{"prediction1" "prediction2" "prediction3"}])
+    (let [it (forward sample-w-network (map float-array [[2 1 -1] [-2 0 2]]) [:skip #{"prediction1" "prediction2" "prediction3"}])
           result (lstm-param-delta sample-w-network
                                    {:block-delta       (float-array (take 10 (repeat 1)))
                                     :input-gate-delta  (float-array (take 10 (repeat 1)))
@@ -314,7 +314,7 @@
       (is (= (mapv float (:peephole-output-gate-delta result)) (take 10 (repeat (float -0.20586835)))))))
 
   (testing "lstm-param-delta in sparse model"
-    (let [it (sequential-output sample-w-network-sparse [{"language" 1} {"processing" 1}] [:skip #{"prediction1" "prediction2" "prediction3"}])
+    (let [it (forward sample-w-network-sparse [{"language" 1} {"processing" 1}] [:skip #{"prediction1" "prediction2" "prediction3"}])
           result (lstm-param-delta sample-w-network-sparse
                                    {:block-delta       (float-array (take 10 (repeat 1)))
                                     :input-gate-delta  (float-array (take 10 (repeat 1)))
@@ -323,7 +323,7 @@
                                    {"processing" 1}
                                    (:hidden (:activation (first it)))
                                    (:hidden (:state      (first it))))
-          it2 (sequential-output sample-w-network [(float-array [0 1 0]) (float-array [0 0 1])] [:skip #{"prediction1" "prediction2" "prediction3"}])
+          it2 (forward sample-w-network [(float-array [0 1 0]) (float-array [0 0 1])] [:skip #{"prediction1" "prediction2" "prediction3"}])
           result2 (lstm-param-delta sample-w-network
                                     {:block-delta       (float-array (take 10 (repeat 1)))
                                      :input-gate-delta  (float-array (take 10 (repeat 1)))
@@ -352,7 +352,7 @@
 
   (testing "bptt with dense binary classification"
     (let [{:keys [param-loss loss]} (bptt sample-w-network
-                                          (sequential-output sample-w-network
+                                          (forward sample-w-network
                                                              [(float-array [0 1 0]) (float-array [2 0 0])]
                                                              [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
                                           [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
@@ -391,7 +391,7 @@
 
   (testing "bptt with sparse model"
     (let [{:keys [param-loss loss]} (bptt sample-w-network-sparse
-                                          (sequential-output sample-w-network-sparse
+                                          (forward sample-w-network-sparse
                                                              [{"language" (float 1)} {"processing" (float 1)}]
                                                              [:skip ["prediction1" "prediction3"]])
                                           [:skip {:pos ["prediction1"] :neg ["prediction3"]}])
@@ -405,7 +405,7 @@
 
   (testing "bptt with sparse prediction"
     (let [{:keys [param-loss loss]} (bptt sample-w-network-prediction
-                                          (sequential-output sample-w-network-prediction
+                                          (forward sample-w-network-prediction
                                                              [{"natural" (float 1)} {"processing" (float 1)}]
                                                              [:skip ["prediction"]])
                                           [:skip {"prediction" 20}])
@@ -421,7 +421,7 @@
   (testing "update-model! with dense model"
     (let [result (update-model! sample-w-network
                                 (:param-loss (bptt sample-w-network
-                                                   (sequential-output sample-w-network
+                                                   (forward sample-w-network
                                                                       [(float-array [0 1 0]) (float-array [2 0 0])]
                                                                       [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
                                                    [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}]))
@@ -467,7 +467,7 @@
   (testing "update-model! with sparse model"
     (let [result (update-model! sample-w-network-sparse
                                 (:param-loss (bptt sample-w-network-sparse
-                                                   (sequential-output sample-w-network-sparse
+                                                   (forward sample-w-network-sparse
                                                                       [{"language" (float 1)} {"processing" (float 1)}]
                                                                       [:skip ["prediction1" "prediction3"]])
                                                    [:skip {:pos ["prediction1"] :neg ["prediction3"]}]))

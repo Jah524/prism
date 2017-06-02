@@ -5,7 +5,7 @@
     [clojure.core.matrix.operators :as o]
     [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param]]
     [prism.util :as util]
-    [prism.nn.lstm :as lstm]))
+    [prism.nn.rnn.lstm :as lstm]))
 
 
 (defn encoder-forward [encoder x-seq]
