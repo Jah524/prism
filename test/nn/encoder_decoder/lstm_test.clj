@@ -394,8 +394,8 @@
   (testing "encoder-decoder-bptt"
     (let [{:keys [loss param-loss]} (encoder-decoder-bptt sample-encoder-decoder
                                                           (encoder-decoder-forward sample-encoder-decoder
-                                                                                   (map float-array [[2 0 0] [0 -1 1]])
-                                                                                   (map float-array [[-1 1 -1] [2 -1 1]])
+                                                                                   (map #(array :vectorz %) [[2 0 0] [0 -1 1]])
+                                                                                   (map #(array :vectorz %) [[-1 1 -1] [2 -1 1]])
                                                                                    [#{"prediction1" "prediction2"} #{"prediction2" "prediction3"}])
                                                           [{:pos ["prediction1"] :neg ["prediction2"]} {:pos ["prediction2"] :neg ["prediction3"]}])
           {:keys [encoder-param-delta decoder-param-delta]} param-loss]
