@@ -61,7 +61,7 @@
                                                         :rnn-type rnn-type})
                                        (dataset)
                                        {:loss-interval 200
-                                        :epoc 1000
+                                        :epoc 2000
                                         :learning-rate 0.01})
         demo-input1 (map array [[1]])
         demo-input2 (map array [[1] [1] [1]])

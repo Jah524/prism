@@ -80,7 +80,7 @@
                                                         :rnn-type rnn-type})
                                        dataset-season
                                        {:loss-interval 500
-                                        :epoc 5000
+                                        :epoc 10000
                                         :learning-rate 0.01})
         demo-input1 [#{"half"}]
         demo-input2 [#{"half"} #{"quarter"}]
