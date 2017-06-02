@@ -37,13 +37,13 @@
         reset-gate-state  (m/add reset-gate'  (mmul reset-gate-wr hidden:t-1)  reset-gate-bias)
         update-gate (m/logistic update-gate-state)
         reset-gate  (m/logistic reset-gate-state)
-        h-state (m/add (mmul wr (o/* reset-gate hidden:t-1))
-                       unit'
-                       bias)
+        h-state (m/add! (mmul wr (o/* reset-gate hidden:t-1))
+                        unit'
+                        bias)
         h (m/tanh h-state)
-        gru (o/+ (o/* update-gate h)
-                 (o/* (o/- (array :vectorz (repeat hidden-size 1)) update-gate)
-                      hidden:t-1))]
+        gru (m/add! (o/* update-gate h)
+                    (o/* (m/sub! (array :vectorz (repeat hidden-size 1)) update-gate)
+                         hidden:t-1))]
     {:activation  {:gru gru :update-gate update-gate :reset-gate reset-gate :h h}
      :state       {:update-gate update-gate-state :reset-gate reset-gate-state :h-state h-state}}))
 
@@ -90,11 +90,11 @@
         reset-gate-delta (o/* tmp-delta
                               hidden:t-1
                               (derivative reset-gate-state :sigmoid))
-        hidden:t-1-delta (o/+ (o/* (o/- ones update-gate)
-                                   propagated-delta)
-                              (mmul (transpose update-gate-wr) update-gate-delta)
-                              (mmul (transpose reset-gate-wr) reset-gate-delta)
-                              (o/* tmp-delta reset-gate))]
+        hidden:t-1-delta (m/add! (o/* (o/- ones update-gate)
+                                      propagated-delta)
+                                 (mmul (transpose update-gate-wr) update-gate-delta)
+                                 (mmul (transpose reset-gate-wr) reset-gate-delta)
+                                 (o/* tmp-delta reset-gate))]
     {:update-gate-delta update-gate-delta
      :reset-gate-delta reset-gate-delta
      :unit-delta h-delta
