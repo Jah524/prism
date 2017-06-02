@@ -1,5 +1,20 @@
 # Change Log
 
+## [0.7.0] - FIXME
+
+### add
+
+- GRU unit for recurrent neural network
+
+### change
+
+- LSTM was moved to src/prism/nn/rnn/
+- encoder-decoder-lstm was moved to src/prism/nn/encoder-decoder/
+
+### rename
+
+- sequential-output was renamed to forward (lstm)
+
 ## [0.6.0] - 2017-6-1
 
 ### add
