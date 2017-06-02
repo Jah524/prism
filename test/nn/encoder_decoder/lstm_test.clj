@@ -1,11 +1,11 @@
-(ns nn.encoder-decoder-test
+(ns nn.encoder-decoder.lstm-test
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.test   :refer :all]
     [clojure.core.matrix :refer [set-current-implementation mget array matrix ecount row-count]]
     [prism.nn.rnn.lstm  :refer [lstm-activation forward]]
     [nn.rnn.lstm-test   :refer [sample-w-network]]
-    [prism.nn.encoder-decoder :refer :all]))
+    [prism.nn.encoder-decoder.lstm :refer :all]))
 
 
 (def encoder-sample-network
