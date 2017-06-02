@@ -141,7 +141,7 @@
         (if (every? map? maps)
           (apply merge-with m maps)
           (do
-            (apply o/+ maps))))
+            (apply add! maps))))
       maps)))
 
 

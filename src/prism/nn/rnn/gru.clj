@@ -19,7 +19,7 @@
                      (let [[sparse-k v] item
                            {:keys [w update-gate-w reset-gate-w]} (get sparses sparse-k)]
                        [(o/* v w) (o/* v update-gate-w) (o/* v reset-gate-w)]))))
-       (apply mapv o/+)))
+       (apply mapv m/add!)))
 
 (defn gru-activation
   [model x-input hidden:t-1]
@@ -33,16 +33,16 @@
                                            (let [{:keys [w update-gate-w reset-gate-w]} hidden
                                                  gru-mat [w update-gate-w reset-gate-w]]
                                              (mapv #(mmul % x-input) gru-mat)))
-        update-gate-state (o/+ update-gate' (mmul update-gate-wr hidden:t-1) update-gate-bias)
-        reset-gate-state  (o/+ reset-gate'  (mmul reset-gate-wr hidden:t-1)  reset-gate-bias)
+        update-gate-state (m/add! update-gate' (mmul update-gate-wr hidden:t-1) update-gate-bias)
+        reset-gate-state  (m/add! reset-gate'  (mmul reset-gate-wr hidden:t-1)  reset-gate-bias)
         update-gate (m/logistic update-gate-state)
         reset-gate  (m/logistic reset-gate-state)
-        h-state (o/+ (mmul wr (o/* reset-gate hidden:t-1))
-                     (o/* unit' w)
-                     bias)
+        h-state (m/add! (mmul wr (o/* reset-gate hidden:t-1))
+                        (o/* unit' w)
+                        bias)
         h (m/tanh h-state)
         gru (o/+ (update-gate h)
-                 (o/* (o/- (array :vectorz (repeat hidden-size 1)) update-gate)
+                 (o/* (m/sub! (array :vectorz (repeat hidden-size 1)) update-gate)
                       hidden:t-1))]
     {:activation  {:gru gru :update-gate update-gate :reset-gate reset-gate :h h}
      :state       {:update-gate update-gate-state :reset-gate reset-gate-state :h-state h-state}}))
@@ -77,11 +77,11 @@
   (let [{:keys [wr update-gate-wr reset-gate-wr]} (:hidden model)
         {:keys [update-gate reset-gate h]} gru-activation
         {update-gate-state :update-gate reset-gate-state :reset-gate h-state :h} gru-state
-        update-gate-delta1 (o/- (array :vectorz (repeat hidden-size 1))
-                                (o/* hidden:t-1
-                                     propagated-delta))
+        update-gate-delta1 (m/sub! (array :vectorz (repeat hidden-size 1))
+                                   (o/* hidden:t-1
+                                        propagated-delta))
         update-gate-delta2 (o/* h propagated-delta)
-        update-gate-delta (o/* (o/+ update-gate-delta1 update-gate-delta2)
+        update-gate-delta (o/* (m/add! update-gate-delta1 update-gate-delta2)
                                (derivative update-gate-state :sgmoid))
         h-delta (o/* (derivative h-state :tanh)
                      update-gate
@@ -160,17 +160,17 @@
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
                                                                 (o/* delta w))))
-                                                       (apply o/+)
+                                                       (apply m/add!)
                                                        (clip! 100)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (o/+ propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (m/add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
                                             propagated-output-to-hidden-delta)
               ;hidden delta
-              gru-state (:hidden (:state (first output-seq)))
+              gru-state (-> output-seq first :state :hidden)
               gruactivation (-> output-seq first :activation :hidden)
               hidden:t-1 (or (-> output-seq second :activation :hidden :gru)
                              (array :vectorz (repeat hidden-size 0)))
