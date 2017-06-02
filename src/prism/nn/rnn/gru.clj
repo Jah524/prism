@@ -33,16 +33,16 @@
                                            (let [{:keys [w update-gate-w reset-gate-w]} hidden
                                                  gru-mat [w update-gate-w reset-gate-w]]
                                              (mapv #(mmul % x-input) gru-mat)))
-        update-gate-state (m/add! update-gate' (mmul update-gate-wr hidden:t-1) update-gate-bias)
-        reset-gate-state  (m/add! reset-gate'  (mmul reset-gate-wr hidden:t-1)  reset-gate-bias)
+        update-gate-state (m/add update-gate' (mmul update-gate-wr hidden:t-1) update-gate-bias)
+        reset-gate-state  (m/add reset-gate'  (mmul reset-gate-wr hidden:t-1)  reset-gate-bias)
         update-gate (m/logistic update-gate-state)
         reset-gate  (m/logistic reset-gate-state)
-        h-state (m/add! (mmul wr (o/* reset-gate hidden:t-1))
-                        (o/* unit' w)
-                        bias)
+        h-state (m/add (mmul wr (o/* reset-gate hidden:t-1))
+                       unit'
+                       bias)
         h (m/tanh h-state)
-        gru (o/+ (update-gate h)
-                 (o/* (m/sub! (array :vectorz (repeat hidden-size 1)) update-gate)
+        gru (o/+ (o/* update-gate h)
+                 (o/* (o/- (array :vectorz (repeat hidden-size 1)) update-gate)
                       hidden:t-1))]
     {:activation  {:gru gru :update-gate update-gate :reset-gate reset-gate :h h}
      :state       {:update-gate update-gate-state :reset-gate reset-gate-state :h-state h-state}}))
@@ -50,7 +50,7 @@
 (defn gru-fixed-time
   [model x-input sparse-outputs hidden:t-1]
   (let [{:keys [activation state]} (gru-activation model x-input hidden:t-1)
-        output (if (= :skip sparse-outputs) :skipped (ff/output-activation model activation sparse-outputs))]
+        output (if (= :skip sparse-outputs) :skipped (ff/output-activation model (:gru activation) sparse-outputs))]
     {:activation  {:input x-input :hidden activation :output output}
      :state       {:input x-input :hidden state}}))
 
@@ -65,7 +65,7 @@
         (let [{:keys [activation state] :as model-output} (gru-fixed-time model x-list (first output-items-seq) hidden:t-1)]
           (recur (rest x-seq)
                  (rest output-items-seq)
-                 (:hidden activation)
+                 (:gru (:hidden activation))
                  (cons model-output acc)))
         (vec (reverse acc))))))
 
@@ -76,22 +76,22 @@
   [model hidden-size propagated-delta gru-activation gru-state hidden:t-1]
   (let [{:keys [wr update-gate-wr reset-gate-wr]} (:hidden model)
         {:keys [update-gate reset-gate h]} gru-activation
-        {update-gate-state :update-gate reset-gate-state :reset-gate h-state :h} gru-state
-        update-gate-delta1 (m/sub! (array :vectorz (repeat hidden-size 1))
-                                   (o/* hidden:t-1
-                                        propagated-delta))
+        {update-gate-state :update-gate reset-gate-state :reset-gate h-state :h-state} gru-state
+        ones (array :vectorz (repeat hidden-size 1))
+        update-gate-delta1 (m/sub ones (o/* hidden:t-1 propagated-delta))
         update-gate-delta2 (o/* h propagated-delta)
-        update-gate-delta (o/* (m/add! update-gate-delta1 update-gate-delta2)
-                               (derivative update-gate-state :sgmoid))
+        update-gate-delta (o/* (m/add update-gate-delta1 update-gate-delta2)
+                               (derivative update-gate-state :sigmoid))
         h-delta (o/* (derivative h-state :tanh)
                      update-gate
                      propagated-delta)
         tmp-delta (mmul (transpose wr) h-delta)
         reset-gate-delta (o/* tmp-delta
-                              (o/* reset-gate hidden:t-1)
-                              (o/* (derivative reset-gate-state :sigmoid)
-                                   hidden:t-1))
-        hidden:t-1-delta (o/+ (mmul (transpose update-gate-wr) update-gate-delta)
+                              hidden:t-1
+                              (derivative reset-gate-state :sigmoid))
+        hidden:t-1-delta (o/+ (o/* (o/- ones update-gate)
+                                   propagated-delta)
+                              (mmul (transpose update-gate-wr) update-gate-delta)
                               (mmul (transpose reset-gate-wr) reset-gate-delta)
                               (o/* tmp-delta reset-gate))]
     {:update-gate-delta update-gate-delta
@@ -160,7 +160,7 @@
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
                                                                 (o/* delta w))))
-                                                       (apply m/add!)
+                                                       (apply m/add)
                                                        (clip! 100)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
@@ -171,7 +171,7 @@
                                             propagated-output-to-hidden-delta)
               ;hidden delta
               gru-state (-> output-seq first :state :hidden)
-              gruactivation (-> output-seq first :activation :hidden)
+              gru-activation (-> output-seq first :activation :hidden)
               hidden:t-1 (or (-> output-seq second :activation :hidden :gru)
                              (array :vectorz (repeat hidden-size 0)))
               gru-delta (gru-delta model hidden-size summed-propagated-delta gru-activation gru-state hidden:t-1)

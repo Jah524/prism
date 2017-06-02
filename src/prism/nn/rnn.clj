@@ -4,15 +4,14 @@
     [prism.nn.rnn.lstm :as lstm]
     [prism.nn.rnn.gru :as gru]))
 
-(comment "must return context vector representation FIXME"
-  (defn hidden-activation
-    [model x-input recurrent-input-list previous-cell-state]
-    (let [{:keys [rnn-type]} model]
-      (condp = rnn-type
-        :standard (s/forward-fixed-time model x-input recurrent-input-list previous-cell-state)
-        :lstm     (lstm/lstm-activation model x-input recurrent-input-list previous-cell-state)
-        :gru      (gru/lstm-activation model x-input recurrent-input-list previous-cell-state))))
-  )
+(defn hidden-fixed-time
+  [model x-input recurrent-input-list previous-cell-state]
+  (let [{:keys [rnn-type]} model]
+    (condp = rnn-type
+      :standard (-> (s/forward-fixed-time model x-input recurrent-input-list previous-cell-state) :activation :hidden)
+      :lstm     (-> (lstm/lstm-activation model x-input recurrent-input-list previous-cell-state) :activation)
+      :gru      (-> (gru/gru-activation model x-input recurrent-input-list previous-cell-state)   :activation :gru))))
+
 
 (defn forward
   [model x-seq output-items-seq]
@@ -43,7 +42,7 @@
   (condp = rnn-type
     :standard (s/init-model params)
     :lstm     (lstm/init-model params)
-    :gru      (lstm/init-model params)
+    :gru      (gru/init-model params)
     (throw (Exception. "rnn-type was not specified"))))
 
 
