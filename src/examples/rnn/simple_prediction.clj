@@ -57,6 +57,7 @@
                                                         :input-size 1
                                                         :hidden-size 2
                                                         :output-type :prediction
+                                                        :activation :sigmoid ;;works only standard rnn
                                                         :rnn-type rnn-type})
                                        (dataset)
                                        {:loss-interval 200

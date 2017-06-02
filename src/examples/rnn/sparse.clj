@@ -58,6 +58,7 @@
                                                         :inupt-size nil
                                                         :hidden-size 10
                                                         :output-type :prediction
+                                                        :activation :sigmoid ;;works only standard rnn
                                                         :rnn-type rnn-type})
                                        dataset-sparse
                                        {:loss-interval 100

@@ -76,6 +76,7 @@
                                                         :inupt-size nil
                                                         :hidden-size 4
                                                         :output-type :multi-class-classification
+                                                        :activation :sigmoid ;;works only standard rnn
                                                         :rnn-type rnn-type})
                                        dataset-season
                                        {:loss-interval 500
