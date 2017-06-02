@@ -4,7 +4,8 @@
 
 ### add
 
-- GRU unit for recurrent neural network
+- standard rnn
+- Gated Recurrent Unit(GRU)
 
 ### change
 
@@ -19,7 +20,7 @@
 
 ### add
 
-- encoder-decoder model formally
+- encoder-decoder model formally (LSTM only)
 - tentatively add batch normalization of feedforward
 
 ### change
