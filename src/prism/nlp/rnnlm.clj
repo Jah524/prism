@@ -170,7 +170,7 @@
            previous-cell-state (array :vectorz (repeat hidden-size 0))]
       (if-let [word (first words)]
         (let [word (if (get wc word) word "<unk>")
-              {:keys [activation state]} (rnn/hidden-activation model (set [word]) previous-activation previous-cell-state)]
+              {:keys [activation state]} (rnn/hidden-fixed-time model (set [word]) previous-activation previous-cell-state)]
           (recur (rest words)
                  activation
                  (:cell-state state)))

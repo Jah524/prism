@@ -73,8 +73,9 @@
 
 (defn gru-delta
   "propagation through a gru unit"
-  [model hidden-size propagated-delta gru-activation gru-state hidden:t-1]
-  (let [{:keys [wr update-gate-wr reset-gate-wr]} (:hidden model)
+  [model propagated-delta gru-activation gru-state hidden:t-1]
+  (let [{:keys [hidden hidden-size]} model
+        {:keys [wr update-gate-wr reset-gate-wr]} hidden
         {:keys [update-gate reset-gate h]} gru-activation
         {update-gate-state :update-gate reset-gate-state :reset-gate h-state :h-state} gru-state
         ones (array :vectorz (repeat hidden-size 1))
@@ -174,7 +175,7 @@
               gru-activation (-> output-seq first :activation :hidden)
               hidden:t-1 (or (-> output-seq second :activation :hidden :gru)
                              (array :vectorz (repeat hidden-size 0)))
-              gru-delta (gru-delta model hidden-size summed-propagated-delta gru-activation gru-state hidden:t-1)
+              gru-delta (gru-delta model summed-propagated-delta gru-activation gru-state hidden:t-1)
               x-input (:input (:activation (first output-seq)))
               gru-param-delta (gru-param-delta model gru-delta x-input hidden:t-1)]
           (recur (rest output-items-seq)
