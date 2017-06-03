@@ -71,7 +71,7 @@
    :decoder decoder-sample-network})
 
 
-(deftest encoder-decoder-test
+(deftest encoder-decoder-lstm-test
   (testing "init-encoder-decoder-model"
     (let [{:keys [encoder decoder]} (init-encoder-decoder-model {:input-items  nil
                                                                  :output-items #{"A" "B" "C"}
