@@ -6,6 +6,7 @@
 
 - standard rnn
 - Gated Recurrent Unit(GRU)
+- Skip-Thought
 
 ### change
 
