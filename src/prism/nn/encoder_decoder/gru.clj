@@ -117,7 +117,7 @@
       (if (first output-seq)
         (let [gru-activation (-> output-seq first  :hidden :activation)
               gru-state (-> output-seq first :hidden :state)
-              hidden:t-1 (or (-> output-seq second :activation :hidden :gru)
+              hidden:t-1 (or (-> output-seq second :hidden :activation :gru)
                              (array :vectorz (repeat hidden-size 0)))
               gru-delta (gru/gru-delta encoder propagated-hidden-to-hidden-delta gru-activation gru-state hidden:t-1 )
               x-input (:input (first output-seq))
