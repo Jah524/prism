@@ -318,4 +318,5 @@
                                       :hidden-size encoder-hidden-size
                                       :input-size input-size)))]
     {:encoder encoder
-     :decoder (init-decoder param)}))
+     :decoder (init-decoder param)
+     :rnn-type :gru}))
