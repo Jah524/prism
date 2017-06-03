@@ -129,7 +129,7 @@
     (if (or (set? x-input) (map? x-input))
       (-> template (assoc :sparses-delta (param-delta-sparse x-input unit-delta update-gate-delta reset-gate-delta)))
       (assoc template
-        :w-delta           (outer-product unit-delta x-input)
+        :w-delta             (outer-product unit-delta x-input)
         :update-gate-w-delta (outer-product update-gate-delta x-input)
         :reset-gate-w-delta  (outer-product reset-gate-delta x-input)))))
 

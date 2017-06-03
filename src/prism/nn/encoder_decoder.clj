@@ -4,11 +4,11 @@
     [prism.nn.encoder-decoder.gru  :as gru]))
 
 (defn forward
-  [model x-seq output-items-seq]
+  [model encoder-x-seq decoder-x-seq output-items-seq]
   (let [{:keys [rnn-type]} model]
     (condp = rnn-type
-      :lstm (lstm/encoder-decoder-forward model x-seq output-items-seq)
-      :gru  (gru/encoder-decoder-forward model x-seq output-items-seq))))
+      :lstm (lstm/encoder-decoder-forward model encoder-x-seq decoder-x-seq output-items-seq)
+      :gru  (gru/encoder-decoder-forward model encoder-x-seq decoder-x-seq output-items-seq))))
 
 (defn bptt
   [model activation output-items-seq]

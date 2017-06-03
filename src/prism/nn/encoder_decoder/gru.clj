@@ -12,12 +12,12 @@
 (defn encoder-forward [encoder x-seq]
   (let [{:keys [hidden hidden-size]} encoder]
     (loop [x-seq x-seq,
-           previous-activation (array :vectorz (repeat hidden-size 0)),
+           hidden:t-1 (array :vectorz (repeat hidden-size 0)),
            acc []]
       (if-let [x-input (first x-seq)]
-        (let [{:keys [activation state] :as model-output} (gru/gru-activation encoder x-input previous-activation)]
+        (let [{:keys [activation state] :as model-output} (gru/gru-activation encoder x-input hidden:t-1)]
           (recur (rest x-seq)
-                 activation
+                 (:gru activation)
                  (cons {:input x-input :hidden model-output} acc)))
         (vec (reverse acc))))))
 
@@ -51,7 +51,7 @@
 (defn decoder-activation-time-fixed
   [decoder x-input sparse-outputs hidden:t-1 encoder-input previous-input]
   (let [{:keys [activation state]} (decoder-gru-activation decoder x-input hidden:t-1 encoder-input)
-        output (if (= :skip sparse-outputs) :skipped (lstm/decoder-output-activation decoder activation encoder-input previous-input sparse-outputs))]
+        output (if (= :skip sparse-outputs) :skipped (lstm/decoder-output-activation decoder (:gru activation) encoder-input previous-input sparse-outputs))]
     {:activation {:input x-input :hidden activation :output output}
      :state  {:input x-input :hidden state}}))
 
@@ -68,7 +68,7 @@
               (decoder-activation-time-fixed decoder x-list (first output-items-seq) hidden:t-1 encoder-input previous-input)]
           (recur (rest x-seq)
                  (rest output-items-seq)
-                 (:hidden activation)
+                 (:gru (:hidden activation))
                  x-list
                  (cons decoder-output acc)))
         (vec (reverse acc))))))
@@ -78,7 +78,7 @@
   [encoder-decoder-model encoder-x-seq decoder-x-seq decoder-output-items-seq]
   (let [{:keys [encoder decoder]} encoder-decoder-model
         encoder-activation (encoder-forward encoder encoder-x-seq)
-        decoder-activation (decoder-forward decoder decoder-x-seq (:gru (:hidden (:activation (last encoder-activation)))) decoder-output-items-seq)]
+        decoder-activation (decoder-forward decoder decoder-x-seq (:gru (:activation (:hidden (last encoder-activation)))) decoder-output-items-seq)]
     {:encoder encoder-activation :decoder decoder-activation}))
 
 
@@ -115,12 +115,12 @@
            output-seq (reverse encoder-activation),
            hidden-acc nil]
       (if (first output-seq)
-        (let [gru-activation (-> output-seq first :activation :hidden)
-              gru-state (-> output-seq first :state :hidden)
+        (let [gru-activation (-> output-seq first  :hidden :activation)
+              gru-state (-> output-seq first :hidden :state)
               hidden:t-1 (or (-> output-seq second :activation :hidden :gru)
                              (array :vectorz (repeat hidden-size 0)))
               gru-delta (gru/gru-delta encoder propagated-hidden-to-hidden-delta gru-activation gru-state hidden:t-1 )
-              x-input (:input (:activation (first output-seq)))
+              x-input (:input (first output-seq))
               gru-param-delta (gru/gru-param-delta encoder gru-delta x-input hidden:t-1)]
           (recur (:hidden:t-1-delta gru-delta)
                  (rest output-seq)
@@ -154,7 +154,7 @@
               previous-decoder-input (if-let [it (:input (:activation (second output-seq)))] it (array :vectorz (repeat input-size 0)))
               output-param-delta (lstm/decoder-output-param-delta output-delta
                                                                   hidden-size
-                                                                  (:hidden (:activation (first output-seq)))
+                                                                  (:gru (:hidden (:activation (first output-seq))))
                                                                   encoder-size
                                                                   encoder-input
                                                                   input-size
@@ -176,7 +176,7 @@
               gru-state (-> output-seq first :state :hidden)
               hidden:t-1 (or (-> output-seq second :activation :hidden :gru)
                              (array :vectorz (repeat hidden-size 0)))
-              gru-delta (gru/gru-delta decoder propagated-hidden-to-hidden-delta gru-activation gru-state hidden:t-1 )
+              gru-delta (gru/gru-delta decoder summed-propagated-delta gru-activation gru-state hidden:t-1 )
               x-input (:input (:activation (first output-seq)))
               gru-param-delta (gru-param-delta decoder gru-delta x-input hidden:t-1 encoder-input)
               {:keys [unit-delta update-gate-delta reset-gate-delta]} gru-delta
@@ -255,7 +255,7 @@
     ; dense
     (when w-delta             (rewrite! learning-rate w w-delta))
     (when update-gate-w-delta (rewrite! learning-rate update-gate-w update-gate-w-delta))
-    (when reset-gate-w-delta  (rewrite! learning-rate reset-gate-we-delta reset-gate-w-delta))
+    (when reset-gate-w-delta  (rewrite! learning-rate reset-gate-w-delta reset-gate-w-delta))
     ;; update recurrent connections
     (rewrite! learning-rate wr wr-delta)
     (rewrite! learning-rate update-gate-wr update-gate-wr-delta)
@@ -275,7 +275,7 @@
   (let[{:keys [encoder decoder]} encoder-decoder-model
        {:keys [encoder-param-delta decoder-param-delta]} encoder-decoder-param-delta]
     (gru/update-model! encoder encoder-param-delta learning-rate)
-    (update-decoder!    decoder decoder-param-delta learning-rate)
+    (update-decoder!   decoder decoder-param-delta learning-rate)
     encoder-decoder-model))
 
 
