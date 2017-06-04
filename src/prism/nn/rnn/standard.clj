@@ -80,8 +80,9 @@
               hidden-delta (emul (derivative hidden-state (:activation hidden))
                                  summed-propagated-delta)
               x-input (:input (:activation (first output-seq)))
-              hidden:t-1 (or (-> (second output-seq) :activation :hidden)
-                             (array :vectorz (repeat hidden-size 0)))
+              hidden:t-1  (if (second output-seq)
+                            (-> (second output-seq) :activation :hidden)
+                            (array :vectorz (repeat hidden-size 0)))
               h2h-param-delta {:wr-delta (outer-product hidden-delta hidden:t-1)}
               i2h-param-delta (if (or (set? x-input) (map? x-input))
                                 (ff/param-delta:sparse model hidden-delta x-input hidden-size)

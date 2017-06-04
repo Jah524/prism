@@ -211,10 +211,12 @@
               lstm-part-delta (lstm-part-delta hidden-size summed-propagated-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (:activation (first output-seq)))
-              self-activation:t-1 (or (:hidden (:activation (second output-seq)))
-                                      (array :vectorz (repeat hidden-size 0)));when first output time (last time of bptt
-              self-state:t-1      (or (:hidden (:state (second output-seq)))
-                                      {:cell-state (array :vectorz (repeat hidden-size 0))});when first output time (last time of bptt)
+              self-activation:t-1  (if (second output-seq)
+                                     (:hidden (:activation (second output-seq)))
+                                     (array :vectorz (repeat hidden-size 0)));when first output time (last time of bptt
+              self-state:t-1       (if (second output-seq)
+                                     (:hidden (:state (second output-seq)))
+                                     {:cell-state (array :vectorz (repeat hidden-size 0))});when first output time (last time of bptt)
               lstm-param-delta (lstm-param-delta model lstm-part-delta x-input self-activation:t-1 self-state:t-1)
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]

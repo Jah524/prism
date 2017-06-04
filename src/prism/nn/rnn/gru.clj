@@ -173,8 +173,9 @@
               ;hidden delta
               gru-state (-> output-seq first :state :hidden)
               gru-activation (-> output-seq first :activation :hidden)
-              hidden:t-1 (or (-> output-seq second :activation :hidden :gru)
-                             (array :vectorz (repeat hidden-size 0)))
+              hidden:t-1 (if (second output-seq)
+                           (-> output-seq second :activation :hidden :gru)
+                           (array :vectorz (repeat hidden-size 0)))
               gru-delta (gru-delta model summed-propagated-delta gru-activation gru-state hidden:t-1)
               x-input (:input (:activation (first output-seq)))
               gru-param-delta (gru-param-delta model gru-delta x-input hidden:t-1)]
