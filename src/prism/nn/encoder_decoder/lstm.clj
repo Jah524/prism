@@ -2,7 +2,7 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! sub sub! emap esum scale emul emul! mmul outer-product transpose array dot exp]]
-    [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param]]
+    [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param!]]
     [prism.util :as util]
     [prism.nn.rnn.lstm :as lstm]))
 
@@ -240,7 +240,7 @@
                  (rest output-seq)
                  lstm-part-delta
                  (:state (:hidden (first output-seq)))
-                 (merge-param hidden-acc lstm-param-delta)))
+                 (merge-param! hidden-acc lstm-param-delta)))
         {:hidden-delta hidden-acc}))))
 
 (defn decoder-bptt
@@ -321,8 +321,8 @@
                  lstm-part-delta
                  (:hidden (:state (first output-seq)))
                  (cons output-delta output-loss)
-                 (merge-param output-acc output-param-delta)
-                 (merge-param hidden-acc lstm-param-delta)
+                 (merge-param! output-acc output-param-delta)
+                 (merge-param! hidden-acc lstm-param-delta)
                  (add! encoder-delta propagation-to-encoder)))
         :else
         {:param-loss {:output-delta output-acc

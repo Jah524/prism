@@ -87,8 +87,8 @@
                                            (ff/param-delta bn-delta training-x)))
                                        (mapv :bn-delta bn-delta-batch)
                                        training-x-batch)]
-    {:param-loss {:output-delta (apply u/merge-param output-param-delta)
-                  :hidden-delta (assoc (apply u/merge-param hidden-param-delta-batch)
+    {:param-loss {:output-delta (apply u/merge-param! output-param-delta)
+                  :hidden-delta (assoc (apply u/merge-param! hidden-param-delta-batch)
                                   :scale-delta (apply add (mapv :scale-delta  bn-delta-batch))
                                   :shift-delta (apply add (mapv :shift-delta  bn-delta-batch)))}
      :loss-seq output-delta-batch}))

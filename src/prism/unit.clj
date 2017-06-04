@@ -132,7 +132,7 @@
     (prediction-error activation expectation)))
 
 
-(defn merge-param
+(defn merge-param!
   [& maps]
   (if (nil? (first maps))
     (second maps); when acc is nil

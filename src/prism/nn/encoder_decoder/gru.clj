@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! sub sub! emap esum emul emul! mmul outer-product transpose array dot exp] :as m]
     [clojure.core.matrix.operators :as o]
-    [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param]]
+    [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param!]]
     [prism.util :as util]
     [prism.nn.rnn.gru :as gru]
     [prism.nn.encoder-decoder.lstm :as lstm]))
@@ -125,7 +125,7 @@
               gru-param-delta (gru/gru-param-delta encoder gru-delta x-input hidden:t-1)]
           (recur (:hidden:t-1-delta gru-delta)
                  (rest output-seq)
-                 (merge-param hidden-acc gru-param-delta)))
+                 (merge-param! hidden-acc gru-param-delta)))
         {:hidden-delta hidden-acc}))))
 
 (defn decoder-bptt
@@ -191,8 +191,8 @@
                  (:hidden:t-1-delta gru-delta)
                  (rest output-seq)
                  (cons output-delta output-loss)
-                 (merge-param output-acc output-param-delta)
-                 (merge-param hidden-acc gru-param-delta)
+                 (merge-param! output-acc output-param-delta)
+                 (merge-param! hidden-acc gru-param-delta)
                  (add! encoder-delta propagation-to-encoder)))
         :else
         {:param-loss {:output-delta output-acc

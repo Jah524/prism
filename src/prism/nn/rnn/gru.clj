@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! emap esum sub sub! scale scale! emul emul! mmul outer-product transpose array dot] :as m]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param]]
+    [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param!]]
     [prism.util :as util]))
 
 
@@ -182,8 +182,8 @@
                  (:hidden:t-1-delta gru-delta)
                  (rest output-seq)
                  (cons output-delta output-loss)
-                 (merge-param output-acc output-param-delta)
-                 (merge-param hidden-acc gru-param-delta)))
+                 (merge-param! output-acc output-param-delta)
+                 (merge-param! hidden-acc gru-param-delta)))
         :else
         {:param-loss  {:output-delta output-acc
                        :hidden-delta hidden-acc}
