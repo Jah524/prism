@@ -64,8 +64,8 @@
          {"processing" 1.0} [4.0 5.0]
          {"natural" 2 "processing" -1} [-4.0 -3.0]))
 
-  (testing "network-output with dense input"
-    (let [result (network-output sample-model (array [2]) #{"prediction"})
+  (testing "forward with dense input"
+    (let [result (forward sample-model (array [2]) #{"prediction"})
           {:keys [activation state]} result
           {:keys [input hidden output]} activation]
       (is (= (vec input) [(float 2)]))
@@ -73,8 +73,8 @@
       (is (= (vec (:hidden state)) [3.0 3.0 3.0]))
       (is (= (reduce (fn[acc [k v]](assoc acc k (float v))) {} output) {"prediction" (float 1.2857722491025925)}))))
 
-  (testing "network-output with sparse input"
-    (let [result (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction3"})
+  (testing "forward with sparse input"
+    (let [result (forward sample-model2:sparse {"language" 1} #{"prediction1" "prediction3"})
           {:keys [activation state]} result
           {:keys [input hidden output]} activation]
       (is (= input {"language" 1}))
@@ -83,8 +83,8 @@
       (is (= (reduce (fn [acc [k v]](assoc acc k (float v))) {} output)
              {"prediction1" (float 2.518785) "prediction3" (float 2.518785)})))
 
-    (let [a (:activation (network-output sample-model2 (float-array [0 1 0]) #{"prediction1" "prediction3"}))
-          b (:activation (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction3"}))]
+    (let [a (:activation (forward sample-model2 (float-array [0 1 0]) #{"prediction1" "prediction3"}))
+          b (:activation (forward sample-model2:sparse {"language" 1} #{"prediction1" "prediction3"}))]
       (is (= (:output a) (:output b)))))
 
 
@@ -95,7 +95,7 @@
 
   (testing "back-propagation with dense"
     (let [{:keys [param-loss loss]} (back-propagation sample-model
-                                                      (network-output sample-model (float-array [2]) #{"prediction"})
+                                                      (forward sample-model (float-array [2]) #{"prediction"})
                                                       {"prediction" 2})
           {:keys [output-delta hidden-delta]} param-loss
           {hidden-w-delta :w-delta hidden-bias-delta :bias-delta} hidden-delta
@@ -112,7 +112,7 @@
 
   (testing "back-propagation with sparse vector"
     (let [{:keys [param-loss loss]} (back-propagation sample-model2:sparse
-                                                      (network-output sample-model2:sparse {"language" 1}  #{"prediction1" "prediction2" "prediction3"})
+                                                      (forward sample-model2:sparse {"language" 1}  #{"prediction1" "prediction2" "prediction3"})
                                                       {"prediction1" 2 "prediction2" 1 "prediction3" 2})
           {:keys [output-delta hidden-delta]} param-loss
           {w-delta1 :w-delta bias-delta1 :bias-delta} (get output-delta "prediction1")
@@ -132,10 +132,10 @@
              (map float [-0.5187848890941353])))
       (is (= (vec bias-delta2) (map double [-1.5187848890941353])))
       (let [a (:param-loss (back-propagation sample-model2:sparse
-                                             (network-output sample-model2:sparse {"language" 1} #{"prediction1" "prediction2" "prediction3"})
+                                             (forward sample-model2:sparse {"language" 1} #{"prediction1" "prediction2" "prediction3"})
                                              {"prediction1" 2 "prediction2" 1 "prediction3" 2}))
             b (:param-loss (back-propagation sample-model2
-                                             (network-output sample-model2 (float-array [0 1 0]) #{"prediction1" "prediction2" "prediction3"})
+                                             (forward sample-model2 (float-array [0 1 0]) #{"prediction1" "prediction2" "prediction3"})
                                              {"prediction1" 2 "prediction2" 1 "prediction3" 2}))]
         (is (= (vec (get (:sparses-delta (:hidden-delta a)) "language"))
                (let [it (:w-delta (:hidden-delta b))]

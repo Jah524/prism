@@ -1,14 +1,13 @@
 (ns prism.nn.feedforward-bn
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [mmul array]]
-    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix :refer [add add! emul emul! scale mmul array]]
     [clojure.core.matrix.stats :as s]
     [prism.unit :refer [rewrite!] :as u]
     [prism.nn.feedforward :as ff]))
 
 
-(defn network-output-batch
+(defn forward-batch
   [model x-input-batch sparse-outputs-batch]
   (let [{:keys [hidden hidden-size]} model
         {:keys [w bias scale]} hidden
@@ -42,7 +41,7 @@
      :pop-variance (s/variance alpha-full-batch)}))
 
 
-(defn network-output
+(defn forward
   [model pop-mean pop-variance x-input sparse-outputs]
   (let [{:keys [hidden hidden-size]} model
         {:keys [w bias scale]} hidden
@@ -74,11 +73,11 @@
                                             (->> output-delta
                                                  (map (fn [[item delta]]
                                                         (let [w (:w (get output item))]
-                                                          (o/* delta w))))
-                                                 (apply o/+)))))
+                                                          (emul delta w))))
+                                                 (apply add!)))))
         hidden-delta-batch (mapv (fn [hidden-state propagated-delta]
-                                   (o/* (u/derivative hidden-state (:activation hidden))
-                                          propagated-delta))
+                                   (emul (u/derivative hidden-state (:activation hidden))
+                                         propagated-delta))
                                  hidden-batch
                                  propagated-delta-batch)
         bn-delta-batch (u/batch-normalization-delta hidden-delta-batch scale model-forward)
@@ -90,8 +89,8 @@
                                        training-x-batch)]
     {:param-loss {:output-delta (apply u/merge-param output-param-delta)
                   :hidden-delta (assoc (apply u/merge-param hidden-param-delta-batch)
-                                  :scale-delta (apply o/+ (mapv :scale-delta  bn-delta-batch))
-                                  :shift-delta (apply o/+ (mapv :shift-delta  bn-delta-batch)))}
+                                  :scale-delta (apply add (mapv :scale-delta  bn-delta-batch))
+                                  :shift-delta (apply add (mapv :shift-delta  bn-delta-batch)))}
      :loss-seq output-delta-batch}))
 
 

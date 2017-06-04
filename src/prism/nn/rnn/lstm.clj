@@ -1,8 +1,7 @@
 (ns prism.nn.rnn.lstm
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [emap esum emul mmul outer-product transpose array dot]]
-    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix :refer [add add! sub sub! scale emap esum emul emul! mmul outer-product transpose array dot]]
     [prism.nn.feedforward :as ff]
     [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param]]
     [prism.util :as util]))
@@ -19,8 +18,8 @@
                      (map? x-input)
                      (let [[sparse-k v] item
                            {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses sparse-k)]
-                       [(o/* v block-w) (o/* v input-gate-w) (o/* v forget-gate-w) (o/* v output-gate-w)]))))
-       (apply mapv o/+)))
+                       [(scale block-w v) (scale input-gate-w v) (scale forget-gate-w v) (scale output-gate-w v)]))))
+       (apply mapv add!)))
 
 (defn lstm-activation
   [model x-input recurrent-input-list previous-cell-state]
@@ -36,13 +35,13 @@
                                                            (mapv #(mmul % x-input) lstm-mat)))
         lstm-mat-r  [block-wr input-gate-wr forget-gate-wr output-gate-wr]
         [block-r' input-gate-r' forget-gate-r' output-gate-r'] (mapv #(mmul % recurrent-input-list) lstm-mat-r)
-        block       (o/+ block' block-r' block-bias)
-        input-gate  (o/+ input-gate' input-gate-r' input-gate-bias    (o/* input-gate-peephole  previous-cell-state))
-        forget-gate (o/+ forget-gate' forget-gate-r' forget-gate-bias (o/* forget-gate-peephole previous-cell-state))
-        output-gate (o/+ output-gate' output-gate-r' output-gate-bias (o/* output-gate-peephole previous-cell-state))
-        cell-state  (o/+ (o/* (emap tanh block) (emap sigmoid input-gate))
-                         (o/* (emap sigmoid forget-gate) previous-cell-state))
-        lstm  (o/* (emap sigmoid output-gate) (emap tanh cell-state))]
+        block       (add block' block-r' block-bias)
+        input-gate  (add input-gate' input-gate-r' input-gate-bias    (emul input-gate-peephole  previous-cell-state))
+        forget-gate (add forget-gate' forget-gate-r' forget-gate-bias (emul forget-gate-peephole previous-cell-state))
+        output-gate (add output-gate' output-gate-r' output-gate-bias (emul output-gate-peephole previous-cell-state))
+        cell-state  (add (emul (emap tanh block) (emap sigmoid input-gate))
+                         (emul (emap sigmoid forget-gate) previous-cell-state))
+        lstm  (emul (emap sigmoid output-gate) (emap tanh cell-state))]
     {:activation lstm
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
 
@@ -81,26 +80,26 @@
    peephole-w-input-gate peephole-w-forget-gate peephole-w-output-gate]
   (let [_dog (derivative (:output-gate lstm-state) :sigmoid)
         _cell-state (:cell-state lstm-state)
-        output-gate-delta (o/* _dog (emap tanh _cell-state) propagated-delta)
+        output-gate-delta (emul _dog (emap tanh _cell-state) propagated-delta)
         _og (:output-gate lstm-state)
         _dcs (derivative (:cell-state lstm-state) :tanh)
         _fg:t+1 (:forget-gate lstm-state:t+1)
         _csd:t+1 (:cell-state-delta self-delta:t+1)
         _igd:t+1 (:input-gate-delta self-delta:t+1)
         _fgd:t+1 (:forget-gate-delta self-delta:t+1)
-        cell-state-delta (o/+ (o/* (emap sigmoid _og) _dcs propagated-delta)
-                              (o/* (emap sigmoid _fg:t+1) _csd:t+1)
-                              (o/* peephole-w-input-gate _igd:t+1)
-                              (o/* peephole-w-forget-gate _fgd:t+1)
-                              (o/* peephole-w-output-gate output-gate-delta))
+        cell-state-delta (add (emul (emap sigmoid _og) _dcs propagated-delta)
+                              (emul (emap sigmoid _fg:t+1) _csd:t+1)
+                              (emul peephole-w-input-gate _igd:t+1)
+                              (emul peephole-w-forget-gate _fgd:t+1)
+                              (emul peephole-w-output-gate output-gate-delta))
         _ig (:input-gate lstm-state)
         _db (derivative (:block lstm-state) :tanh)
-        block-delta (o/* (emap sigmoid _ig) _db cell-state-delta)
+        block-delta (emul (emap sigmoid _ig) _db cell-state-delta)
         _dfg (derivative (:forget-gate lstm-state) :sigmoid)
-        forget-gate-delta (o/* _dfg cell-state:t-1 cell-state-delta)
+        forget-gate-delta (emul _dfg cell-state:t-1 cell-state-delta)
         _dig (derivative (:input-gate lstm-state) :sigmoid)
         _b (:block lstm-state)
-        input-gate-delta (o/* _dig (emap tanh _b) cell-state-delta)]
+        input-gate-delta (emul _dig (emap tanh _b) cell-state-delta)]
     {:output-gate-delta output-gate-delta :cell-state-delta cell-state-delta :block-delta block-delta
      :forget-gate-delta forget-gate-delta :input-gate-delta input-gate-delta}))
 
@@ -114,10 +113,10 @@
                                      :output-gate-w-delta output-gate-delta})
                   (map? x-input)
                   (let [[sparse-k v] sparse]
-                    (assoc acc sparse-k {:block-w-delta       (o/* v block-delta)
-                                         :input-gate-w-delta  (o/* v input-gate-delta)
-                                         :forget-gate-w-delta (o/* v forget-gate-delta)
-                                         :output-gate-w-delta (o/* v output-gate-delta)}))))
+                    (assoc acc sparse-k {:block-w-delta       (scale block-delta v)
+                                         :input-gate-w-delta  (scale input-gate-delta v)
+                                         :forget-gate-w-delta (scale forget-gate-delta v)
+                                         :output-gate-w-delta (scale output-gate-delta v)}))))
           {}
           x-input))
 
@@ -130,9 +129,9 @@
         input-gate-wr-delta  (outer-product input-gate-delta self-activation:t-1)
         forget-gate-wr-delta (outer-product forget-gate-delta self-activation:t-1)
         output-gate-wr-delta (outer-product output-gate-delta self-activation:t-1)
-        peephole-input-gate  (o/* input-gate-delta  (:cell-state self-state:t-1))
-        peephole-forget-gate (o/* forget-gate-delta (:cell-state self-state:t-1))
-        peephole-output-gate (o/* output-gate-delta (:cell-state self-state:t-1))
+        peephole-input-gate  (emul input-gate-delta  (:cell-state self-state:t-1))
+        peephole-forget-gate (emul forget-gate-delta (:cell-state self-state:t-1))
+        peephole-output-gate (emul output-gate-delta (:cell-state self-state:t-1))
         template {:block-wr-delta block-wr-delta :input-gate-wr-delta input-gate-wr-delta
                   :forget-gate-wr-delta forget-gate-wr-delta :output-gate-wr-delta output-gate-wr-delta
                   :block-bias-delta block-delta
@@ -195,12 +194,12 @@
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
-                                                                (o/* delta w))))
-                                                       (apply o/+)
+                                                                (emul delta w))))
+                                                       (apply add!)
                                                        (clip! 100)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (o/+ propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
@@ -223,7 +222,7 @@
                                                                 (mmul (transpose w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                         (apply o/+))]
+                                                         (apply add!))]
           (recur (rest output-items-seq)
                  propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)

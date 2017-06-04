@@ -1,7 +1,7 @@
 (ns prism.nn.encoder-decoder.gru
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [emap esum emul mmul outer-product transpose array dot exp] :as m]
+    [clojure.core.matrix :refer [add add! sub sub! emap esum emul emul! mmul outer-product transpose array dot exp] :as m]
     [clojure.core.matrix.operators :as o]
     [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param]]
     [prism.util :as util]
@@ -33,17 +33,17 @@
                                            (let [{:keys [w update-gate-w reset-gate-w]} hidden
                                                  gru-mat [w update-gate-w reset-gate-w]]
                                              (mapv #(mmul % x-input) gru-mat)))
-        update-gate-state (m/add update-gate' (mmul update-gate-wr hidden:t-1) (mmul update-gate-we encoder-input) update-gate-bias)
-        reset-gate-state  (m/add reset-gate'  (mmul reset-gate-wr hidden:t-1)  (mmul reset-gate-we encoder-input)  reset-gate-bias)
+        update-gate-state (add update-gate' (mmul update-gate-wr hidden:t-1) (mmul update-gate-we encoder-input) update-gate-bias)
+        reset-gate-state  (add reset-gate'  (mmul reset-gate-wr hidden:t-1)  (mmul reset-gate-we encoder-input)  reset-gate-bias)
         update-gate (m/logistic update-gate-state)
         reset-gate  (m/logistic reset-gate-state)
-        h-state (m/add! (mmul wr (o/* reset-gate hidden:t-1))
-                        unit'
-                        (mmul we encoder-input)
-                        bias)
+        h-state (add! (mmul wr (emul reset-gate hidden:t-1))
+                      unit'
+                      (mmul we encoder-input)
+                      bias)
         h (m/tanh h-state)
-        gru (m/add! (o/* update-gate h)
-                    (o/* (m/sub! (array :vectorz (repeat hidden-size 1)) update-gate)
+        gru (add! (emul update-gate h)
+                  (emul! (sub! (array :vectorz (repeat hidden-size 1)) update-gate)
                          hidden:t-1))]
     {:activation  {:gru gru :update-gate update-gate :reset-gate reset-gate :h h}
      :state       {:update-gate update-gate-state :reset-gate reset-gate-state :h-state h-state}}))
@@ -164,11 +164,11 @@
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
-                                                                (o/* delta w))))
-                                                       (apply o/+)))
+                                                                (emul delta w))))
+                                                       (apply add!)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (m/add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
@@ -186,14 +186,14 @@
                                                  (mmul (transpose w) d))
                                                [we         update-gate-we    reset-gate-we]
                                                [unit-delta update-gate-delta reset-gate-delta])
-                                          (apply o/+))]
+                                          (apply add!))]
           (recur (rest output-items-seq)
                  (:hidden:t-1-delta gru-delta)
                  (rest output-seq)
                  (cons output-delta output-loss)
                  (merge-param output-acc output-param-delta)
                  (merge-param hidden-acc gru-param-delta)
-                 (o/+ encoder-delta propagation-to-encoder)))
+                 (add! encoder-delta propagation-to-encoder)))
         :else
         {:param-loss {:output-delta output-acc
                       :hidden-delta hidden-acc

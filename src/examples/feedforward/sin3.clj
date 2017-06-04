@@ -18,7 +18,7 @@
          acc-loss 0]
     (if-let [training-pair (first training-list)]
       (let [{x :x y :y} training-pair
-            forward (ff/network-output model x (keys y))
+            forward (ff/forward model x (keys y))
             {:keys [param-loss loss]} (ff/back-propagation model forward y)
             diff (get loss "sin-prediction")
             loss (* diff diff 0.5)] ; sum-of-squares-error
@@ -51,10 +51,10 @@
                      (training-sin3)
                      {:epoc 10000 :loss-interval 500 :learning-rate 0.01})]
     (-> (function-plot #(Math/sin %) -3 3)
-        (add-function #(get (:output (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"})))) 0) -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"})))) 1) -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ff/network-output model (array :vectorz [%]) #{"sin-prediction"})))) 2) -3 3)
+        (add-function #(get (:output (:activation (ff/forward model (array :vectorz [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ff/forward model (array :vectorz [%]) #{"sin-prediction"})))) 0) -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ff/forward model (array :vectorz [%]) #{"sin-prediction"})))) 1) -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ff/forward model (array :vectorz [%]) #{"sin-prediction"})))) 2) -3 3)
         (set-stroke-color java.awt.Color/gray :dataset 2)
         (set-stroke-color java.awt.Color/gray :dataset 3)
         (set-stroke-color java.awt.Color/gray :dataset 4)

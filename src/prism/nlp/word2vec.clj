@@ -102,7 +102,7 @@
                                               negative-items (->> negatives (drop (* negative i)) (take negative) set)
                                               all-items (clojure.set/union positive-items negative-items)]
                                           (try
-                                            (let [forward (ff/network-output w2v-model (set [target]) all-items)
+                                            (let [forward (ff/forward w2v-model (set [target]) all-items)
                                                   {:keys [param-loss loss]} (ff/back-propagation w2v-model forward {:pos positive-items :neg negative-items})
                                                   loss-sum (->> loss (map (fn [[_ v]] (Math/abs v))) (reduce +))]
                                               (swap! tmp-loss #(+ %1 (/ loss-sum (count loss))))

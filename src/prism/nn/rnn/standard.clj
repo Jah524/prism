@@ -1,8 +1,7 @@
 (ns prism.nn.rnn.standard
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [emap esum emul mmul outer-product transpose array dot]]
-    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix :refer [add add! sub sub! emap esum scale emul emul! mmul outer-product transpose array dot]]
     [prism.nn.feedforward :as ff]
     [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param]]
     [prism.util :as util]))
@@ -13,9 +12,9 @@
   (let [{:keys [hidden]} model
         {:keys [w wr bias]} hidden
         activation-function (:activation hidden)
-        state (o/+ (if (or (set? x-input) (map? x-input))
+        state (add (if (or (set? x-input) (map? x-input))
                      (ff/hidden-state-by-sparse model x-input bias)
-                     (o/+ (mmul w x-input) bias))
+                     (add (mmul w x-input) bias))
                    (mmul wr hidden:t-1))
         hidden-activation (activation state activation-function)
         output-activation (if (= :skip sparse-outputs) :skipped (ff/output-activation model hidden-activation sparse-outputs))]
@@ -65,12 +64,12 @@
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
-                                                                (o/* delta w))))
-                                                       (apply o/+)
+                                                                (emul delta w))))
+                                                       (apply add!)
                                                        (clip! 100)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (o/+ propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)

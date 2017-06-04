@@ -1,8 +1,7 @@
 (ns prism.nn.rnn.gru
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [emap esum emul mmul outer-product transpose array dot] :as m]
-    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix :refer [add add! emap esum sub sub! scale scale! emul emul! mmul outer-product transpose array dot] :as m]
     [prism.nn.feedforward :as ff]
     [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param]]
     [prism.util :as util]))
@@ -18,8 +17,8 @@
                      (map? x-input)
                      (let [[sparse-k v] item
                            {:keys [w update-gate-w reset-gate-w]} (get sparses sparse-k)]
-                       [(o/* v w) (o/* v update-gate-w) (o/* v reset-gate-w)]))))
-       (apply mapv m/add!)))
+                       [(scale w v) (scale update-gate-w v) (scale reset-gate-w v)]))))
+       (apply mapv add!)))
 
 (defn gru-activation
   [model x-input hidden:t-1]
@@ -33,16 +32,16 @@
                                            (let [{:keys [w update-gate-w reset-gate-w]} hidden
                                                  gru-mat [w update-gate-w reset-gate-w]]
                                              (mapv #(mmul % x-input) gru-mat)))
-        update-gate-state (m/add update-gate' (mmul update-gate-wr hidden:t-1) update-gate-bias)
-        reset-gate-state  (m/add reset-gate'  (mmul reset-gate-wr hidden:t-1)  reset-gate-bias)
+        update-gate-state (add update-gate' (mmul update-gate-wr hidden:t-1) update-gate-bias)
+        reset-gate-state  (add reset-gate'  (mmul reset-gate-wr hidden:t-1)  reset-gate-bias)
         update-gate (m/logistic update-gate-state)
         reset-gate  (m/logistic reset-gate-state)
-        h-state (m/add! (mmul wr (o/* reset-gate hidden:t-1))
-                        unit'
-                        bias)
+        h-state (add! (mmul wr (emul reset-gate hidden:t-1))
+                      unit'
+                      bias)
         h (m/tanh h-state)
-        gru (m/add! (o/* update-gate h)
-                    (o/* (m/sub! (array :vectorz (repeat hidden-size 1)) update-gate)
+        gru (add! (emul h update-gate)
+                  (emul! (sub! (array :vectorz (repeat hidden-size 1)) update-gate)
                          hidden:t-1))]
     {:activation  {:gru gru :update-gate update-gate :reset-gate reset-gate :h h}
      :state       {:update-gate update-gate-state :reset-gate reset-gate-state :h-state h-state}}))
@@ -79,22 +78,22 @@
         {:keys [update-gate reset-gate h]} gru-activation
         {update-gate-state :update-gate reset-gate-state :reset-gate h-state :h-state} gru-state
         ones (array :vectorz (repeat hidden-size 1))
-        update-gate-delta1 (m/sub ones (o/* hidden:t-1 propagated-delta))
-        update-gate-delta2 (o/* h propagated-delta)
-        update-gate-delta (o/* (m/add update-gate-delta1 update-gate-delta2)
-                               (derivative update-gate-state :sigmoid))
-        h-delta (o/* (derivative h-state :tanh)
-                     update-gate
-                     propagated-delta)
+        update-gate-delta1 (sub ones (emul hidden:t-1 propagated-delta))
+        update-gate-delta2 (emul h propagated-delta)
+        update-gate-delta (emul (add update-gate-delta1 update-gate-delta2)
+                                (derivative update-gate-state :sigmoid))
+        h-delta (emul (derivative h-state :tanh)
+                      update-gate
+                      propagated-delta)
         tmp-delta (mmul (transpose wr) h-delta)
-        reset-gate-delta (o/* tmp-delta
-                              hidden:t-1
-                              (derivative reset-gate-state :sigmoid))
-        hidden:t-1-delta (m/add! (o/* (o/- ones update-gate)
-                                      propagated-delta)
-                                 (mmul (transpose update-gate-wr) update-gate-delta)
-                                 (mmul (transpose reset-gate-wr) reset-gate-delta)
-                                 (o/* tmp-delta reset-gate))]
+        reset-gate-delta (emul tmp-delta
+                               hidden:t-1
+                               (derivative reset-gate-state :sigmoid))
+        hidden:t-1-delta (add! (emul (sub ones update-gate)
+                                     propagated-delta)
+                               (mmul (transpose update-gate-wr) update-gate-delta)
+                               (mmul (transpose reset-gate-wr) reset-gate-delta)
+                               (emul tmp-delta reset-gate))]
     {:update-gate-delta update-gate-delta
      :reset-gate-delta reset-gate-delta
      :unit-delta h-delta
@@ -109,9 +108,9 @@
                                      :reset-gate-w-delta  reset-gate-delta})
                   (map? x-input)
                   (let [[sparse-k v] sparse]
-                    (assoc acc sparse-k {:w-delta             (o/* v unit-delta)
-                                         :update-gate-w-delta (o/* v update-gate-delta)
-                                         :reset-gate-w-delta  (o/* v reset-gate-delta)}))))
+                    (assoc acc sparse-k {:w-delta             (scale unit-delta v)
+                                         :update-gate-w-delta (scale update-gate-delta v)
+                                         :reset-gate-w-delta  (scale reset-gate-delta v)}))))
           {}
           x-input))
 
@@ -160,12 +159,12 @@
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
-                                                                (o/* delta w))))
-                                                       (apply m/add)
+                                                                (emul delta w))))
+                                                       (apply add!)
                                                        (clip! 100)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (m/add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)

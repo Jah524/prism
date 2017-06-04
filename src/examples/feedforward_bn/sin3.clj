@@ -20,7 +20,7 @@
       (let [mini-batch (take batch-size training-list)
             x-batch (map :x mini-batch)
             y-batch (map :y mini-batch)
-            forward (ffbn/network-output-batch model x-batch  (map keys y-batch))
+            forward (ffbn/forward-batch model x-batch  (map keys y-batch))
             {:keys [param-loss loss-seq]} (ffbn/back-propagation model forward y-batch)
             diff-seq (->> loss-seq (mapv (fn [loss] (get loss "sin-prediction"))))
             loss-sum (->> diff-seq (mapv (fn [diff] (* diff diff 0.5))) (apply +))] ; sum-of-squares-error
@@ -55,10 +55,10 @@
         full-batch (mapv :x (training-sin3))
         {:keys [pop-mean pop-variance]} (ffbn/population model full-batch)]
     (-> (function-plot #(Math/sin %) -3 3)
-        (add-function #(get (:output (:activation (ffbn/network-output model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ffbn/network-output model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"})))) 0) -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ffbn/network-output model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"})))) 1) -3 3)
-        (add-function #(nth (seq (:hidden (:activation (ffbn/network-output model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"})))) 2) -3 3)
+        (add-function #(get (:output (:activation (ffbn/forward model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"}))) "sin-prediction") -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ffbn/forward model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"})))) 0) -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ffbn/forward model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"})))) 1) -3 3)
+        (add-function #(nth (seq (:hidden (:activation (ffbn/forward model pop-mean pop-variance (array :vectorz [%]) #{"sin-prediction"})))) 2) -3 3)
         (set-stroke-color java.awt.Color/gray :dataset 2)
         (set-stroke-color java.awt.Color/gray :dataset 3)
         (set-stroke-color java.awt.Color/gray :dataset 4)

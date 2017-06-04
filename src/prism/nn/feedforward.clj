@@ -1,8 +1,7 @@
 (ns prism.nn.feedforward
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [emap esum emul mmul outer-product array dot]]
-    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix :refer [add add! scale emap esum emul emul! mmul outer-product array dot]]
     [prism.unit :refer [sigmoid init-vector init-matrix rewrite! activation multi-class-prob derivative error]]
     [prism.util :as util]))
 
@@ -15,11 +14,11 @@
          (reduce (fn [acc item]
                    (cond (set? x-input)
                          (let [w (get sparses item)]
-                           (o/+ acc w))
+                           (add acc w))
                          (map? x-input)
                          (let [[k v] item
                                w (get sparses k)]
-                           (o/+ acc (o/* v w)))))
+                           (add acc (scale w v)))))
                  bias))))
 
 
@@ -37,14 +36,14 @@
                      {}))))))
 
 
-(defn network-output
+(defn forward
   [model x-input sparse-outputs]
   (let [{:keys [hidden]} model
         {:keys [w bias]} hidden
         activation-function (:activation hidden)
         state (if (or (set? x-input) (map? x-input))
                 (hidden-state-by-sparse model x-input bias)
-                (o/+ (mmul w x-input) bias))
+                (add (mmul w x-input) bias))
         hidden-activation (activation state activation-function)
         output-activation (output-activation model hidden-activation sparse-outputs)]
     {:activation {:input x-input :hidden hidden-activation :output output-activation}
@@ -58,7 +57,7 @@
   [item-delta-pairs hidden-size hidden-activation]
   (->> item-delta-pairs
        (reduce (fn [acc [item delta]]
-                 (assoc acc item {:w-delta    (o/* delta hidden-activation)
+                 (assoc acc item {:w-delta    (emul delta hidden-activation)
                                   :bias-delta (array :vectorz [delta])}))
                {})))
 
@@ -74,7 +73,7 @@
                                   (assoc acc sparse delta)
                                   (map? sparse-inputs)
                                   (let [[k v] sparse]
-                                    (assoc acc k (o/* v delta)))))
+                                    (assoc acc k (scale delta v)))))
                           {}
                           sparse-inputs)
    :bias-delta delta})
@@ -93,8 +92,8 @@
         propagated-delta (->> output-delta
                               (map (fn [[item delta]]
                                      (let [w (:w (get output item))]
-                                       (o/* delta w))))
-                              (apply o/+))
+                                       (emul delta w))))
+                              (apply add!))
         hidden-delta (emul (derivative (:hidden state) (:activation hidden))
                            propagated-delta)
         hidden-param-delta (if (or (set? training-x) (map? training-x))

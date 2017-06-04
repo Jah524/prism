@@ -1,8 +1,7 @@
 (ns prism.nn.encoder-decoder.lstm
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [emap esum emul mmul outer-product transpose array dot exp]]
-    [clojure.core.matrix.operators :as o]
+    [clojure.core.matrix :refer [add add! sub sub! emap esum scale emul emul! mmul outer-product transpose array dot exp]]
     [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param]]
     [prism.util :as util]
     [prism.nn.rnn.lstm :as lstm]))
@@ -45,13 +44,13 @@
         lstm-mat-e  [block-we input-gate-we forget-gate-we output-gate-we]
         [block-e' input-gate-e' forget-gate-e' output-gate-e'] (mapv #(mmul % encoder-input) lstm-mat-e)
         ;; state of each gates
-        block       (o/+ block'       block-r'       block-e'       block-bias)
-        input-gate  (o/+ input-gate'  input-gate-r'  input-gate-e'  input-gate-bias  (o/* input-gate-peephole  previous-cell-state))
-        forget-gate (o/+ forget-gate' forget-gate-r' forget-gate-e' forget-gate-bias (o/* forget-gate-peephole previous-cell-state))
-        output-gate (o/+ output-gate' output-gate-r' forget-gate-e' output-gate-bias (o/* output-gate-peephole previous-cell-state))
-        cell-state  (o/+ (o/* (emap tanh block) (emap sigmoid input-gate))
-                         (o/* (emap sigmoid forget-gate) previous-cell-state))
-        lstm (o/* (emap sigmoid output-gate) (emap tanh cell-state))]
+        block       (add block'       block-r'       block-e'       block-bias)
+        input-gate  (add input-gate'  input-gate-r'  input-gate-e'  input-gate-bias  (emul input-gate-peephole  previous-cell-state))
+        forget-gate (add forget-gate' forget-gate-r' forget-gate-e' forget-gate-bias (emul forget-gate-peephole previous-cell-state))
+        output-gate (add output-gate' output-gate-r' forget-gate-e' output-gate-bias (emul output-gate-peephole previous-cell-state))
+        cell-state  (add (emul (emap tanh block) (emap sigmoid input-gate))
+                         (emul (emap sigmoid forget-gate) previous-cell-state))
+        lstm (emul (emap sigmoid output-gate) (emap tanh cell-state))]
     {:activation lstm
      :state {:lstm lstm :block block :input-gate input-gate :forget-gate forget-gate :output-gate output-gate :cell-state cell-state}}))
 
@@ -73,7 +72,7 @@
                                           (esum (:w (get previous-input-sparses item)))
                                           (map? previous-input)
                                           (let [[sparse-k v] item]
-                                            (esum (o/* v (:w (get previous-input-sparses sparse-k))))))))
+                                            (esum (scale (:w (get previous-input-sparses sparse-k)) v))))))
                             (apply +))
                        (dot previous-input-w previous-input)))
             state (cond (> state 25) 25 (< state -25) -25 :else state)]
@@ -87,7 +86,7 @@
   (let [{:keys [items states]} (decoder-softmax-states decoder-hidden-list encoder-input previous-input all-output-connection)
         activations (exp states)
         s (esum activations)
-        a (o/* (/ 1 s) activations)]
+        a (scale activations (/ 1 s))]
     (->> (mapv vector items a)
          (reduce (fn [acc [item a]]
                    (assoc acc item a))
@@ -111,7 +110,7 @@
                                                                               (esum (:w (get previous-input-sparses item)))
                                                                               (map? previous-input)
                                                                               (let [[sparse-k v] item]
-                                                                                (esum (o/* v (:w (get previous-input-sparses sparse-k))))))))
+                                                                                (esum (scale (:w (get previous-input-sparses sparse-k)) v))))))
                                                                 (apply +))
                                                            (dot previous-input-w previous-input)))))))
                 {}
@@ -161,9 +160,9 @@
   [item-delta-pairs decoder-hidden-size hidden-activation encoder-size encoder-input input-size previous-input]
   (->> item-delta-pairs
        (reduce (fn [acc [item delta]]
-                 (assoc acc item {:w-delta    (o/* delta hidden-activation)
+                 (assoc acc item {:w-delta    (emul delta hidden-activation)
                                   :bias-delta (array :vectorz [delta])
-                                  :encoder-w-delta (o/* delta encoder-input)
+                                  :encoder-w-delta (emul delta encoder-input)
                                   :previous-input-w-delta (if (or (set? previous-input) (map? previous-input))
                                                             {:sparses-delta (->> previous-input
                                                                                  (reduce (fn [acc sparse]
@@ -171,9 +170,9 @@
                                                                                                  (assoc acc sparse {:w-delta (array :vectorz [delta])})
                                                                                                  (map? previous-input)
                                                                                                  (let [[sparse-k v] sparse]
-                                                                                                   (assoc acc sparse-k {:w-delta (array :vectorz [(o/* v delta)])}))))
+                                                                                                   (assoc acc sparse-k {:w-delta (array :vectorz [(scale delta v)])}))))
                                                                                          {}))}
-                                                            {:w (o/* delta previous-input)})}))
+                                                            {:w (emul delta previous-input)})}))
                {})))
 
 (defn decoder-lstm-param-delta
@@ -196,9 +195,9 @@
                    :input-gate-bias-delta  input-gate-delta
                    :forget-gate-bias-delta forget-gate-delta
                    :output-gate-bias-delta output-gate-delta
-                   :peephole-input-gate-delta  (o/* input-gate-delta  (:cell-state self-state:t-1))
-                   :peephole-forget-gate-delta (o/* forget-gate-delta (:cell-state self-state:t-1))
-                   :peephole-output-gate-delta (o/* output-gate-delta (:cell-state self-state:t-1))}]
+                   :peephole-input-gate-delta  (emul input-gate-delta  (:cell-state self-state:t-1))
+                   :peephole-forget-gate-delta (emul forget-gate-delta (:cell-state self-state:t-1))
+                   :peephole-output-gate-delta (emul output-gate-delta (:cell-state self-state:t-1))}]
     (if (or (set? x-input) (map? x-input))
       (assoc template :sparses-delta (lstm/param-delta-sparse x-input block-delta input-gate-delta forget-gate-delta output-gate-delta))
       (assoc template
@@ -236,7 +235,7 @@
                                                                 (mmul (transpose w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                         (apply o/+))]
+                                                         (apply add!))]
           (recur propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
                  lstm-part-delta
@@ -285,11 +284,11 @@
                                                   (->> output-delta
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
-                                                                (o/* delta w))))
-                                                       (apply o/+)))
+                                                                (emul delta w))))
+                                                       (apply add!)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
-                                            (o/+ propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
+                                            (add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
                                             (= :skip (first output-items-seq))
                                             propagated-hidden-to-hidden-delta
                                             (nil? propagated-hidden-to-hidden-delta)
@@ -310,12 +309,12 @@
                                                                 (mmul (transpose w) d))
                                                               [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                                         (apply o/+))
+                                                         (apply add!))
               propagation-to-encoder (->> (map (fn [w d]
                                                  (mmul (transpose w) d))
                                                [block-we    input-gate-we    forget-gate-we    output-gate-we]
                                                [block-delta input-gate-delta forget-gate-delta output-gate-delta])
-                                          (apply o/+))]
+                                          (apply add!))]
           (recur (rest output-items-seq)
                  propagated-hidden-to-hidden-delta:t-1
                  (rest output-seq)
@@ -324,7 +323,7 @@
                  (cons output-delta output-loss)
                  (merge-param output-acc output-param-delta)
                  (merge-param hidden-acc lstm-param-delta)
-                 (o/+ encoder-delta propagation-to-encoder)))
+                 (add! encoder-delta propagation-to-encoder)))
         :else
         {:param-loss {:output-delta output-acc
                       :hidden-delta hidden-acc
