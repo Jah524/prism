@@ -13,8 +13,9 @@
     [clojure.core.matrix :as m]
     [think.tsne.core :as tsne]
     [server.view :refer [tsne word-probability-given-context]]
-    [prism.nlp.word2vec :as w2v]
-    [prism.nlp.rnnlm :as rnnlm]))
+    [prism.util :as util]
+    [prism.nlp.rnnlm :as rnnlm]
+    [prism.nlp.skip-thought :as st]))
 
 (def m-path (atom nil))
 (def model-type (atom nil))
@@ -28,8 +29,19 @@
         (let [contents (json/read-str (.readLine (io/reader body)))
               {:strs [items perplexity iters]} contents
               item-vec (condp = @model-type
-                         "word2vec" (->> items flatten (mapv (fn [item] {:item item :v (w2v/word2vec @model item)})))
-                         "rnnlm" (->> items (mapv (fn [words] {:item (->> words (interpose " ") (apply str)) :v (rnnlm/text-vector @model words)})))
+                         "word2vec" (->> items flatten (mapv (fn [item] {:item item :v (get @model item)})))
+                         "rnnlm" (->> items
+                                      (mapv (fn [words]
+                                              {:item (->> words
+                                                          (interpose " ")
+                                                          (apply str))
+                                               :v (rnnlm/text-vector @model words)})))
+                         "skip-thought" (->> items
+                                             (mapv (fn [words]
+                                                     {:item (->> words
+                                                                 (interpose " ")
+                                                                 (apply str))
+                                                      :v (st/skip-thought-vector @model words)})))
                          :model-has-gone)]
           (if (= item-vec :model-has-gone)
             (do (println "you need to restart server, model has gone.") (json/write-str {:condition "model-has-gone"}))
@@ -90,8 +102,9 @@
         options-summary
         ""
         "model-type:"
-        "  word2vec    Word2Vec embedding"
-        "  rnnlm       RNNLM model"
+        "  word2vec    "
+        "  rnnlm       "
+        "  skip-thought"
         ""]
        (string/join \newline)))
 
@@ -106,7 +119,7 @@
       {:exit-message (usage summary)}
       (not model-exists?)
       {:exit-message "model doesn't exist"}
-      (and (#{"word2vec" "rnnlm"} type)
+      (and (#{"word2vec" "rnnlm" "skip-thought"} type)
            model-exists?)
       {:type type :model-path model-path :port port}
       :else
@@ -120,8 +133,10 @@
         (println (str "loading " model-path " ..."))
         (reset! m-path model-path)
         (case type
-          "word2vec" (do (reset! model-type "word2vec") (reset! model (w2v/load-embedding model-path nil)))
-          "rnnlm"    (do (reset! model-type "rnnlm"   ) (reset! model (rnnlm/load-model model-path nil))))
+          "word2vec"     (reset! model-type "word2vec")
+          "rnnlm"        (reset! model-type "rnnlm"   )
+          "skip-thought" (reset! model-type "skip-thought"))
+        (reset! model (util/load-model model-path))
         (println (str @model-type " model was loaded"))
         (run-server app  {:port port})
         (println (str "Server listening on port " port)))
