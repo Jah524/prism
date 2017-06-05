@@ -224,3 +224,12 @@
     (util/save-model model export-path)
     (println "Done")
     model))
+
+(defn skip-thought-vector
+  [st-model words]
+  (let [{:keys [encoder em]} (:prev-model st-model)
+        context (->> words (mapv #(word->feature em %)))]
+    (-> (ed/encoder-forward encoder context)
+        last
+        :hidden
+        :activation :gru)))

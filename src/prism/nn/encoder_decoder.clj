@@ -3,6 +3,14 @@
     [prism.nn.encoder-decoder.lstm :as lstm]
     [prism.nn.encoder-decoder.gru  :as gru]))
 
+(defn encoder-forward
+  [encoder encoder-x-seq]
+  (let [{:keys [rnn-type]} encoder]
+    (condp = rnn-type
+      :lstm (lstm/encoder-forward encoder encoder-x-seq)
+      :gru  (gru/encoder-forward encoder encoder-x-seq))))
+
+
 (defn forward
   [model encoder-x-seq decoder-x-seq output-items-seq]
   (let [{:keys [rnn-type]} model]
