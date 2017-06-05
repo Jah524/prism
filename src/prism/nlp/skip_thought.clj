@@ -24,7 +24,7 @@
   [wc line]
   (let [sens (->> (str/split line #"<eos>")
                   (mapv (fn [sentence]
-                          (->> (str/split sentence #" ")
+                          (->> (str/split sentence #" |　")
                                (remove #(or (re-find #" |　" %) (= "" %)))
                                (map #(convert-rare-word-to-unk wc %))))))]
     (if (> (count sens) 1)
@@ -102,7 +102,7 @@
               }} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
         {:keys [prev-model next-model shared? ns?]} model
-        {:keys [wc em input-typ]} prev-model
+        {:keys [wc em]} prev-model
         neg-cum (when ns?
                   (println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
                   (let [wc-unif (-> wc (dissoc "<unk>" "<go>" "<eos>") (assoc "<eos>" all-lines-num))]
@@ -123,9 +123,10 @@
           (swap! progress-counter inc)
           (recur (dec skip))))
       (println "done")
-      (println "making initial distribution for negative-sampling ...")
-      (when ns? (swap! negative-dist (fn[_](samples neg-cum (* negative cache-size)))))
-      (println "done")
+      (when ns?
+        (println "making initial distribution for negative-sampling ...")
+        (swap! negative-dist (fn[_](samples neg-cum (* negative cache-size))))
+        (println "done"))
       (dotimes [w workers]
         (go (loop []
               (if-let [line (.readLine r)]
@@ -213,7 +214,7 @@
 
 (defn make-skip-thought
   [training-path embedding-path export-path em-size encoder-hidden-size decoder-hidden-size rnn-type option]
-  (let [{:keys [shared? ns?] :or {shared? false ns? false}} option
+  (let [{:keys {shared? ns?} :or {shared? false ns? false}} option
         _(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")

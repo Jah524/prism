@@ -32,9 +32,22 @@
              :decoder-prev-y ["E" "<unk>" "A" "D" "<eos>"],
              :decoder-next-x nil,
              :decoder-next-y nil}])))
-
+  (testing "line->skip-thought-pairs with special character"
+    (is (= (line->skip-thought-pairs example-wc "A B C <eos> 　A")
+           [{:encoder-x ["A" "B" "C"],
+             :decoder-prev-x nil,
+             :decoder-prev-y nil,
+             :decoder-next-x ["<go>" "A"],
+             :decoder-next-y ["A" "<eos>"]}
+            {:encoder-x ["A"],
+             :decoder-prev-x ["<go>" "A" "B" "C"],
+             :decoder-prev-y ["A" "B" "C" "<eos>"],
+             :decoder-next-x nil,
+             :decoder-next-y nil}])))
   (testing "line->skip-thought-pairs with invalid line"
     (is (= (line->skip-thought-pairs {"A" 123 "B" 321 "C" 432 "D" 12 "E" 432} "A B C")
+           :skip))
+    (is (= (line->skip-thought-pairs {"A" 123 "B" 321 "C" 432 "D" 12 "E" 432} "A B C <eos>")
            :skip)))
   (testing "add-negatives"
     (let [target1 {:encoder-x ["E" "<unk>" "A" "D"],
