@@ -4,6 +4,9 @@
 
 Prism is a handy neural network library for natural language processing written in pure Clojure.
 This library get you a distributed representation of words.
+
+![Visualization with t-sne](https://s3.amazonaws.com/prism-archive/source/visualization.png)
+
 Now prism is ready to work with following models.
 
 - Word2Vec by skip-gram with negative-sampling
