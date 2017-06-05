@@ -10,7 +10,7 @@ Now prism is ready to work with following models.
 - RNNLM with negative-sampling
 - Skip-Thought
 
-This library also includes some basic neural network model (e.g. feedforward, LSTM, encoder-decoder).
+This library also includes some basic neural network model (e.g. feedforward, RNN(LSTM, GRU), encoder-decoder(LSTM, GRU)).
 See demonstration section and [examples](/src/examples) for more detail.
 
 ## Usage
