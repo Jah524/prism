@@ -224,7 +224,7 @@
       (is (= (map #(mapv float %) (:update-gate-w hd))
              (take 10 (repeat [(float 0.15455884) (float 0.1) (float 0.1)]))))
       (is (= (map #(mapv float %) (:reset-gate-w hd))
-             (take 10 (repeat [(float 0.1) (float 0.1) (float 0.1)]))))
+             (take 10 (repeat [(float 0.09998072) (float 0.1) (float 0.1)]))))
       ;; reccurent connection
       (is (= (map #(mapv float %) (:wr hd))
              (partition 10 (take 100 (repeat (float 0.09989627))))))

@@ -235,17 +235,17 @@
     ;; update input connections
     ; sparse
     (->> sparses-delta
-         (map (fn [[word lstm-w-delta]]
-                (let [{:keys [w-delta update-gate-w-delta reset-gate-w-deltaa]} lstm-w-delta
-                      {:keys [w update-gate-w reset-gate-we-delta]} (get sparses word)]
+         (map (fn [[word gru-w-delta]]
+                (let [{:keys [w-delta update-gate-w-delta reset-gate-w-delta]} gru-w-delta
+                      {:keys [w update-gate-w reset-gate-w]} (get sparses word)]
                   (rewrite! learning-rate w w-delta)
                   (rewrite! learning-rate update-gate-w update-gate-w-delta)
-                  (rewrite! learning-rate reset-gate-w-delta reset-gate-w-delta))))
+                  (rewrite! learning-rate reset-gate-w reset-gate-w-delta))))
          dorun)
     ; dense
     (when w-delta             (rewrite! learning-rate w w-delta))
     (when update-gate-w-delta (rewrite! learning-rate update-gate-w update-gate-w-delta))
-    (when reset-gate-w-delta  (rewrite! learning-rate reset-gate-w-delta reset-gate-w-delta))
+    (when reset-gate-w-delta  (rewrite! learning-rate reset-gate-w reset-gate-w-delta))
     ;; update recurrent connections
     (rewrite! learning-rate wr wr-delta)
     (rewrite! learning-rate update-gate-wr update-gate-wr-delta)
