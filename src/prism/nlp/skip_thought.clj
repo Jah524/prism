@@ -69,6 +69,26 @@
                {:pos (set [pos]) :neg (->> next-negative (drop (* i negative)) (take negative) set)}))
            vec))))
 
+
+(defn sgd-loss
+  [model encoder-x decoder-x decoder-y ns?]
+  (when-not (empty? decoder-y)
+    (let [forward (ed/forward model encoder-x decoder-x
+                              (if ns?
+                                (map #(if (= % :skip) :skip (apply clojure.set/union (vals %))) decoder-y)
+                                decoder-y))
+          {:keys [param-loss loss]} (ed/bptt model forward decoder-y)
+          loss-no-skipped (->> loss (remove empty?))
+          loss-seq (->> loss-no-skipped
+                        (mapv #(/ (->> % ; by 1 target and some negatives
+                                       (map (fn [[_ v]] (Math/abs v)))
+                                       (apply +))
+                                  (if ns?
+                                    (count (last loss))
+                                    1))))];; loss per output-item]
+      {:param-loss param-loss :loss-seq loss-seq})))
+
+
 (defn train-skip-thought!
   [model train-path & [option]]
   (let [{:keys [interval-ms workers negative learning-rate
@@ -81,8 +101,8 @@
               snapshot 60 ;  1 hour when interval-ms is set 60000
               }} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
-        {:keys [wc em input-type weight-type ns?]} model
-        shared? (= weight-type :shared)
+        {:keys [prev-model next-model shared? ns?]} model
+        {:keys [wc em input-typ]} prev-model
         neg-cum (when ns?
                   (println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
                   (let [wc-unif (-> wc (dissoc "<unk>" "<go>" "<eos>") (assoc "<eos>" all-lines-num))]
@@ -125,49 +145,16 @@
                                                                                    @negative-dist))
                                              st-pair)]
                                        (try
-                                         (if shared? ;when single decoder
-                                           (let [encoder-x (->> encoder-x (mapv #(word->feature em %)))
-                                                 decoder-prev-x (vec (cons #{"<go>"} (->> (rest decoder-prev-x) (mapv #(word->feature em %)))))
-                                                 decoder-next-x (vec (cons #{"<go>"} (->> (rest decoder-next-x) (mapv #(word->feature em %)))))
-                                                 [param-loss-prev loss-seq-prev] (if (empty? decoder-prev-y)
-                                                                                   [nil [0]]
-                                                                                   (let [forward (ed/forward model encoder-x decoder-prev-x
-                                                                                                             (if ns?
-                                                                                                               (map #(if (= % :skip) :skip (apply clojure.set/union (vals %))) decoder-prev-y)
-                                                                                                               decoder-prev-y))
-                                                                                         {:keys [param-loss loss] :as tmp} (ed/bptt model forward decoder-prev-y)
-                                                                                         loss-no-skipped (->> loss (remove empty?))
-                                                                                         loss-seq (->> loss-no-skipped
-                                                                                                       (mapv #(/ (->> % ; by 1 target and some negatives
-                                                                                                                      (map (fn [[_ v]] (Math/abs v)))
-                                                                                                                      (apply +))
-                                                                                                                 (if ns?
-                                                                                                                   (count (last loss))
-                                                                                                                   1))))];; loss per output-item]
-                                                                                     [param-loss loss-seq]))
-                                                 [param-loss-next loss-seq-next] (if (empty? decoder-next-y)
-                                                                                   [nil [0]]
-                                                                                   (let [forward-next (ed/forward model encoder-x decoder-next-x
-                                                                                                                  (if ns?
-                                                                                                                    (map #(if (= % :skip) :skip (apply clojure.set/union (vals %))) decoder-next-y)
-                                                                                                                    decoder-next-y))
-                                                                                         {param-loss-next :param-loss loss-next :loss} (ed/bptt model forward-next decoder-next-y)
-                                                                                         loss-next-no-skipped (->> loss-next (remove empty?))
-                                                                                         loss-seq-next (->> loss-next-no-skipped
-                                                                                                            (mapv #(/ (->> % ; by 1 target and some negatives
-                                                                                                                           (map (fn [[_ v]] (Math/abs v)))
-                                                                                                                           (apply +))
-                                                                                                                      (if ns?
-                                                                                                                        (count (last loss-next))
-                                                                                                                        1))))]
-                                                                                     [param-loss-next loss-seq-next]))
-                                                 merged-loss (+ (/ (reduce + loss-seq-prev) (count loss-seq-prev))
-                                                                (/ (reduce + loss-seq-next) (count loss-seq-next)));; loss per rnn-step
-                                                 ]
-                                             (swap! tmp-loss #(+ %1 merged-loss))
-                                             (when param-loss-prev (ed/update-model! model param-loss-prev learning-rate))
-                                             (when param-loss-next (ed/update-model! model param-loss-next learning-rate)))
-                                           :fixme)
+                                         (let [encoder-x (->> encoder-x (mapv #(word->feature em %)))
+                                               decoder-prev-x (vec (cons #{"<go>"} (->> (rest decoder-prev-x) (mapv #(word->feature em %)))))
+                                               decoder-next-x (vec (cons #{"<go>"} (->> (rest decoder-next-x) (mapv #(word->feature em %)))))
+                                               {param-loss-prev :param-loss loss-seq-prev :loss-seq} (sgd-loss prev-model encoder-x decoder-prev-x decoder-prev-y ns?)
+                                               {param-loss-next :param-loss loss-seq-next :loss-seq} (sgd-loss next-model encoder-x decoder-next-x decoder-next-y ns?)
+                                               merged-loss (+ (if loss-seq-prev (/ (reduce + loss-seq-prev) (count loss-seq-prev)) 0)
+                                                              (if loss-seq-next (/ (reduce + loss-seq-next) (count loss-seq-next)) 0))]
+                                           (swap! tmp-loss #(+ %1 merged-loss))
+                                           (when param-loss-prev (ed/update-model! prev-model param-loss-prev learning-rate))
+                                           (when param-loss-next (ed/update-model! next-model param-loss-next learning-rate)))
                                          (catch Exception e
                                            (do
                                              ;; debug purpose
@@ -196,7 +183,7 @@
       (println "finished learning")))
   model)
 
-(defn init-shared-skip-thought
+(defn skip-thought-template
   [wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?]
   (let [ns? (or ns? false)
         wc-set (-> (set (keys wc)))]
@@ -209,19 +196,29 @@
                         :rnn-type rnn-type})
         (assoc
           :wc wc
-          :em em
-          :ns? ns?
-          :weight-type :shared))))
+          :em em))))
+
+(defn init-skip-thought-model
+  [wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared? ns?]
+  (-> (if shared?
+        (let [m (skip-thought-template wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?)]
+          {:prev-model m
+           :next-model m})
+        (let [m1 (skip-thought-template wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?)
+              m2 (skip-thought-template wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?)]
+          {:prev-model m1
+           :next-model (assoc m2 :encoder (:encoder (dissoc m1 :wc :em :decoder)))}))
+      (assoc :ns? ns? :shared? shared?)))
+
 
 (defn make-skip-thought
-  [training-path embedding-path export-path em-size encoder-hidden-size decoder-hidden-size rnn-type shared-weight? ns? option]
-  (let [_(println "making word list...")
+  [training-path embedding-path export-path em-size encoder-hidden-size decoder-hidden-size rnn-type option]
+  (let [{:keys [shared? ns?] :or {shared? false ns? false}} option
+        _(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
         em (util/load-model embedding-path)
-        model (if shared-weight?
-                (init-shared-skip-thought wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?)
-                :fixme)]
+        model (init-skip-thought-model wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared? ns?)]
     (train-skip-thought! model training-path (assoc option :model-path export-path))
     (print (str "Saving Skip-Thought model as " export-path " ... "))
     (util/save-model model export-path)

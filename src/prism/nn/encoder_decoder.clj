@@ -31,5 +31,3 @@
     :gru   (gru/init-encoder-decoder-model params)
     (throw (Exception. "rnn-type was not specified"))))
 
-
-
