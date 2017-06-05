@@ -234,19 +234,31 @@
 
   (testing "forward in sparse model"
     (let [result1 (forward sample-w-network-sparse
-                                     [{"language" (float 1)} {"processing" (float 1)}]
-                                     [:skip #{"prediction1" "prediction2" "prediction3"}])
+                           [{"language" (float 1)} {"processing" (float 1)}]
+                           [:skip #{"prediction1" "prediction2" "prediction3"}])
           result2 (forward sample-w-network
-                                     [(float-array [0 1 0]) (float-array [0 0 1])]
-                                     [:skip #{"prediction1" "prediction2" "prediction3"}])
+                           [(float-array [0 1 0]) (float-array [0 0 1])]
+                           [:skip #{"prediction1" "prediction2" "prediction3"}])
           out1 (mapv float (:hidden (:activation (first result1))))
           out2 (mapv float (:hidden (:activation (first result2))))
           out3 (mapv float (:hidden (:activation (second result1))))
           out4 (mapv float (:hidden (:activation (second result2))))]
       (is (= out1 out2 (take 10 (repeat (float -0.05900606)))))
       (is (= out3 out4 (take 10 (repeat (float -0.07346944)))))))
+  (testing "context"
+    (let [result (context sample-w-network (map array [[1 0 0] [1 0 0]]))
+          {:keys [hidden input]} (last result)
+          {:keys [block input-gate forget-gate output-gate]} (:state hidden)]
+      (is (= (vec input) (map float [1 0 0])))
+      (is (= 2 (count result)))
+      (is (= (mapv float block)       (take 10 (repeat (float -0.9590061)))))
+      (is (= (mapv float input-gate)  (take 10 (repeat (float -0.93830144)))))
+      (is (= (mapv float forget-gate) (take 10 (repeat (float -0.93830144)))))
+      (is (= (mapv float output-gate) (take 10 (repeat (float -0.93830144)))))))
 
   ;; Back Propagation Through Time ;;
+
+
   (testing "output-param-delta"
     (let [result (->> (ff/output-param-delta {"A" 0.5 "B" 0 "C" -0.5} 10 (float-array (range 10)))
                       (reduce (fn [acc [item {:keys [w-delta bias-delta]}]]
@@ -353,8 +365,8 @@
   (testing "bptt with dense binary classification"
     (let [{:keys [param-loss loss]} (bptt sample-w-network
                                           (forward sample-w-network
-                                                             [(float-array [0 1 0]) (float-array [2 0 0])]
-                                                             [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
+                                                   [(float-array [0 1 0]) (float-array [2 0 0])]
+                                                   [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
                                           [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}])
           {hd :hidden-delta od :output-delta} param-loss]
       (is (= (count loss) 2))
@@ -392,8 +404,8 @@
   (testing "bptt with sparse model"
     (let [{:keys [param-loss loss]} (bptt sample-w-network-sparse
                                           (forward sample-w-network-sparse
-                                                             [{"language" (float 1)} {"processing" (float 1)}]
-                                                             [:skip ["prediction1" "prediction3"]])
+                                                   [{"language" (float 1)} {"processing" (float 1)}]
+                                                   [:skip ["prediction1" "prediction3"]])
                                           [:skip {:pos ["prediction1"] :neg ["prediction3"]}])
           {hd :hidden-delta od :output-delta} param-loss
           it (:sparses-delta hd)]
@@ -406,8 +418,8 @@
   (testing "bptt with sparse prediction"
     (let [{:keys [param-loss loss]} (bptt sample-w-network-prediction
                                           (forward sample-w-network-prediction
-                                                             [{"natural" (float 1)} {"processing" (float 1)}]
-                                                             [:skip ["prediction"]])
+                                                   [{"natural" (float 1)} {"processing" (float 1)}]
+                                                   [:skip ["prediction"]])
                                           [:skip {"prediction" 20}])
           {hd :hidden-delta o :output-delta} param-loss
           it (:sparses-delta hd)]
@@ -422,8 +434,8 @@
     (let [result (update-model! sample-w-network
                                 (:param-loss (bptt sample-w-network
                                                    (forward sample-w-network
-                                                                      [(float-array [0 1 0]) (float-array [2 0 0])]
-                                                                      [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
+                                                            [(float-array [0 1 0]) (float-array [2 0 0])]
+                                                            [["prediction1" "prediction3"] ["prediction2" "prediction3"]])
                                                    [{:pos ["prediction1"] :neg ["prediction3"]} {:pos ["prediction2"] :neg ["prediction3"]}]))
                                 0.1)
           hd (:hidden result)]
@@ -468,8 +480,8 @@
     (let [result (update-model! sample-w-network-sparse
                                 (:param-loss (bptt sample-w-network-sparse
                                                    (forward sample-w-network-sparse
-                                                                      [{"language" (float 1)} {"processing" (float 1)}]
-                                                                      [:skip ["prediction1" "prediction3"]])
+                                                            [{"language" (float 1)} {"processing" (float 1)}]
+                                                            [:skip ["prediction1" "prediction3"]])
                                                    [:skip {:pos ["prediction1"] :neg ["prediction3"]}]))
                                 0.1)
           hd (:hidden result)

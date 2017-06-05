@@ -7,22 +7,6 @@
     [prism.nn.rnn.lstm :as lstm]))
 
 
-(defn encoder-forward [encoder x-seq]
-  (let [{:keys [hidden hidden-size]} encoder]
-    (loop [x-seq x-seq,
-           previous-activation (array :vectorz (repeat hidden-size 0)),
-           previous-cell-state (array :vectorz (repeat hidden-size 0)),
-           acc []]
-      (if-let [x-input (first x-seq)]
-        (let [model-output (lstm/lstm-activation encoder x-input previous-activation previous-cell-state)
-              {:keys [activation state]} model-output]
-          (recur (rest x-seq)
-                 activation
-                 (:cell-state state)
-                 (cons {:input x-input :hidden model-output} acc)))
-        (vec (reverse acc))))))
-
-
 (defn decoder-lstm-activation [decoder x-input recurrent-input-list encoder-input previous-cell-state]
   (let [{:keys [hidden hidden-size]} decoder
         {:keys [block-wr block-bias input-gate-wr input-gate-bias input-gate-peephole
@@ -148,7 +132,7 @@
 (defn encoder-decoder-forward
   [encoder-decoder-model encoder-x-seq decoder-x-seq decoder-output-items-seq]
   (let [{:keys [encoder decoder]} encoder-decoder-model
-        encoder-activation (encoder-forward encoder encoder-x-seq)
+        encoder-activation (lstm/context encoder encoder-x-seq)
         decoder-activation (decoder-forward decoder decoder-x-seq (:activation (:hidden (last encoder-activation))) decoder-output-items-seq)]
     {:encoder encoder-activation :decoder decoder-activation}))
 

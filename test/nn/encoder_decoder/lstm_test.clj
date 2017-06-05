@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.test   :refer :all]
     [clojure.core.matrix :refer [set-current-implementation mget array matrix ecount row-count]]
-    [prism.nn.rnn.lstm  :refer [lstm-activation forward]]
+    [prism.nn.rnn.lstm  :refer [lstm-activation forward context]]
     [nn.rnn.lstm-test   :refer [sample-w-network]]
     [prism.nn.encoder-decoder.lstm :refer :all]))
 
@@ -179,16 +179,6 @@
       (is (= (mapv float (:input-gate s)) (take 10 (repeat (float 1.7)))))
       (is (= (mapv float (:forget-gate s)) (take 10 (repeat (float 1.7)))))
       (is (= (mapv float (:output-gate s)) (take 10 (repeat (float 1.7)))))))
-  (testing "encoder-forward"
-    (let [result (encoder-forward sample-w-network (map array [[1 0 0] [1 0 0]]))
-          {:keys [hidden input]} (last result)
-          {:keys [block input-gate forget-gate output-gate]} (:state hidden)]
-      (is (= (vec input) (map float [1 0 0])))
-      (is (= 2 (count result)))
-      (is (= (mapv float block)       (take 10 (repeat (float -0.9590061)))))
-      (is (= (mapv float input-gate)  (take 10 (repeat (float -0.93830144)))))
-      (is (= (mapv float forget-gate) (take 10 (repeat (float -0.93830144)))))
-      (is (= (mapv float output-gate) (take 10 (repeat (float -0.93830144)))))))
 
   (testing "decoder-output-activation"
     (is (= (decoder-output-activation decoder-sample-network
@@ -318,7 +308,7 @@
       (is (= (vec (:peephole-output-gate-delta result)) (take 10 (repeat (float -0.1)))))))
   (testing "encoder-bptt"
     (let [hd (:hidden-delta (encoder-bptt encoder-sample-network
-                                          (encoder-forward encoder-sample-network (map float-array [[1 0 0] [1 0 0]]))
+                                          (context encoder-sample-network (map float-array [[1 0 0] [1 0 0]]))
                                           (float-array (take 5 (repeat (float -0.5))))))]
       (is (= (row-count (:block-w-delta                 hd)) 5))
       (is (= (row-count (:block-w-delta   hd)) 5))

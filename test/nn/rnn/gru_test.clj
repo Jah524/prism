@@ -196,6 +196,16 @@
       (is (= out1 out2 (take 10 (repeat (float -0.20704626)))))
       (is (= out3 out4 (take 10 (repeat (float -0.33955097)))))))
 
+  (testing "context"
+    (let [result (context sample-w-network (map array [[1 0 0] [1 0 0]]))
+          {:keys [hidden input]} (last result)
+          {:keys [h-state update-gate reset-gate]} (:state hidden)]
+      (is (= (vec input) (map float [1 0 0])))
+      (is (= 2 (count result)))
+      (is (= (mapv float h-state)       (take 10 (repeat (float -0.95143485)))))
+      (is (= (mapv float update-gate)  (take 10 (repeat (float -1.1070462)))))
+      (is (= (mapv float reset-gate) (take 10 (repeat (float -1.1070462)))))))
+
   (testing "gru-delta"
     (let [result (gru-delta sample-w-network
                             (array :vectorz (repeat 10 100))

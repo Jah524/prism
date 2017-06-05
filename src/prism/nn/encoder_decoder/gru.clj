@@ -9,18 +9,6 @@
     [prism.nn.encoder-decoder.lstm :as lstm]))
 
 
-(defn encoder-forward [encoder x-seq]
-  (let [{:keys [hidden hidden-size]} encoder]
-    (loop [x-seq x-seq,
-           hidden:t-1 (array :vectorz (repeat hidden-size 0)),
-           acc []]
-      (if-let [x-input (first x-seq)]
-        (let [{:keys [activation state] :as model-output} (gru/gru-activation encoder x-input hidden:t-1)]
-          (recur (rest x-seq)
-                 (:gru activation)
-                 (cons {:input x-input :hidden model-output} acc)))
-        (vec (reverse acc))))))
-
 (defn decoder-gru-activation [decoder x-input hidden:t-1 encoder-input]
   (let [{:keys [hidden hidden-size]} decoder
         {:keys [w wr bias
@@ -77,7 +65,7 @@
 (defn encoder-decoder-forward
   [encoder-decoder-model encoder-x-seq decoder-x-seq decoder-output-items-seq]
   (let [{:keys [encoder decoder]} encoder-decoder-model
-        encoder-activation (encoder-forward encoder encoder-x-seq)
+        encoder-activation (gru/context encoder encoder-x-seq)
         decoder-activation (decoder-forward decoder decoder-x-seq (:gru (:activation (:hidden (last encoder-activation)))) decoder-output-items-seq)]
     {:encoder encoder-activation :decoder decoder-activation}))
 

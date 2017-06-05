@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.test   :refer :all]
     [clojure.core.matrix :refer [mget array matrix ecount row-count]]
-    [prism.nn.rnn.gru  :refer [gru-activation forward]]
+    [prism.nn.rnn.gru  :refer [gru-activation forward context]]
     [nn.rnn.gru-test   :refer [sample-w-network]]
     [prism.nn.encoder-decoder.gru :refer :all]))
 
@@ -60,19 +60,7 @@
   {:encoder encoder-sample-network
    :decoder decoder-sample-network})
 
-
-
 (deftest encoder-decoder-gru-test
-  (testing "encoder-forward"
-    (let [result (encoder-forward sample-w-network (map array [[1 0 0] [1 0 0]]))
-          {:keys [hidden input]} (last result)
-          {:keys [h-state update-gate reset-gate]} (:state hidden)]
-      (is (= (vec input) (map float [1 0 0])))
-      (is (= 2 (count result)))
-      (is (= (mapv float h-state)       (take 10 (repeat (float -0.95143485)))))
-      (is (= (mapv float update-gate)  (take 10 (repeat (float -1.1070462)))))
-      (is (= (mapv float reset-gate) (take 10 (repeat (float -1.1070462)))))))
-
   (testing "decoder-activation-time-fixed"
     (let [{:keys [activation state]} (decoder-activation-time-fixed decoder-sample-network
                                                                     (array (take 3 (repeat (float 0.3))))
@@ -150,7 +138,7 @@
 
   (testing "encoder-bptt"
     (let [hd (:hidden-delta (encoder-bptt encoder-sample-network
-                                          (encoder-forward encoder-sample-network (map float-array [[1 0 0] [1 0 0]]))
+                                          (context encoder-sample-network (map float-array [[1 0 0] [1 0 0]]))
                                           (float-array (take 5 (repeat (float -0.5))))))]
       (is (= (row-count (:w-delta   hd)) 5))
       (is (= (row-count (:wr-delta  hd)) 5))
