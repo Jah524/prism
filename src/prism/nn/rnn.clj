@@ -4,13 +4,14 @@
     [prism.nn.rnn.lstm :as lstm]
     [prism.nn.rnn.gru :as gru]))
 
-(defn hidden-fixed-time
-  [model x-input recurrent-input-list previous-cell-state]
+(defn context
+  [model x-seq]
   (let [{:keys [rnn-type]} model]
     (condp = rnn-type
-      :standard (-> (s/forward-fixed-time model x-input recurrent-input-list previous-cell-state) :activation :hidden)
-      :lstm     (-> (lstm/lstm-activation model x-input recurrent-input-list previous-cell-state) :activation)
-      :gru      (-> (gru/gru-activation model x-input recurrent-input-list previous-cell-state)   :activation :gru))))
+      :standard (-> (s/context model x-seq)    last :hidden :activation :hidden)
+      :lstm     (-> (lstm/context model x-seq) last :hidden :activation)
+      :gru      (-> (gru/context model x-seq)  last :hidden :activation :gru))))
+
 
 
 (defn forward

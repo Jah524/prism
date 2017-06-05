@@ -136,16 +136,16 @@
                          :hidden-size hidden-size
                          :output-type :binary-classification
                          :output-items wc-set
-                         :activation :linear
+                         :activation :tanh
                          :rnn-type rnn-type})
         (assoc :wc wc))))
 
 (defn make-rnnlm
-  [training-path export-path hidden-size option]
+  [training-path export-path hidden-size rnn-type option]
   (let [_(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
-        model (init-rnnlm-model wc hidden-size)
+        model (init-rnnlm-model wc hidden-size rnn-type)
         model-path export-path]
     (train-rnnlm! model training-path (assoc option :model-path model-path))
     (print (str "Saving RNNLM model as " model-path " ... "))
@@ -164,17 +164,13 @@
     model))
 
 (defn text-vector [model words]
-  (let [{:keys [hidden hidden-size wc]} model]
-    (loop [words words,
-           previous-activation (array :vectorz (repeat hidden-size 0)),
-           previous-cell-state (array :vectorz (repeat hidden-size 0))]
-      (if-let [word (first words)]
-        (let [word (if (get wc word) word "<unk>")
-              {:keys [activation state]} (rnn/hidden-fixed-time model (set [word]) previous-activation previous-cell-state)]
-          (recur (rest words)
-                 activation
-                 (:cell-state state)))
-        previous-activation))))
+  (let [{:keys [wc]} model
+        words (->> words
+                   (mapv (fn [word]
+                           (let [w (if (get wc word) word "<unk>")]
+                             (set [w])))))]
+    (rnn/context model words)))
+
 
 (defn text-similarity
   [model words1 words2 l2?]

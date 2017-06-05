@@ -71,6 +71,21 @@
                  (cons model-output acc)))
         (vec (reverse acc))))))
 
+(defn context [model x-seq]
+  (let [{:keys [hidden hidden-size]} model]
+    (loop [x-seq x-seq,
+           previous-activation (array :vectorz (repeat hidden-size 0)),
+           previous-cell-state (array :vectorz (repeat hidden-size 0)),
+           acc []]
+      (if-let [x-input (first x-seq)]
+        (let [model-output (lstm-activation model x-input previous-activation previous-cell-state)
+              {:keys [activation state]} model-output]
+          (recur (rest x-seq)
+                 activation
+                 (:cell-state state)
+                 (cons {:input x-input :hidden model-output} acc)))
+        (vec (reverse acc))))))
+
 
 ;;;;    Back Propagation Through Time    ;;;;
 

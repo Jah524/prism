@@ -68,7 +68,17 @@
                  (cons model-output acc)))
         (vec (reverse acc))))))
 
-
+(defn context [model x-seq]
+  (let [{:keys [hidden hidden-size]} model]
+    (loop [x-seq x-seq,
+           hidden:t-1 (array :vectorz (repeat hidden-size 0)),
+           acc []]
+      (if-let [x-input (first x-seq)]
+        (let [{:keys [activation state] :as model-output} (gru-activation model x-input hidden:t-1)]
+          (recur (rest x-seq)
+                 (:gru activation)
+                 (cons {:input x-input :hidden model-output} acc)))
+        (vec (reverse acc))))))
 
 (defn gru-delta
   "propagation through a gru unit"
