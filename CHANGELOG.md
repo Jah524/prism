@@ -6,6 +6,7 @@
 
 - standard rnn
 - Gated Recurrent Unit(GRU)
+- encoder-decoder with GRU
 - Skip-Thought
 
 ### change
