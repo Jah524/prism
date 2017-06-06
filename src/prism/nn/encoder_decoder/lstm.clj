@@ -193,8 +193,7 @@
 
 (defn encoder-bptt
   [encoder encoder-activation propagated-delta-from-decoder]
-  (let [{:keys [hidden hidden-size]} encoder
-        {:keys [output hidden]} encoder
+  (let [{:keys [hidden hidden-size output]} encoder
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole]} hidden]
     ;looping latest to old
