@@ -193,8 +193,7 @@
 
 (defn encoder-bptt
   [encoder encoder-activation propagated-delta-from-decoder]
-  (let [{:keys [hidden hidden-size]} encoder
-        {:keys [output hidden]} encoder
+  (let [{:keys [hidden hidden-size output]} encoder
         {:keys [block-wr input-gate-wr forget-gate-wr output-gate-wr
                 input-gate-peephole forget-gate-peephole output-gate-peephole]} hidden]
     ;looping latest to old
@@ -205,14 +204,18 @@
            hidden-acc nil]
       (if (first output-seq)
         (let [lstm-state (:state (:hidden (first output-seq)))
-              cell-state:t-1 (or (:cell-state (:state (:hidden (second output-seq)))) (array :vectorz (repeat hidden-size 0)))
+              cell-state:t-1 (if (second output-seq)
+                               (:cell-state (:state (:hidden (second output-seq))))
+                               (array :vectorz (repeat hidden-size 0)))
               lstm-part-delta (lstm/lstm-part-delta hidden-size propagated-hidden-to-hidden-delta self-delta:t+1 lstm-state lstm-state:t+1 cell-state:t-1
                                                     input-gate-peephole forget-gate-peephole output-gate-peephole)
               x-input (:input (first output-seq))
-              self-activation:t-1 (or (:activation (:hidden (second output-seq)))
-                                      (array :vectorz (repeat hidden-size 0)));when first output time (last time of bptt
-              self-state:t-1      (or (:state (:hidden (second output-seq)))
-                                      {:cell-state (array :vectorz (repeat hidden-size 0))});when first output time (last time of bptt)
+              self-activation:t-1 (if (second output-seq)
+                                    (:activation (:hidden (second output-seq)))
+                                    (array :vectorz (repeat hidden-size 0)));when first output time (last time of bptt
+              self-state:t-1      (if (second output-seq)
+                                    (:state (:hidden (second output-seq)))
+                                    {:cell-state (array :vectorz (repeat hidden-size 0))});when first output time (last time of bptt)
               lstm-param-delta (lstm/lstm-param-delta encoder lstm-part-delta x-input self-activation:t-1 self-state:t-1)
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
