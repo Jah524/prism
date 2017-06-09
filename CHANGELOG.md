@@ -1,6 +1,15 @@
 # Change Log
 
-## [0.7.0] - FIXME
+## [0.8.0] - 2017-6-9
+
+### add
+
+- attention encoder-decoder
+  + GRU
+  + LSTM
+
+
+## [0.7.0] - 2017-6-6
 
 ### add
 
