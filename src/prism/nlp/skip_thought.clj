@@ -116,13 +116,14 @@
         done? (atom false)
         negative-dist (atom nil)]
     (with-open [r (reader train-path)]
-      (print (str "skipping " skip-lines " lines ..."))
-      (loop [skip skip-lines]
-        (when (> skip 0)
-          (.readLine r)
-          (swap! progress-counter inc)
-          (recur (dec skip))))
-      (println "done")
+      (when (> skip-lines 0)
+        (print (str "skipping " skip-lines " lines ..."))
+        (loop [skip skip-lines]
+          (when (> skip 0)
+            (.readLine r)
+            (swap! progress-counter inc)
+            (recur (dec skip))))
+        (println "done"))
       (when ns?
         (println "making initial distribution for negative-sampling ...")
         (swap! negative-dist (fn[_](samples neg-cum (* negative cache-size))))
@@ -170,7 +171,7 @@
                 (reset! done? true)))))
       (loop [loop-counter 0]
         (when-not @done?
-          (println (str (util/progress-format @progress-counter all-lines-num @interval-counter interval-ms "lines/s") ", loss: " (float (/ @tmp-loss (inc @interval-counter))))); loss per 1 word, and avoiding zero divide
+          (println (str (util/progress-format @progress-counter all-lines-num @interval-counter interval-ms "lines/s") ", loss: " (float (/ @tmp-loss (inc @interval-counter) workers)))); loss per 1 word, and avoiding zero divide
           (reset! tmp-loss 0)
           (reset! interval-counter 0)
           (when (and model-path (not (zero? snapshot)) (not (zero? loop-counter)) (zero? (rem loop-counter snapshot)))
@@ -193,7 +194,7 @@
                         :encoder-hidden-size encoder-hidden-size
                         :decoder-hidden-size decoder-hidden-size
                         :output-type (if ns? :binary-classification :multi-class-classification)
-                        :output-items (conj wc-set "<eos>")
+                        :output-items (-> wc-set (conj "<eos>" ) (conj "<unk>"))
                         :rnn-type rnn-type})
         (assoc
           :wc wc
@@ -223,6 +224,15 @@
     (train-skip-thought! model training-path (assoc option :model-path export-path))
     (print (str "Saving Skip-Thought model as " export-path " ... "))
     (util/save-model model export-path)
+    (println "Done")
+    model))
+
+(defn resume-train
+  [model-path training-path option]
+  (let [model (util/load-model model-path)]
+    (train-skip-thought! model training-path (assoc option :model-path model-path))
+    (print (str "Saving Skip-Thought model as " model-path " ... "))
+    (util/save-model model model-path)
     (println "Done")
     model))
 
