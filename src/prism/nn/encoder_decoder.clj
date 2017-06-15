@@ -11,10 +11,10 @@
   [encoder encoder-x-seq]
   (let [{:keys [rnn-type]} encoder]
     (condp = rnn-type
-      :lstm (lstmr/context encoder encoder-x-seq)
-      :gru  (grur/context encoder encoder-x-seq)
-      :gru-attention  (:activation (gruatt/alignment  (grur/context encoder encoder-x-seq)))
-      :lstm-attention (:activation (lstmatt/alignment (lstmr/context encoder encoder-x-seq))))))
+      :lstm (-> (lstmr/context encoder encoder-x-seq) last :hidden :activation)
+      :gru  (-> (grur/context encoder encoder-x-seq) last :hidden :activation :gru)
+      :gru-attention  (-> (gruatt/alignment  (grur/context encoder encoder-x-seq))  :activation last :hidden :activation :gru)
+      :lstm-attention (-> (lstmatt/alignment (lstmr/context encoder encoder-x-seq)) :activation last :hidden :activation))))
 
 
 (defn forward

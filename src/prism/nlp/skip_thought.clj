@@ -92,7 +92,7 @@
 (defn train-skip-thought!
   [model train-path & [option]]
   (let [{:keys [interval-ms workers negative learning-rate
-                skip-lines snapshot model-path]
+                skip-lines snapshot model-path epoc epoc-c]
          :or {interval-ms 60000 ;; 1 minutes
               workers 4
               negative 5
@@ -171,7 +171,7 @@
                 (reset! done? true)))))
       (loop [loop-counter 0]
         (when-not @done?
-          (println (str (util/progress-format @progress-counter all-lines-num @interval-counter interval-ms "lines/s") ", loss: " (float (/ @tmp-loss (inc @interval-counter) workers)))); loss per 1 word, and avoiding zero divide
+          (println (str (util/progress-format @progress-counter all-lines-num @interval-counter interval-ms "lines/s") ", epoc: " epoc-c "/" epoc ", loss: " (float (/ @tmp-loss (inc @interval-counter) workers)))); loss per 1 word, and avoiding zero divide
           (reset! tmp-loss 0)
           (reset! interval-counter 0)
           (when (and model-path (not (zero? snapshot)) (not (zero? loop-counter)) (zero? (rem loop-counter snapshot)))
@@ -215,32 +215,33 @@
 
 (defn make-skip-thought
   [training-path embedding-path export-path em-size encoder-hidden-size decoder-hidden-size rnn-type option]
-  (let [{:keys {shared? ns?} :or {shared? false ns? false}} option
+  (let [{:keys [shared? ns? epoc] :or {shared? false ns? false epoc 1}} option
         _(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
         em (util/load-model embedding-path)
         model (init-skip-thought-model wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared? ns?)]
-    (train-skip-thought! model training-path (assoc option :model-path export-path))
-    (print (str "Saving Skip-Thought model as " export-path " ... "))
-    (util/save-model model export-path)
-    (println "Done")
+    (dotimes [epoc-c epoc]
+      (train-skip-thought! model training-path (assoc option :model-path export-path :epoc-c epoc-c))
+      (print (str "Saving Skip-Thought model as " export-path " ... "))
+      (util/save-model model export-path)
+      (println "Done"))
     model))
 
 (defn resume-train
   [model-path training-path option]
-  (let [model (util/load-model model-path)]
-    (train-skip-thought! model training-path (assoc option :model-path model-path))
-    (print (str "Saving Skip-Thought model as " model-path " ... "))
-    (util/save-model model model-path)
-    (println "Done")
+  (let [model (util/load-model model-path)
+        {:keys [epoc] :or {epoc 1}} option]
+    (dotimes [epoc-c epoc]
+      (train-skip-thought! model training-path (assoc option :model-path model-path :epoc-c epoc-c))
+      (print (str "Saving Skip-Thought model as " model-path " ... "))
+      (util/save-model model model-path)
+      (println "Done"))
     model))
 
 (defn skip-thought-vector
   [st-model words]
   (let [{:keys [encoder em]} (:prev-model st-model)
         context (->> words (mapv #(word->feature em %)))]
-    (-> (ed/encoder-forward encoder context)
-        last
-        :hidden
-        :activation :gru)))
+    (ed/encoder-forward encoder context)))
+
