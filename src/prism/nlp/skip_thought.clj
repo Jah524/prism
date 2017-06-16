@@ -231,6 +231,9 @@
 (defn resume-train
   [model-path training-path option]
   (let [model (util/load-model model-path)
+        {:keys [encoder decoder]} model
+        {:keys [hidden]} encoder
+        model (assoc model :decoder (assoc decoder :hidden hidden)); let weight shared
         {:keys [epoc] :or {epoc 1}} option]
     (dotimes [epoc-c epoc]
       (train-skip-thought! model training-path (assoc option :model-path model-path :epoc-c (inc epoc-c)))
@@ -239,9 +242,15 @@
       (println "Done"))
     model))
 
+(defn save-encoder
+  [encoder-decoder-model save-path]
+  (let [{:keys [encoder]} (:prev-model encoder-decoder-model)]
+    (util/save-model encoder save-path)))
+
+
 (defn skip-thought-vector
-  [st-model words]
-  (let [{:keys [encoder em]} (:prev-model st-model)
+  [encoder words]
+  (let [{:keys [em]} encoder
         context (->> words (mapv #(word->feature em %)))]
     (ed/encoder-forward encoder context)))
 
