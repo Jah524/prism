@@ -1,4 +1,4 @@
-(defproject jah524/prism "0.8.1"
+(defproject jah524/prism "0.8.2"
   :description "A handy neural network library for natural language processing written in pure Clojure"
   :url "https://github.com/Jah524/prism"
   :license {:name "Eclipse Public License"
