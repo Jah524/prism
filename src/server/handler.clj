@@ -29,7 +29,7 @@
         (let [contents (json/read-str (.readLine (io/reader body)))
               {:strs [items perplexity iters]} contents
               item-vec (condp = @model-type
-                         "word2vec" (->> items flatten (mapv (fn [item] {:item item :v (get @model item)})))
+                         "word2vec" (->> items flatten distinct (mapv (fn [item] {:item item :v (get @model item)})))
                          "rnnlm" (->> items
                                       (mapv (fn [words]
                                               {:item (->> words
