@@ -16,13 +16,13 @@ Now prism is ready to work with following models.
 This library also includes some basic neural network model (e.g. feedforward, RNN(LSTM, GRU), encoder-decoder(LSTM, GRU)).
 See demonstration section and [examples](/src/examples) for more detail.
 
-And prism provides visualization tool that makes figure like above one.
-See [wiki](https://github.com/Jah524/prism/wiki/Visualization) for more about it.
+And prism also provides visualization tool that makes figure like above one.
+See [wiki](https://github.com/Jah524/prism/wiki/Visualization).
 
 ## Usage
 
 `git clone https://github.com/Jah524/prism.git` and `lein repl`.
-You can find how to do with prism at [project wiki](https://github.com/Jah524/prism/wiki)
+You can find how to do with prism at [wiki](https://github.com/Jah524/prism/wiki)
 
 If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
