@@ -140,7 +140,8 @@
       (fn m [& maps]
         (if (every? map? maps)
           (apply merge-with m maps)
-          (do
+          (if (every? number? maps)
+            (apply + maps)
             (apply add! maps))))
       maps)))
 

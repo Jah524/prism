@@ -32,4 +32,9 @@
   (testing "prediction-error"
     (is (= (prediction-error {"A" 0.2 "B" 0.5 "C" 0.1} {"A" 1 "B" 1 "C" 1})
            {"A" 0.8, "B" 0.5, "C" 0.9})))
+  (testing "merge-param!"
+    (is (= (merge-param! (array [1 2 3]) (array [1 2 3]))
+           (array [2 4 6])))
+    (is (= (merge-param! {"A" 0.2} {"A" -0.5 "B" 0.1})
+           {"A" -0.3 "B" 0.1})))
   )
