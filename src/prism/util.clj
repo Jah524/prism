@@ -6,7 +6,7 @@
     [clj-time.local :as l]
     [clj-time.core  :as t]
     [taoensso.nippy :refer [freeze-to-out! thaw-from-in!]]
-    [clojure.core.matrix :refer [dot]]
+    [clojure.core.matrix :refer [dot mutable?]]
     [clojure.core.matrix.operators :as o]))
 
 (defn save-model [obj target-path]
@@ -71,6 +71,11 @@
                   wc
                   @all-wc))))))
 
+(defn valid-embedding?
+  [em]
+  (->> (vals em)
+       (every? mutable?)))
+
 
 (defn l2-normalize
   [v]
@@ -83,3 +88,4 @@
   (if l2?
     (dot v1 v2)
     (dot (l2-normalize v1) (l2-normalize v2))))
+
