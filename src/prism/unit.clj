@@ -1,9 +1,9 @@
 (ns prism.unit
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [set-current-implementation array matrix esum dot shape add! emul emul! mmul
+    [clojure.core.matrix :refer [set-current-implementation array matrix esum dot shape add! add emul emul! mmul
                                  matrix? vec? emap emap! outer-product transpose ecount
-                                 matrix array esum dot exp emap sqrt pow]]
+                                 matrix array esum dot exp emap sqrt pow mutable?]]
     [clojure.core.matrix.random :refer [sample-normal]]
     [clojure.core.matrix.linear :refer [svd]]
     [clojure.core.matrix.operators :as o]
@@ -131,6 +131,15 @@
     :prediction
     (prediction-error activation expectation)))
 
+(defn plus
+  [a b]
+  (cond
+    (and (mutable? a) (mutable? b))
+    (add! a b)
+    (and (vec? a) (vec? b))
+    (add a b)
+    (and (number? a) (number? b))
+    (+ a b)))
 
 (defn merge-param!
   [& maps]
@@ -140,9 +149,8 @@
       (fn m [& maps]
         (if (every? map? maps)
           (apply merge-with m maps)
-          (if (every? number? maps)
-            (apply + maps)
-            (apply add! maps))))
+          (do
+            (apply plus maps))))
       maps)))
 
 
