@@ -27,7 +27,7 @@ You can find how to do with prism at [wiki](https://github.com/Jah524/prism/wiki
 If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
 ```
-[jah524/prism "0.8.3"]
+[jah524/prism "0.8.4"]
 ```
 
 ## Demonstration

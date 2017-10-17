@@ -1,5 +1,15 @@
 # Change Log
 
+## [0.8.4] - 2017-10-17
+
+### add
+
+- valid-embedding?
+
+### fix
+
+- merge-param!
+
 ## [0.8.0] - 2017-6-9
 
 ### add
