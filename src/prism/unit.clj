@@ -106,7 +106,8 @@
 
 (defn binary-classification-error
   [activation expectation]
-  (when (and (nil? (:pos expectation))
+  (when (and (not= :skip expectation)
+             (nil? (:pos expectation))
              (nil? (:neg expectation)))
     (throw (Exception. "binary-classification-error needs :pos or :neg")))
   (let [{:keys [pos neg]} expectation
