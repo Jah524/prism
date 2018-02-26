@@ -1,5 +1,27 @@
 # Change Log
 
+## [0.8.6] - 2018-2-26
+
+### update
+
+- dependencies
+
+```
+[org.clojure/clojure "1.9.0"]
+[net.mikera/core.matrix "0.62.0"]
+[clj-time "0.14.2"]
+[org.clojure/core.async "0.4.474"]
+```
+
+
+## [0.8.5] - 2018-1-12
+
+### update
+
+- binary-classification-error
+  + throws exception wheninvalid expectation given
+
+
 ## [0.8.4] - 2017-10-17
 
 ### add
