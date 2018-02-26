@@ -1,5 +1,5 @@
 (ns prism.nn.rnn
-  (require
+  (:require
     [prism.nn.rnn.standard :as s]
     [prism.nn.rnn.lstm :as lstm]
     [prism.nn.rnn.gru :as gru]))

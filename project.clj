@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :jvm-opts ["-Xmx12G" "-Xms1028m" "-server"]
-  :dependencies [[org.clojure/clojure "1.8.0"]
+  :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/clojurescript "1.9.521"]
                  [net.mikera/vectorz-clj "0.47.0"]
                  [net.mikera/core.matrix "0.60.3"]

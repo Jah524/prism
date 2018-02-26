@@ -1,5 +1,5 @@
 (ns prism.nn.encoder-decoder
-  (require
+  (:require
     [prism.nn.rnn.lstm :as lstmr]
     [prism.nn.rnn.gru :as grur]
     [prism.nn.encoder-decoder.lstm :as lstm]
