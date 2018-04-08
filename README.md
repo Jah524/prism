@@ -49,7 +49,25 @@ If you want to work on trained model in your project, add following dependency t
 
 ```
 
-- See [Word2vec](https://github.com/Jah524/prism/wiki/Word2Vec) for more details about word2vec
+- See [Word2vec](https://github.com/Jah524/prism/wiki/Word2Vec) for more details.
+
+### RNNLM
+
+```clojure
+(require '[prism.nlp.rnnlm :as rnnlm])
+(def rnnlm (rnnlm/make-rnnlm "your-training-path" "model-save-path.rnnlm" 100 :gru {:workers 2 :negative 5}))
+
+(require '[prism.util :as util])
+(def rnnlm (util/load-model "your-save-path.rnnlm"))
+
+;; you can take distributed representation of text or phrase
+(rnnlm/text-vector rnnlm ["word1" "word2" "word3"]) ;=> #vectorz/vector [0.5559875183548029,0.6338452816753448,0.49570920352227194 ...]
+
+;; and resume train, model-path represents your-save-path.rnnlm
+(rnnlm/resume-train "your-training-path" "model-path.rnnlm" {:workers 4})
+```
+
+- See [RNNLM](https://github.com/Jah524/prism/wiki/RNNLM) for more details.
 
 ### Skip Thought
 
