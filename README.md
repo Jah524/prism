@@ -14,7 +14,7 @@ Now prism is ready to work with following models.
 - Skip-Thought
 
 This library also includes some basic neural network model (e.g. feedforward, RNN(LSTM, GRU), encoder-decoder(LSTM, GRU)).
-See demonstration section and [examples](/src/examples) for more detail.
+See demonstration section and [examples](/src/examples) for more details.
 
 And prism also provides visualization tool that makes figure like above one.
 See [wiki](https://github.com/Jah524/prism/wiki/Visualization).
@@ -30,7 +30,26 @@ If you want to work on trained model in your project, add following dependency t
 [jah524/prism "0.8.6"]
 ```
 
-## Demonstration
+## Word2vec
+
+```clojure
+
+;make word embeddings
+(require '[prism.nlp.word2vec :as w2v])
+(def model (w2v/make-word2vec "your-training-path.txt" "model-save-path.w2v" 100 {:workers 2}))
+
+;use word embeddings
+(require '[prism.util :as util])
+(def em (util/load-model "your-save-path.w2v.em"))
+(get em "word") ;=> #vectorz/vector [0.06990837345068174,-0.09570045605373989 ....]
+
+(util/similarity (get em "word1") (get em "word2") true) => 0.03489215427695168
+
+```
+
+- See [Word2vec](https://github.com/Jah524/prism/wiki/Word2Vec) for more details about word2vec
+
+## Basic neural networks
 
 ### Feed Forward
 
