@@ -144,22 +144,34 @@
         (assoc :wc wc))))
 
 
+(defn leave-freq-word
+  [w2v top-n]
+  (let [{:keys [wc]} w2v
+        freq-words (->> wc
+                        (sort-by val >)
+                        (take top-n)
+                        (map first)
+                        (cons "<unk>"))]
+    (reduce (fn [acc word]
+              (assoc acc word (-> w2v :hidden :sparses (get word))))
+            {}
+            freq-words)))
+
 (defn save-embedding
-  "top-n = 0 represents all words"
-  [model path top-n]
-  (let [{:keys [hidden wc]} model
-        word-em (:sparses hidden)
-        considered (set (->> (dissoc wc "") (sort-by second >) (map first) (take top-n) (cons "<unk>")))
-        word-em (if (or (zero? top-n) (= :all top-n))
-                  word-em
-                  (reduce (fn [acc [word em]] (if (contains? considered word) (assoc acc word em) acc)) {} word-em))
-        l2-em (reduce (fn [acc [k v]] (assoc acc k (l2-normalize v))) {} word-em)]
-    (util/save-model l2-em path)))
+  [w2v path top-n]
+  (let [{:keys [hidden wc]} w2v
+        rest-word-em (if (= :all top-n)
+                       (:sparses hidden)
+                       (leave-freq-word w2v top-n))
+        l2-em (reduce (fn [acc [k v]] (assoc acc k (l2-normalize v))) {} rest-word-em)]
+    (util/save-model l2-em path)
+    l2-em))
 
 (defn make-word2vec
   [training-path export-path hidden-size option]
   (let [_(println "making word list...")
         wc (util/make-wc training-path option)
+        top-n (or (:top-n option) :all)
         _(println "done")
         model (init-w2v-model wc hidden-size)
         model-path     export-path
@@ -168,7 +180,7 @@
     (println (str "Saving word2vec model as " model-path))
     (util/save-model model model-path)
     (println (str "Saving embedding as " embedding-path))
-    (save-embedding model embedding-path 0)
+    (save-embedding model embedding-path top-n)
     (println "Done")
     model))
 
@@ -204,6 +216,8 @@
                (rest targets)
                targets)
              (take n))))))
+
+
 
 (defn most-sim-in-model
   [model word-or-vec n & [limit]]

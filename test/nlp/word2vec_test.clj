@@ -36,6 +36,13 @@
       (train-word2vec! w2v target-tok {:initial-learning-rate 0.01 :min-learning-rate 0.005 :nagetaive 10 :workers 1 :interval-ms 500 :sample 0.1})
       (is (not= (vec D)
                 (vec (get-in w2v [:hidden :sparses "D"])))))
+
+    (testing "leave-freq-word"
+      (is (= (leave-freq-word {:hidden {:sparses {"<unk>" :unk "A" :a "B" :b "C" :c}}
+                               :wc {"<unk>" 10 "A" 2 "B" 1 "C" 3}} 2)
+             {"<unk>" :unk, "C" :c})))
+
+
     (testing "most-sim-in-model"
       (let [result (most-sim-in-model w2v "D" 3)
             sims (->> result (map #(get % :x)) set)]
