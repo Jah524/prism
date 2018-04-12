@@ -22,6 +22,7 @@
                  [cljs-ajax "0.5.9"]
                  ]
   :plugins [[lein-cljsbuild "1.1.1"]]
+  :uberjar-name "prism.jar"
   :cljsbuild {:builds [{:id "tsne"
                         :source-paths ["src/server/cljs/tsne"]
                         :compiler {:output-to  "resources/public/js/tsne.js"
