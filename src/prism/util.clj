@@ -71,12 +71,6 @@
                   wc
                   @all-wc))))))
 
-(defn valid-embedding?
-  [em]
-  (->> (vals em)
-       (every? mutable?)))
-
-
 (defn l2-normalize
   [v]
   (let [acc (/ 1 (Math/sqrt (dot v v)))]
