@@ -222,7 +222,7 @@
         em (util/load-model embedding-path)
         model (init-skip-thought-model wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared? ns?)]
     (dotimes [epoc-c epoc]
-      (train-skip-thought! model training-path (assoc option :model-path export-path :epoc-c (inc epoc-c)))
+      (train-skip-thought! model training-path (assoc option :model-path export-path :epoc epoc :epoc-c (inc epoc-c)))
       (print (str "Saving Skip-Thought model as " export-path " ... "))
       (util/save-model model export-path)
       (println "Done"))
