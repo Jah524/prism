@@ -27,7 +27,7 @@ You can find how to do with prism at [wiki](https://github.com/Jah524/prism/wiki
 If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
 ```
-[jah524/prism "0.8.6"]
+[jah524/prism "0.8.7"]
 ```
 
 ## models for NLP
@@ -74,10 +74,18 @@ If you want to work on trained model in your project, add following dependency t
 ``` clojure
 (require '[prism.nlp.skip-thought :as st])
 
-(def m (st/make-skip-thought "your-training-path" "your-embedding-path" "model-save-path.st" 200 100 100 :gru {:workers 1 :interval-ms 1000 :ns? false :shared? false}))
+(def m (st/make-skip-thought "your-training-path" "your-embedding-path" "model-save-path.st" 200 100 100 :gru {:workers 4 :interval-ms 10000}))
 
-(st/skip-thought-vector m ["word1" "word2" "word3"]) ; => #vectorz/vector [0.08737680011079421,0.07707453000181463, ...]
+;; get encoder
+(def en (st/get-encoder m))
 
+;; get words vector
+(st/skip-thought-vector en ["word1" "word2" "word3"]) ; => #vectorz/vector [0.08737680011079421,0.07707453000181463, ...]
+
+;; save and load encoder
+(require '[prism.util :as u])
+(u/save-model en "output-path.st.encoder")
+(def en (u/load-model "output-path.st.encoder"))
 ```
 
 ## Visualization

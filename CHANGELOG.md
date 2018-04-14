@@ -1,5 +1,10 @@
 # Change Log
 
+## [0.8.7] - 2018-4-14
+
+- trivial changes and fixes
+- update documentation
+
 ## [0.8.6] - 2018-2-26
 
 ### update

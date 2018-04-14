@@ -212,6 +212,11 @@
            :next-model (assoc m2 :encoder (:encoder (dissoc m1 :wc :em :decoder)))}))
       (assoc :ns? ns? :shared? shared?)))
 
+(defn get-encoder
+  [encoder-decoder-model]
+  (let [{:keys [encoder em]} (:prev-model encoder-decoder-model)]
+    (assoc encoder :em em)))
+
 
 (defn make-skip-thought
   [training-path embedding-path export-path em-size encoder-hidden-size decoder-hidden-size rnn-type option]
@@ -227,28 +232,6 @@
       (util/save-model model export-path)
       (println "Done"))
     model))
-
-(defn resume-train
-  [model-path training-path option]
-  (let [model (util/load-model model-path)
-        {:keys [prev-model next-model]} model
-        {:keys [encoder]} prev-model
-        {:keys [hidden]} encoder
-        next-encoder (:encoder next-model)
-        model (assoc model :next-model (assoc next-model :encoder (assoc next-encoder :hidden hidden))); let weight shared
-        {:keys [epoc] :or {epoc 1}} option]
-    (dotimes [epoc-c epoc]
-      (train-skip-thought! model training-path (assoc option :model-path model-path :epoc-c (inc epoc-c)))
-      (print (str "Saving Skip-Thought model as " model-path " ... "))
-      (util/save-model model model-path)
-      (println "Done"))
-    model))
-
-(defn save-encoder-with-em
-  [encoder-decoder-model save-path]
-  (let [{:keys [encoder em]} (:prev-model encoder-decoder-model)]
-    (util/save-model (assoc encoder :em em) save-path)))
-
 
 (defn skip-thought-vector
   [encoder words]
