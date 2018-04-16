@@ -88,6 +88,8 @@ If you want to work on trained model in your project, add following dependency t
 (def en (u/load-model "output-path.st.encoder"))
 ```
 
+- See [Skip-Thoght Vectors](https://github.com/Jah524/prism/wiki/Skip-Thought) for more details.
+
 ## Visualization
 
 Move on to your console.
