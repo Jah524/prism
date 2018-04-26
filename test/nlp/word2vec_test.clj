@@ -41,17 +41,4 @@
       (is (= (leave-freq-word {:hidden {:sparses {"<unk>" :unk "A" :a "B" :b "C" :c}}
                                :wc {"<unk>" 10 "A" 2 "B" 1 "C" 3}} 2)
              {"<unk>" :unk, "C" :c})))
-
-
-    (testing "most-sim-in-model"
-      (let [result (most-sim-in-model w2v "D" 3)
-            sims (->> result (map #(get % :x)) set)]
-        (is (= (:x (first result)) "D")))))
-
-  (testing "most-sim"
-    (let [em {"A" (array (range 10))
-              "B" (array (repeat 10 0.3))
-              "C" (array (range 10 20))
-              "X" (array (range 10))}]
-      (is (= (most-sim em "X" ["A" "B" "C" ] 3 false)
-             [{:x "A", :sim (float 1)} {:x "C", :sim (float 0.9314063)} {:x "B", :sim (float 0.8429272081702948)}])))))
+    ))
