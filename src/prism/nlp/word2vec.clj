@@ -203,14 +203,14 @@
 (defn most-sim
   "embeddings have to be l2-normalized
   a word doesn't exist in embeddings are not removed"
-  [embedding reference target-list n l2]
+  [embedding reference target-list & {:keys [n l2?], :or {n 5 l2? true}}]
   (let [{:keys [em]} embedding]
     (when-let [reference-vec (if (string? reference) (get embedding reference) reference)]
       (let [targets (->> target-list
-                         (keep (fn [x]
-                                 (when-let [vec2 (if (string? x) (get embedding x) x)]
-                                   {:x x
-                                    :sim (float (min 1 (similarity reference-vec vec2 l2)))})))
+                         (keep (fn [w]
+                                 (when-let [v (get embedding w)]
+                                   {:word w
+                                    :sim (float (min 1 (similarity reference-vec v l2?)))})))
                          (sort-by :sim >))]
         (->> (if (= reference (:word (first targets)))
                (rest targets)
@@ -225,5 +225,5 @@
         {em :sparses} hidden
         limit (or limit (count wc))
         target-word-list (->> wc (sort-by second >) (map first) (take limit))]; sort by frequency
-    (most-sim em word-or-vec target-word-list n false)))
+    (most-sim em word-or-vec target-word-list :n n :l2? false)))
 
