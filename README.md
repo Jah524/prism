@@ -59,10 +59,12 @@ If you want to work on trained model in your project, add following dependency t
 (def em (util/load-model "https://s3.amazonaws.com/prism-archive/pretrained-model/1-billion-word-language-modeling-benchmark_200h_ns5_min10.w2v"))
 
 (def v1 (m/add (m/sub (get em "Japan") (get em "Tokyo")) (get em "Paris")))
-(most-sim em v1 ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"]) ;=> ({:x "France", :sim 0.7725763} {:x "Italy", :sim 0.6931164} {:x "Spain", :sim 0.6633791} {:x "Paris", :sim 0.64103466} {:x "Rome", :sim 0.49774215})
+(most-sim em v1 ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"])
+;=> ({:x "France", :sim 0.7725763} {:x "Italy", :sim 0.6931164} {:x "Spain", :sim 0.6633791} {:x "Paris", :sim 0.64103466} {:x "Rome", :sim 0.49774215})
 
 (def v2 (m/add (m/sub (get em "Japan") (get em "Tokyo")) (get em "Beijing")))
-(most-sim em v2 ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"]) ;=> ({:x "China", :sim 0.97199464} {:x "Beijing", :sim 0.8846489} {:x "Japan", :sim 0.7798172} {:x "Italy", :sim 0.44583768} {:x "Singapore", :sim 0.41647854})
+(most-sim em v2 ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"])
+;=> ({:x "China", :sim 0.97199464} {:x "Beijing", :sim 0.8846489} {:x "Japan", :sim 0.7798172} {:x "Italy", :sim 0.44583768} {:x "Singapore", :sim 0.41647854})
 
 ```
 
