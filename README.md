@@ -53,7 +53,7 @@ If you want to work on trained model in your project, add following dependency t
 
 - example using [pretrained model](https://s3.amazonaws.com/prism-archive/pretrained-model/1-billion-word-language-modeling-benchmark_200h_ns5_min10.w2v)
 
-```
+```clojure
 (require '[prism.util :as util])
 
 (def em (util/load-model "https://s3.amazonaws.com/prism-archive/pretrained-model/1-billion-word-language-modeling-benchmark_200h_ns5_min10.w2v"))
