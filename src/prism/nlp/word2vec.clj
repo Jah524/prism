@@ -201,8 +201,7 @@
 ;; work on embedding ;;
 
 (defn most-sim
-  "embeddings have to be l2-normalized
-  a word doesn't exist in embeddings are not removed"
+  "embeddings have to be l2-normalized"
   [embedding reference target-list & {:keys [n l2?], :or {n 5 l2? true}}]
   (let [{:keys [em]} embedding]
     (when-let [reference-vec (if (string? reference) (get embedding reference) reference)]
@@ -220,10 +219,9 @@
 
 
 (defn most-sim-in-model
-  [model word-or-vec n & [limit]]
+  [model word-or-vec & {:keys [n] :or {n 5}}]
   (let [{:keys [wc hidden]} model
         {em :sparses} hidden
-        limit (or limit (count wc))
-        target-word-list (->> wc (sort-by second >) (map first) (take limit))]; sort by frequency
+        target-word-list (->> wc (map first))]; sort by frequency
     (most-sim em word-or-vec target-word-list :n n :l2? false)))
 
