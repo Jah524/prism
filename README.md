@@ -55,17 +55,27 @@ If you want to work on trained model in your project, add following dependency t
 
 ```clojure
 (require '[prism.util :as util])
+(require '[prism.nlp.word2vec :as word2vec])
+(require '[clojure.core.matrix :as m])
+(m/set-current-implementation :vectorz)
 
 (def em (util/load-model "https://s3.amazonaws.com/prism-archive/pretrained-model/1-billion-word-language-modeling-benchmark_200h_ns5_min10.w2v.em"))
 ;; it takes a minutes (222.0MB)
 
+; or
+; download the model and 
+(def em (util/load-model "your path to pretrained model"))
+
+
+(def target-list ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"])
+
 (def v1 (m/add (m/sub (get em "Japan") (get em "Tokyo")) (get em "Paris")))
-(most-sim em v1 ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"])
-;=> ({:x "France", :sim 0.7725763} {:x "Italy", :sim 0.6931164} {:x "Spain", :sim 0.6633791} {:x "Paris", :sim 0.64103466} {:x "Rome", :sim 0.49774215})
+(word2vec/most-sim em v1 target-list)
+;=> ({:word "France", :sim 0.7725763} {:word "Italy", :sim 0.6931164} {:word "Spain", :sim 0.6633791} {:word "Paris", :sim 0.64103466} {:word "Rome", :sim 0.49774215})
 
 (def v2 (m/add (m/sub (get em "Japan") (get em "Tokyo")) (get em "Beijing")))
-(most-sim em v2 ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"])
-;=> ({:x "China", :sim 0.97199464} {:x "Beijing", :sim 0.8846489} {:x "Japan", :sim 0.7798172} {:x "Italy", :sim 0.44583768} {:x "Singapore", :sim 0.41647854})
+(word2vec/most-sim em v2 target-list)
+;=> ({:word "China", :sim 0.97199464} {:word "Beijing", :sim 0.8846489} {:word "Japan", :sim 0.7798172} {:word "Italy", :sim 0.44583768} {:word "Singapore", :sim 0.41647854})
 
 ```
 
