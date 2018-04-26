@@ -56,7 +56,8 @@ If you want to work on trained model in your project, add following dependency t
 ```clojure
 (require '[prism.util :as util])
 
-(def em (util/load-model "https://s3.amazonaws.com/prism-archive/pretrained-model/1-billion-word-language-modeling-benchmark_200h_ns5_min10.w2v"))
+(def em (util/load-model "https://s3.amazonaws.com/prism-archive/pretrained-model/1-billion-word-language-modeling-benchmark_200h_ns5_min10.w2v.em"))
+;; it takes a minutes (222.0MB)
 
 (def v1 (m/add (m/sub (get em "Japan") (get em "Tokyo")) (get em "Paris")))
 (most-sim em v1 ["Japan" "Tokyo" "China" "Beijing" "Bangkok" "Thai" "Singapore" "France" "Paris" "Italy" "Rome" "Spain" "Madrid"])
