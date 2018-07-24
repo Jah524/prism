@@ -27,7 +27,8 @@
                           (->> (str/split sentence #" |　")
                                (remove #(or (re-find #" |　" %) (= "" %)))
                                (map #(convert-rare-word-to-unk wc %))))))]
-    (if (> (count sens) 1)
+    (if (and (> (count sens) 1)
+             (every? #(not (empty? %)) sens))
       (loop [sens sens,
              prev-sen nil,
              acc []]

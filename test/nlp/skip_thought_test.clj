@@ -48,6 +48,8 @@
     (is (= (line->skip-thought-pairs {"A" 123 "B" 321 "C" 432 "D" 12 "E" 432} "A B C")
            :skip))
     (is (= (line->skip-thought-pairs {"A" 123 "B" 321 "C" 432 "D" 12 "E" 432} "A B C <eos>")
+           :skip))
+    (is (= (line->skip-thought-pairs {"A" 123 "B" 321 "C" 432 "D" 12 "E" 432} "A B C <eos> D E <eos> ")
            :skip)))
   (testing "add-negatives"
     (let [target1 {:encoder-x ["E" "<unk>" "A" "D"],
