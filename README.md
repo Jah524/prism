@@ -27,7 +27,7 @@ You can find how to do with prism at [wiki](https://github.com/Jah524/prism/wiki
 If you want to work on trained model in your project, add following dependency to your `project.clj`,
 
 ```
-[jah524/prism "0.8.7"]
+[jah524/prism "0.8.8"]
 ```
 
 ## models for NLP
@@ -63,7 +63,7 @@ If you want to work on trained model in your project, add following dependency t
 ;; it takes a minutes (222.0MB)
 
 ; or
-; download the model and 
+; download the model and
 (def em (util/load-model "your path to pretrained model"))
 
 
