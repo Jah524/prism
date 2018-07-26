@@ -272,7 +272,8 @@
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
                                                                 (emul delta w))))
-                                                       (apply add!)))
+                                                       (apply add!)
+                                                       (clip! 1)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
                                             (add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
