@@ -26,8 +26,10 @@
     (emap! #(cond (> % t) t (< % tmin) tmin :else %) v)))
 
 (defn rewrite!
-  [alpha v! v2]
-  (add! v! (emap! #(* alpha %) v2)))
+  [alpha v! delta]
+  (->> (emap! #(* alpha %) delta)
+       (clip! 1)
+       (add! v!)))
 
 
 (defn random-array [^Integer n]

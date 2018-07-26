@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! sub sub! scale emap esum emul emul! mmul outer-product transpose array dot]]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [sigmoid tanh clip! init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param!]]
+    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param!]]
     [prism.util :as util]))
 
 
@@ -210,8 +210,7 @@
                                                        (map (fn [[item delta]]
                                                               (let [w (:w (get output item))]
                                                                 (emul delta w))))
-                                                       (apply add!)
-                                                       (clip! 1)))
+                                                       (apply add!)))
               ;merging delta: hidden-to-hidden + above-to-hidden
               summed-propagated-delta (cond (and (not= :skip (first output-items-seq)) propagated-hidden-to-hidden-delta)
                                             (add! propagated-hidden-to-hidden-delta propagated-output-to-hidden-delta)
@@ -235,7 +234,7 @@
               {:keys [block-delta input-gate-delta forget-gate-delta output-gate-delta]} lstm-part-delta
               propagated-hidden-to-hidden-delta:t-1 (->> (map (fn [w d]
                                                                 (mmul (transpose w) d))
-                                                              [block-wr    input-gate-wr     forget-gate-wr    output-gate-wr]
+                                                              [block-wr    input-gate-wr    forget-gate-wr    output-gate-wr]
                                                               [block-delta input-gate-delta forget-gate-delta output-gate-delta])
                                                          (apply add!))]
           (recur (rest output-items-seq)
