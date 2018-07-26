@@ -1,5 +1,22 @@
 # Change Log
 
+## [0.8.9] - 2018-7-26
+
+### fix
+
+- add clip! to encoder-decoder models to avoid NaN
+
+### change
+
+- changed clipping value from -1 to 1
+
+
+## [0.8.8] - 2018-7-24
+
+### fix
+
+- skip-thought model skips incomplete conversation line
+
 ## [0.8.7] - 2018-4-14
 
 - trivial changes and fixes
