@@ -10,6 +10,7 @@
    :hidden-size 3
    :input-type  :dense
    :output-type :prediction
+   :optimizer :sgd
    :hidden {:w (matrix [[1] [1] [1]])
             :bias (array [1 1 1])
             :activation :sigmoid}
@@ -20,6 +21,7 @@
 (def sample-model2 ;3->2->3
   {:input-type  :dense
    :output-type :prediction
+   :optimizer :sgd
    :input-size 3
    :hidden-size 2
    :hidden {:w (matrix [[0.1 0.1 0.1] [0.2 0.2 0.2]])
@@ -36,6 +38,7 @@
 (def sample-model2:sparse ;3->2->3
   {:input-type  :sparse
    :output-type :prediction
+   :optimizer :sgd
    :input-size 3
    :hidden-size 2
    :hidden {:sparses {"natural" (array [0.1 0.2]) "language" (array [0.1 0.2]) "processing" (array [0.1 0.2])}

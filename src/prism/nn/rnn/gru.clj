@@ -5,7 +5,7 @@
     [prism.nn.feedforward :as ff]
     [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix activation derivative error merge-param!]]
     [prism.util :as util]
-    [prism.optimizer :refer [sgd!]]))
+    [prism.optimizer :refer [update-param!]]))
 
 
 (defn partial-state-sparse
@@ -202,7 +202,7 @@
 
 (defn update-model!
   [model param-delta-list learning-rate]
-  (let [{:keys [output hidden]} model
+  (let [{:keys [output hidden optimizer]} model
         {:keys [output-delta hidden-delta]} param-delta-list
         {:keys [w-delta wr-delta bias-delta
                 update-gate-w-delta update-gate-wr-delta update-gate-bias-delta
@@ -216,8 +216,8 @@
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
-                  (sgd! learning-rate bias bias-delta)
-                  (sgd! learning-rate w w-delta))))
+                  (update-param! optimizer learning-rate bias bias-delta)
+                  (update-param! optimizer learning-rate w w-delta))))
          dorun)
     ;update input connection
     (->> sparses-delta
@@ -225,26 +225,27 @@
          (mapv (fn [[word gru-w-delta]]
                  (let [{:keys [w-delta update-gate-w-delta reset-gate-w-delta]} gru-w-delta
                        {:keys [w update-gate-w reset-gate-w]} (get sparses word)]
-                   (sgd! learning-rate w w-delta)
-                   (sgd! learning-rate update-gate-w update-gate-w-delta)
-                   (sgd! learning-rate reset-gate-w  reset-gate-w-delta))))
+                   (update-param! optimizer learning-rate w w-delta)
+                   (update-param! optimizer learning-rate update-gate-w update-gate-w-delta)
+                   (update-param! optimizer learning-rate reset-gate-w  reset-gate-w-delta))))
          dorun)
-    (when w-delta       (sgd! learning-rate w w-delta))
-    (when update-gate-w-delta (sgd! learning-rate update-gate-w update-gate-w-delta))
-    (when reset-gate-w-delta  (sgd! learning-rate reset-gate-w  reset-gate-w-delta))
+    (when w-delta       (update-param! optimizer learning-rate w w-delta))
+    (when update-gate-w-delta (update-param! optimizer learning-rate update-gate-w update-gate-w-delta))
+    (when reset-gate-w-delta  (update-param! optimizer learning-rate reset-gate-w  reset-gate-w-delta))
     ;update recurrent connection
-    (sgd! learning-rate  wr  wr-delta)
-    (sgd! learning-rate  update-gate-wr  update-gate-wr-delta)
-    (sgd! learning-rate  reset-gate-wr   reset-gate-wr-delta)
+    (update-param! optimizer learning-rate  wr  wr-delta)
+    (update-param! optimizer learning-rate  update-gate-wr  update-gate-wr-delta)
+    (update-param! optimizer learning-rate  reset-gate-wr   reset-gate-wr-delta)
     ;update lstm bias and peephole
-    (sgd! learning-rate bias bias-delta)
-    (sgd! learning-rate update-gate-bias update-gate-bias-delta)
-    (sgd! learning-rate reset-gate-bias reset-gate-bias-delta)
+    (update-param! optimizer learning-rate bias bias-delta)
+    (update-param! optimizer learning-rate update-gate-bias update-gate-bias-delta)
+    (update-param! optimizer learning-rate reset-gate-bias reset-gate-bias-delta)
     model))
 
 
 (defn init-model
-  [{:keys [input-items input-size hidden-size output-type output-items]}]
+  [{:keys [input-items input-size hidden-size output-type output-items optimizer]
+    :or {optimizer :sgd}}]
   {:hidden {:w                (when input-size (init-matrix input-size hidden-size))
             :wr               (init-orthogonal-matrix hidden-size)
             :bias             (init-vector hidden-size)
@@ -266,4 +267,5 @@
    :input-size input-size
    :hidden-size hidden-size
    :output-type output-type
-   :rnn-type :gru})
+   :rnn-type :gru
+   :optimizer optimizer})

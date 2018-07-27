@@ -5,7 +5,7 @@
     [prism.nn.feedforward :as ff]
     [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix activation derivative error merge-param!]]
     [prism.util :as util]
-    [prism.optimizer :refer [sgd!]]))
+    [prism.optimizer :refer [update-param!]]))
 
 
 (defn partial-state-sparse
@@ -254,7 +254,7 @@
 
 (defn update-model!
   [model param-delta-list learning-rate]
-  (let [{:keys [output hidden]} model
+  (let [{:keys [output hidden optimizer]} model
         {:keys [output-delta hidden-delta]} param-delta-list
         {:keys [block-w-delta block-wr-delta block-bias-delta input-gate-w-delta input-gate-wr-delta input-gate-bias-delta
                 forget-gate-w-delta forget-gate-wr-delta forget-gate-bias-delta output-gate-w-delta output-gate-wr-delta output-gate-bias-delta
@@ -267,8 +267,8 @@
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
-                  (sgd! learning-rate bias bias-delta)
-                  (sgd! learning-rate w w-delta))))
+                  (update-param! optimizer learning-rate bias bias-delta)
+                  (update-param! optimizer learning-rate w w-delta))))
          dorun)
     ;update input connection
     (->> sparses-delta
@@ -276,33 +276,34 @@
          (mapv (fn [[word lstm-w-delta]]
                  (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]} lstm-w-delta
                        {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses word)]
-                   (sgd! learning-rate block-w block-w-delta)
-                   (sgd! learning-rate input-gate-w input-gate-w-delta)
-                   (sgd! learning-rate forget-gate-w forget-gate-w-delta)
-                   (sgd! learning-rate output-gate-w output-gate-w-delta))))
+                   (update-param! optimizer learning-rate block-w block-w-delta)
+                   (update-param! optimizer learning-rate input-gate-w input-gate-w-delta)
+                   (update-param! optimizer learning-rate forget-gate-w forget-gate-w-delta)
+                   (update-param! optimizer learning-rate output-gate-w output-gate-w-delta))))
          dorun)
-    (when block-w-delta       (sgd! learning-rate block-w block-w-delta))
-    (when input-gate-w-delta  (sgd! learning-rate input-gate-w input-gate-w-delta))
-    (when forget-gate-w-delta (sgd! learning-rate forget-gate-w forget-gate-w-delta))
-    (when output-gate-w-delta (sgd! learning-rate output-gate-w output-gate-w-delta))
+    (when block-w-delta       (update-param! optimizer learning-rate block-w block-w-delta))
+    (when input-gate-w-delta  (update-param! optimizer learning-rate input-gate-w input-gate-w-delta))
+    (when forget-gate-w-delta (update-param! optimizer learning-rate forget-gate-w forget-gate-w-delta))
+    (when output-gate-w-delta (update-param! optimizer learning-rate output-gate-w output-gate-w-delta))
     ;update recurrent connection
-    (sgd! learning-rate  block-wr  block-wr-delta)
-    (sgd! learning-rate  input-gate-wr  input-gate-wr-delta)
-    (sgd! learning-rate  forget-gate-wr  forget-gate-wr-delta)
-    (sgd! learning-rate  output-gate-wr  output-gate-wr-delta)
+    (update-param! optimizer learning-rate  block-wr  block-wr-delta)
+    (update-param! optimizer learning-rate  input-gate-wr  input-gate-wr-delta)
+    (update-param! optimizer learning-rate  forget-gate-wr  forget-gate-wr-delta)
+    (update-param! optimizer learning-rate  output-gate-wr  output-gate-wr-delta)
     ;update lstm bias and peephole
-    (sgd! learning-rate block-bias block-bias-delta)
-    (sgd! learning-rate input-gate-bias input-gate-bias-delta)
-    (sgd! learning-rate forget-gate-bias forget-gate-bias-delta)
-    (sgd! learning-rate output-gate-bias output-gate-bias-delta)
-    (sgd! learning-rate input-gate-peephole peephole-input-gate-delta)
-    (sgd! learning-rate forget-gate-peephole peephole-forget-gate-delta)
-    (sgd! learning-rate output-gate-peephole peephole-output-gate-delta)
+    (update-param! optimizer learning-rate block-bias block-bias-delta)
+    (update-param! optimizer learning-rate input-gate-bias input-gate-bias-delta)
+    (update-param! optimizer learning-rate forget-gate-bias forget-gate-bias-delta)
+    (update-param! optimizer learning-rate output-gate-bias output-gate-bias-delta)
+    (update-param! optimizer learning-rate input-gate-peephole peephole-input-gate-delta)
+    (update-param! optimizer learning-rate forget-gate-peephole peephole-forget-gate-delta)
+    (update-param! optimizer learning-rate output-gate-peephole peephole-output-gate-delta)
     model))
 
 
 (defn init-model
-  [{:keys [input-items input-size hidden-size output-type output-items]}]
+  [{:keys [input-items input-size hidden-size output-type output-items optimizer]
+    :or {optimizer :sgd}}]
   {:hidden (let [bwr (init-orthogonal-matrix hidden-size);for recurrent connection
                  bb  (init-vector hidden-size)
                  iwr (init-orthogonal-matrix hidden-size)
@@ -338,5 +339,6 @@
    :input-size input-size
    :hidden-size hidden-size
    :output-type output-type
-   :rnn-type :lstm})
+   :rnn-type :lstm
+   :optimizer optimizer})
 

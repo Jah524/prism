@@ -5,7 +5,7 @@
     [prism.nn.feedforward :as ff]
     [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix activation derivative error merge-param!]]
     [prism.util :as util]
-    [prism.optimizer :refer [sgd!]]))
+    [prism.optimizer :refer [update-param!]]))
 
 
 (defn forward-fixed-time
@@ -112,16 +112,16 @@
 
 
 (defn update-model! [model param-delta learning-rate]
-  (let [{:keys [output hidden]} model
+  (let [{:keys [output hidden optimizer]} model
         {:keys [output-delta hidden-delta]} param-delta]
     ;; update output
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
                   ;update output w
-                  (sgd! learning-rate w w-delta)
+                  (update-param! optimizer learning-rate w w-delta)
                   ;update output bias
-                  (sgd! learning-rate bias bias-delta))))
+                  (update-param! optimizer learning-rate bias bias-delta))))
          dorun)
     ;; update hidden
     (let [{:keys [sparses w bias wr]} hidden
@@ -130,19 +130,20 @@
            (map (fn [[k v]]
                   (let [word-w (get sparses k)]
                     ;; update hidden w
-                    (sgd! learning-rate word-w v))))
+                    (update-param! optimizer learning-rate word-w v))))
            dorun)
       ;; update input to hidden hidden connection
-      (when w-delta (sgd! learning-rate w w-delta))
+      (when w-delta (update-param! optimizer learning-rate w w-delta))
       ;; update hidden to hidden connection
-      (sgd! learning-rate wr wr-delta)
+      (update-param! optimizer learning-rate wr wr-delta)
       ;; update hidden bias
-      (sgd! learning-rate bias bias-delta)))
+      (update-param! optimizer learning-rate bias bias-delta)))
   model)
 
 
 (defn init-model
-  [{:keys [input-items input-size hidden-size output-type output-items activation]}]
+  [{:keys [input-items input-size hidden-size output-type output-items activation optimizer]
+    :or {optimizer :sgd}}]
   {:hidden {:w (when input-size (init-matrix input-size hidden-size))
             :bias (init-vector hidden-size)
             :wr (init-orthogonal-matrix hidden-size)
@@ -157,4 +158,5 @@
    :input-size input-size
    :hidden-size hidden-size
    :output-type output-type
-   :rnn-type :standard})
+   :rnn-type :standard
+   :optimizer optimizer})

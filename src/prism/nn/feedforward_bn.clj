@@ -4,7 +4,7 @@
     [clojure.core.matrix :refer [add add! emul emul! scale mmul array]]
     [clojure.core.matrix.stats :as s]
     [prism.unit :as u]
-    [prism.optimizer :refer [sgd!]]
+    [prism.optimizer :refer [update-param!]]
     [prism.nn.feedforward :as ff]))
 
 
@@ -96,16 +96,16 @@
 
 
 (defn update-model! [model param-delta learning-rate]
-  (let [{:keys [output hidden]} model
+  (let [{:keys [output hidden optimizer]} model
         {:keys [output-delta hidden-delta]} param-delta]
     ;; update output
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
                   ;update output w
-                  (sgd! learning-rate w w-delta)
+                  (update-param! optimizer learning-rate w w-delta)
                   ;update output bias
-                  (sgd! learning-rate bias bias-delta))))
+                  (update-param! optimizer learning-rate bias bias-delta))))
          dorun)
     ;; update hidden
     (let [{:keys [sparses w bias scale]} hidden
@@ -114,14 +114,14 @@
            (map (fn [[k v]]
                   (let [word-w (get sparses k)]
                     ;; update hidden w
-                    (sgd! learning-rate word-w v))))
+                    (update-param! optimizer learning-rate word-w v))))
            dorun)
       ;; update hidden w
-      (when w-delta (sgd! learning-rate w w-delta))
+      (when w-delta (update-param! optimizer learning-rate w w-delta))
       ;; update gain
-      (sgd! learning-rate scale scale-delta)
+      (update-param! optimizer learning-rate scale scale-delta)
       ;; update hidden bias
-      (sgd! learning-rate bias shift-delta)))
+      (update-param! optimizer learning-rate bias shift-delta)))
   model)
 
 (defn init-model

@@ -3,7 +3,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! scale emap esum emul emul! mmul outer-product array dot]]
     [prism.unit :refer [sigmoid init-vector init-matrix activation multi-class-prob derivative error]]
-    [prism.optimizer :refer [sgd!]]
+    [prism.optimizer :refer [update-param!]]
     [prism.util :as util]))
 
 
@@ -106,16 +106,16 @@
 
 
 (defn update-model! [model param-delta learning-rate]
-  (let [{:keys [output hidden]} model
+  (let [{:keys [output hidden optimizer]} model
         {:keys [output-delta hidden-delta]} param-delta]
     ;; update output
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
                   ;update output w
-                  (sgd! learning-rate w w-delta)
+                  (update-param! optimizer learning-rate w w-delta)
                   ;update output bias
-                  (sgd! learning-rate bias bias-delta))))
+                  (update-param! optimizer learning-rate bias bias-delta))))
          dorun)
     ;; update hidden
     (let [{:keys [sparses w bias]} hidden
@@ -124,17 +124,18 @@
            (map (fn [[k v]]
                   (let [word-w (get sparses k)]
                     ;; update hidden w
-                    (sgd! learning-rate word-w v))))
+                    (update-param! optimizer learning-rate word-w v))))
            dorun)
       ;; update hidden w
-      (when w-delta (sgd! learning-rate w w-delta))
+      (when w-delta (update-param! optimizer learning-rate w w-delta))
       ;; update hidden bias
-      (sgd! learning-rate bias bias-delta)))
+      (update-param! optimizer learning-rate bias bias-delta)))
   model)
 
 
 (defn init-model
-  [{:keys [input-items input-size hidden-size output-type output-items activation]}]
+  [{:keys [input-items input-size hidden-size output-type output-items activation optimizer]
+    :or {optimizer :sgd}}]
   {:hidden {:sparses (reduce (fn [acc sparse]
                                (assoc acc sparse (init-vector hidden-size)))
                              {}
@@ -149,5 +150,6 @@
                    output-items)
    :input-size  input-size
    :hidden-size hidden-size
-   :output-type output-type})
+   :output-type output-type
+   :optimizer optimizer})
 

@@ -17,4 +17,8 @@
            (map float [0.04 0.02 -0.02 -0.05 0.01]))))
   (testing "sgd!"
     (is (= (map float (sgd! 0.05 (array (range 10)) (array (repeat 10 1))))
+           (map float [0.05 1.05 2.05 3.05 4.05 5.05 6.05 7.05 8.05 9.05]))))
+  (testing "update-param!"
+    (is (= (map float (update-param! :sgd 0.05 (array (range 10)) (array (repeat 10 1))))
            (map float [0.05 1.05 2.05 3.05 4.05 5.05 6.05 7.05 8.05 9.05])))))
+

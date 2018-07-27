@@ -10,6 +10,7 @@
   {:input-size 3
    :hidden-size 10
    :output-type :binary-classification
+   :optimizer :sgd
    :hidden {:unit-type :lstm
             :layer-type :hidden
             :block-w (matrix (partition 3 (take 30 (repeat 0.1))))
@@ -37,6 +38,7 @@
 
 (def sample-w-network-sparse
   {:output-type :binary-classification
+   :optimizer :sgd
    :hidden-size 10
    :hidden {:sparses {"natural" {:block-w (array (take 10 (repeat 0.1)))
                                  :input-gate-w  (array (take 10 (repeat 0.1)))
@@ -71,6 +73,7 @@
 
 (def sample-w-network-prediction
   {:output-type :prediction
+   :optimizer :sgd
    :hidden-size 10
    :hidden {:sparses {"natural" {:block-w (array (take 10 (repeat 0.1)))
                                  :input-gate-w  (array (take 10 (repeat 0.1)))

@@ -11,6 +11,7 @@
 (def encoder-sample-network
   "assumed 3->5->3 connection"
   {:output-type :binary-classification
+   :optimizer :sgd
    :input-size 3
    :hidden-size 5
    :hidden {:w (matrix (partition 3 (take 15 (repeat 0.1))))

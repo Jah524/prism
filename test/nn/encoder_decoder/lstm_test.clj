@@ -12,6 +12,7 @@
   "assumed 3->5->3 connection"
   {:input-type :dense
    :output-type :binary-classification
+   :optimizer :sgd
    :input-size 3
    :hidden-size 5
    :hidden {:unit-type :lstm

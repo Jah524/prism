@@ -17,13 +17,13 @@
       g)))
 
 
-;;     (emap! #(cond (> % t) t
-;;                   (< % tmin) tmin
-;;                   :else %)
-;;            (emul! g n))))
-
 (defn sgd!
   [learning-rate model-param! delta]
   (->> (emap! #(* learning-rate %) delta)
        (clip! 1)
        (add! model-param!)))
+
+(defn update-param!
+  [optimizer learning-rate model-param! delta]
+  (case optimizer
+    :sgd (sgd! learning-rate model-param! delta)))
