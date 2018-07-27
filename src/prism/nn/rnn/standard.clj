@@ -3,8 +3,9 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! sub sub! emap esum scale emul emul! mmul outer-product transpose array dot]]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param!]]
-    [prism.util :as util]))
+    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix activation derivative error merge-param!]]
+    [prism.util :as util]
+    [prism.optimizer :refer [sgd!]]))
 
 
 (defn forward-fixed-time
@@ -118,9 +119,9 @@
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
                   ;update output w
-                  (rewrite! learning-rate w w-delta)
+                  (sgd! learning-rate w w-delta)
                   ;update output bias
-                  (rewrite! learning-rate bias bias-delta))))
+                  (sgd! learning-rate bias bias-delta))))
          dorun)
     ;; update hidden
     (let [{:keys [sparses w bias wr]} hidden
@@ -129,14 +130,14 @@
            (map (fn [[k v]]
                   (let [word-w (get sparses k)]
                     ;; update hidden w
-                    (rewrite! learning-rate word-w v))))
+                    (sgd! learning-rate word-w v))))
            dorun)
       ;; update input to hidden hidden connection
-      (when w-delta (rewrite! learning-rate w w-delta))
+      (when w-delta (sgd! learning-rate w w-delta))
       ;; update hidden to hidden connection
-      (rewrite! learning-rate wr wr-delta)
+      (sgd! learning-rate wr wr-delta)
       ;; update hidden bias
-      (rewrite! learning-rate bias bias-delta)))
+      (sgd! learning-rate bias bias-delta)))
   model)
 
 

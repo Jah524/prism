@@ -3,8 +3,9 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! sub sub! emap esum emul emul! mmul outer-product transpose array dot exp] :as m]
     [clojure.core.matrix.operators :as o]
-    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param!]]
+    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix error merge-param!]]
     [prism.util :as util]
+    [prism.optimizer :refer [sgd!]]
     [prism.nn.rnn.gru :as gru]
     [prism.nn.encoder-decoder.lstm :as lstm]))
 
@@ -216,19 +217,19 @@
          (map (fn [[item {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta previous-input-w-delta]}]]
                 (let [{:keys [w bias encoder-w previous-input-w previous-input-sparses]} (get output item)]
                   ; update output params
-                  (rewrite! learning-rate bias bias-delta)
-                  (rewrite! learning-rate w w-delta)
+                  (sgd! learning-rate bias bias-delta)
+                  (sgd! learning-rate w w-delta)
                   ;; update encoder connection
-                  (rewrite! learning-rate encoder-w encoder-w-delta)
+                  (sgd! learning-rate encoder-w encoder-w-delta)
                   ;; update decoder previous input
                   ; sparse
                   (->> (:sparses-delta previous-input-w-delta)
                        (map (fn [[item {:keys [w-delta]}]]
                               (let [{:keys [w]} (get previous-input-sparses item)]
-                                (rewrite! learning-rate w w-delta))))
+                                (sgd! learning-rate w w-delta))))
                        dorun)
                   ; dense
-                  (when (:w previous-input-w-delta) (rewrite! learning-rate previous-input-w (:w previous-input-w-delta))))))
+                  (when (:w previous-input-w-delta) (sgd! learning-rate previous-input-w (:w previous-input-w-delta))))))
          dorun)
     ;;; update hidden layer
     ;; update input connections
@@ -237,26 +238,26 @@
          (map (fn [[word gru-w-delta]]
                 (let [{:keys [w-delta update-gate-w-delta reset-gate-w-delta]} gru-w-delta
                       {:keys [w update-gate-w reset-gate-w]} (get sparses word)]
-                  (rewrite! learning-rate w w-delta)
-                  (rewrite! learning-rate update-gate-w update-gate-w-delta)
-                  (rewrite! learning-rate reset-gate-w reset-gate-w-delta))))
+                  (sgd! learning-rate w w-delta)
+                  (sgd! learning-rate update-gate-w update-gate-w-delta)
+                  (sgd! learning-rate reset-gate-w reset-gate-w-delta))))
          dorun)
     ; dense
-    (when w-delta             (rewrite! learning-rate w w-delta))
-    (when update-gate-w-delta (rewrite! learning-rate update-gate-w update-gate-w-delta))
-    (when reset-gate-w-delta  (rewrite! learning-rate reset-gate-w reset-gate-w-delta))
+    (when w-delta             (sgd! learning-rate w w-delta))
+    (when update-gate-w-delta (sgd! learning-rate update-gate-w update-gate-w-delta))
+    (when reset-gate-w-delta  (sgd! learning-rate reset-gate-w reset-gate-w-delta))
     ;; update recurrent connections
-    (rewrite! learning-rate wr wr-delta)
-    (rewrite! learning-rate update-gate-wr update-gate-wr-delta)
-    (rewrite! learning-rate reset-gate-wr reset-gate-wr-delta)
+    (sgd! learning-rate wr wr-delta)
+    (sgd! learning-rate update-gate-wr update-gate-wr-delta)
+    (sgd! learning-rate reset-gate-wr reset-gate-wr-delta)
     ; update encoder connections
-    (rewrite! learning-rate we we-delta)
-    (rewrite! learning-rate update-gate-we update-gate-we-delta)
-    (rewrite! learning-rate reset-gate-we  reset-gate-we-delta)
+    (sgd! learning-rate we we-delta)
+    (sgd! learning-rate update-gate-we update-gate-we-delta)
+    (sgd! learning-rate reset-gate-we  reset-gate-we-delta)
     ;; update lstm bias and peephole
-    (rewrite! learning-rate bias bias-delta)
-    (rewrite! learning-rate update-gate-bias update-gate-bias-delta)
-    (rewrite! learning-rate reset-gate-bias reset-gate-bias-delta)
+    (sgd! learning-rate bias bias-delta)
+    (sgd! learning-rate update-gate-bias update-gate-bias-delta)
+    (sgd! learning-rate reset-gate-bias reset-gate-bias-delta)
     decoder))
 
 (defn update-encoder-decoder!

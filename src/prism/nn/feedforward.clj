@@ -2,7 +2,8 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! scale emap esum emul emul! mmul outer-product array dot]]
-    [prism.unit :refer [sigmoid init-vector init-matrix rewrite! activation multi-class-prob derivative error]]
+    [prism.unit :refer [sigmoid init-vector init-matrix activation multi-class-prob derivative error]]
+    [prism.optimizer :refer [sgd!]]
     [prism.util :as util]))
 
 
@@ -112,9 +113,9 @@
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
                   ;update output w
-                  (rewrite! learning-rate w w-delta)
+                  (sgd! learning-rate w w-delta)
                   ;update output bias
-                  (rewrite! learning-rate bias bias-delta))))
+                  (sgd! learning-rate bias bias-delta))))
          dorun)
     ;; update hidden
     (let [{:keys [sparses w bias]} hidden
@@ -123,12 +124,12 @@
            (map (fn [[k v]]
                   (let [word-w (get sparses k)]
                     ;; update hidden w
-                    (rewrite! learning-rate word-w v))))
+                    (sgd! learning-rate word-w v))))
            dorun)
       ;; update hidden w
-      (when w-delta (rewrite! learning-rate w w-delta))
+      (when w-delta (sgd! learning-rate w w-delta))
       ;; update hidden bias
-      (rewrite! learning-rate bias bias-delta)))
+      (sgd! learning-rate bias bias-delta)))
   model)
 
 

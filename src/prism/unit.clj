@@ -1,9 +1,9 @@
 (ns prism.unit
   (:require
     [clojure.pprint :refer [pprint]]
-    [clojure.core.matrix :refer [set-current-implementation array matrix esum dot shape add! add emul emul! mmul
-                                 matrix? vec? emap emap! outer-product transpose ecount
-                                 matrix array esum dot exp emap sqrt pow mutable?]]
+    [clojure.core.matrix :refer [set-current-implementation array matrix esum dot shape add! add mmul
+                                 matrix? vec? emap emap! outer-product transpose ecount esum dot
+                                 exp sqrt pow mutable?]]
     [clojure.core.matrix.random :refer [sample-normal]]
     [clojure.core.matrix.linear :refer [svd]]
     [clojure.core.matrix.operators :as o]
@@ -18,18 +18,6 @@
 (defn tanh-derivative [x] (let [it (Math/tanh x)] (float (- 1 (* it it)))))
 
 (defn linear-derivative-vector [v] (array :vectorz (take (ecount v) (repeat 1))))
-
-(defn clip!
-  "v: vector, t: threshould(positive value)"
-  [t v]
-  (let [tmin (- t)]
-    (emap! #(cond (> % t) t (< % tmin) tmin :else %) v)))
-
-(defn rewrite!
-  [alpha v! delta]
-  (->> (emap! #(* alpha %) delta)
-       (clip! 1)
-       (add! v!)))
 
 
 (defn random-array [^Integer n]

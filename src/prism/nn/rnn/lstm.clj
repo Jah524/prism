@@ -3,8 +3,9 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! sub sub! scale emap esum emul emul! mmul outer-product transpose array dot]]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param!]]
-    [prism.util :as util]))
+    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix activation derivative error merge-param!]]
+    [prism.util :as util]
+    [prism.optimizer :refer [sgd!]]))
 
 
 (defn partial-state-sparse
@@ -266,8 +267,8 @@
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
-                  (rewrite! learning-rate bias bias-delta)
-                  (rewrite! learning-rate w w-delta))))
+                  (sgd! learning-rate bias bias-delta)
+                  (sgd! learning-rate w w-delta))))
          dorun)
     ;update input connection
     (->> sparses-delta
@@ -275,28 +276,28 @@
          (mapv (fn [[word lstm-w-delta]]
                  (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]} lstm-w-delta
                        {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses word)]
-                   (rewrite! learning-rate block-w block-w-delta)
-                   (rewrite! learning-rate input-gate-w input-gate-w-delta)
-                   (rewrite! learning-rate forget-gate-w forget-gate-w-delta)
-                   (rewrite! learning-rate output-gate-w output-gate-w-delta))))
+                   (sgd! learning-rate block-w block-w-delta)
+                   (sgd! learning-rate input-gate-w input-gate-w-delta)
+                   (sgd! learning-rate forget-gate-w forget-gate-w-delta)
+                   (sgd! learning-rate output-gate-w output-gate-w-delta))))
          dorun)
-    (when block-w-delta       (rewrite! learning-rate block-w block-w-delta))
-    (when input-gate-w-delta  (rewrite! learning-rate input-gate-w input-gate-w-delta))
-    (when forget-gate-w-delta (rewrite! learning-rate forget-gate-w forget-gate-w-delta))
-    (when output-gate-w-delta (rewrite! learning-rate output-gate-w output-gate-w-delta))
+    (when block-w-delta       (sgd! learning-rate block-w block-w-delta))
+    (when input-gate-w-delta  (sgd! learning-rate input-gate-w input-gate-w-delta))
+    (when forget-gate-w-delta (sgd! learning-rate forget-gate-w forget-gate-w-delta))
+    (when output-gate-w-delta (sgd! learning-rate output-gate-w output-gate-w-delta))
     ;update recurrent connection
-    (rewrite! learning-rate  block-wr  block-wr-delta)
-    (rewrite! learning-rate  input-gate-wr  input-gate-wr-delta)
-    (rewrite! learning-rate  forget-gate-wr  forget-gate-wr-delta)
-    (rewrite! learning-rate  output-gate-wr  output-gate-wr-delta)
+    (sgd! learning-rate  block-wr  block-wr-delta)
+    (sgd! learning-rate  input-gate-wr  input-gate-wr-delta)
+    (sgd! learning-rate  forget-gate-wr  forget-gate-wr-delta)
+    (sgd! learning-rate  output-gate-wr  output-gate-wr-delta)
     ;update lstm bias and peephole
-    (rewrite! learning-rate block-bias block-bias-delta)
-    (rewrite! learning-rate input-gate-bias input-gate-bias-delta)
-    (rewrite! learning-rate forget-gate-bias forget-gate-bias-delta)
-    (rewrite! learning-rate output-gate-bias output-gate-bias-delta)
-    (rewrite! learning-rate input-gate-peephole peephole-input-gate-delta)
-    (rewrite! learning-rate forget-gate-peephole peephole-forget-gate-delta)
-    (rewrite! learning-rate output-gate-peephole peephole-output-gate-delta)
+    (sgd! learning-rate block-bias block-bias-delta)
+    (sgd! learning-rate input-gate-bias input-gate-bias-delta)
+    (sgd! learning-rate forget-gate-bias forget-gate-bias-delta)
+    (sgd! learning-rate output-gate-bias output-gate-bias-delta)
+    (sgd! learning-rate input-gate-peephole peephole-input-gate-delta)
+    (sgd! learning-rate forget-gate-peephole peephole-forget-gate-delta)
+    (sgd! learning-rate output-gate-peephole peephole-output-gate-delta)
     model))
 
 

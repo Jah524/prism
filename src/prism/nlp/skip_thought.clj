@@ -99,7 +99,7 @@
               negative 5
               learning-rate 0.01
               skip-lines 0
-              snapshot 60 ;  1 hour when interval-ms is set 60000
+              snapshot 0 ;  set to 60 as 1 hour when interval-ms is set 60000
               }} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
         {:keys [prev-model next-model shared? ns?]} model

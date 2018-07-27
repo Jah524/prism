@@ -5,12 +5,6 @@
     [prism.unit :refer :all]))
 
 (deftest unit-test
-  (testing "clip!"
-    (is (= (map float (clip! 25 (array [1 -3 -30 30 24 -24.9])))
-           (map float [1 -3 -25 25 24 -24.9]))))
-  (testing "rewrite!"
-    (is (= (map float (rewrite! 0.05 (array (range 10)) (array (repeat 10 1))))
-           (map float [0.05 1.05 2.05 3.05 4.05 5.05 6.05 7.05 8.05 9.05]))))
   (testing "init-orthogonal-matrix"
     (let [result (init-orthogonal-matrix 5)]
       (is (= (ecount result) 25))

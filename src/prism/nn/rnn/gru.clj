@@ -3,8 +3,9 @@
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! emap esum sub sub! scale scale! emul emul! mmul outer-product transpose array dot] :as m]
     [prism.nn.feedforward :as ff]
-    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix rewrite! activation derivative error merge-param!]]
-    [prism.util :as util]))
+    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix activation derivative error merge-param!]]
+    [prism.util :as util]
+    [prism.optimizer :refer [sgd!]]))
 
 
 (defn partial-state-sparse
@@ -215,8 +216,8 @@
     (->> output-delta
          (map (fn [[item {:keys [w-delta bias-delta]}]]
                 (let [{:keys [w bias]} (get output item)]
-                  (rewrite! learning-rate bias bias-delta)
-                  (rewrite! learning-rate w w-delta))))
+                  (sgd! learning-rate bias bias-delta)
+                  (sgd! learning-rate w w-delta))))
          dorun)
     ;update input connection
     (->> sparses-delta
@@ -224,21 +225,21 @@
          (mapv (fn [[word gru-w-delta]]
                  (let [{:keys [w-delta update-gate-w-delta reset-gate-w-delta]} gru-w-delta
                        {:keys [w update-gate-w reset-gate-w]} (get sparses word)]
-                   (rewrite! learning-rate w w-delta)
-                   (rewrite! learning-rate update-gate-w update-gate-w-delta)
-                   (rewrite! learning-rate reset-gate-w  reset-gate-w-delta))))
+                   (sgd! learning-rate w w-delta)
+                   (sgd! learning-rate update-gate-w update-gate-w-delta)
+                   (sgd! learning-rate reset-gate-w  reset-gate-w-delta))))
          dorun)
-    (when w-delta       (rewrite! learning-rate w w-delta))
-    (when update-gate-w-delta (rewrite! learning-rate update-gate-w update-gate-w-delta))
-    (when reset-gate-w-delta  (rewrite! learning-rate reset-gate-w  reset-gate-w-delta))
+    (when w-delta       (sgd! learning-rate w w-delta))
+    (when update-gate-w-delta (sgd! learning-rate update-gate-w update-gate-w-delta))
+    (when reset-gate-w-delta  (sgd! learning-rate reset-gate-w  reset-gate-w-delta))
     ;update recurrent connection
-    (rewrite! learning-rate  wr  wr-delta)
-    (rewrite! learning-rate  update-gate-wr  update-gate-wr-delta)
-    (rewrite! learning-rate  reset-gate-wr   reset-gate-wr-delta)
+    (sgd! learning-rate  wr  wr-delta)
+    (sgd! learning-rate  update-gate-wr  update-gate-wr-delta)
+    (sgd! learning-rate  reset-gate-wr   reset-gate-wr-delta)
     ;update lstm bias and peephole
-    (rewrite! learning-rate bias bias-delta)
-    (rewrite! learning-rate update-gate-bias update-gate-bias-delta)
-    (rewrite! learning-rate reset-gate-bias reset-gate-bias-delta)
+    (sgd! learning-rate bias bias-delta)
+    (sgd! learning-rate update-gate-bias update-gate-bias-delta)
+    (sgd! learning-rate reset-gate-bias reset-gate-bias-delta)
     model))
 
 

@@ -2,7 +2,8 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.core.matrix :refer [add add! sub sub! emap esum scale emul emul! mmul outer-product transpose array dot exp]]
-    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix rewrite! error merge-param!]]
+    [prism.unit :refer [sigmoid tanh init-orthogonal-matrix init-vector init-matrix error merge-param!]]
+    [prism.optimizer :refer [sgd!]]
     [prism.util :as util]
     [prism.nn.rnn.lstm :as lstm]))
 
@@ -346,19 +347,19 @@
          (map (fn [[item {:keys [w-delta bias-delta encoder-w-delta previous-input-w-delta previous-input-w-delta]}]]
                 (let [{:keys [w bias encoder-w previous-input-w previous-input-sparses]} (get output item)]
                   ; update output params
-                  (rewrite! learning-rate bias bias-delta)
-                  (rewrite! learning-rate w w-delta)
+                  (sgd! learning-rate bias bias-delta)
+                  (sgd! learning-rate w w-delta)
                   ;; update encoder connection
-                  (rewrite! learning-rate encoder-w encoder-w-delta)
+                  (sgd! learning-rate encoder-w encoder-w-delta)
                   ;; update decoder previous input
                   ; sparse
                   (->> (:sparses-delta previous-input-w-delta)
                        (map (fn [[item {:keys [w-delta]}]]
                               (let [{:keys [w]} (get previous-input-sparses item)]
-                                (rewrite! learning-rate w w-delta))))
+                                (sgd! learning-rate w w-delta))))
                        dorun)
                   ; dense
-                  (when (:w previous-input-w-delta) (rewrite! learning-rate previous-input-w (:w previous-input-w-delta))))))
+                  (when (:w previous-input-w-delta) (sgd! learning-rate previous-input-w (:w previous-input-w-delta))))))
          dorun)
     ;;; update hidden layer
     ;; update input connections
@@ -367,34 +368,34 @@
          (map (fn [[word lstm-w-delta]]
                 (let [{:keys [block-w-delta input-gate-w-delta forget-gate-w-delta output-gate-w-delta]} lstm-w-delta
                       {:keys [block-w input-gate-w forget-gate-w output-gate-w]} (get sparses word)]
-                  (rewrite! learning-rate block-w block-w-delta)
-                  (rewrite! learning-rate input-gate-w input-gate-w-delta)
-                  (rewrite! learning-rate forget-gate-w forget-gate-w-delta)
-                  (rewrite! learning-rate output-gate-w output-gate-w-delta))))
+                  (sgd! learning-rate block-w block-w-delta)
+                  (sgd! learning-rate input-gate-w input-gate-w-delta)
+                  (sgd! learning-rate forget-gate-w forget-gate-w-delta)
+                  (sgd! learning-rate output-gate-w output-gate-w-delta))))
          dorun)
     ; dense
-    (when block-w-delta       (rewrite! learning-rate block-w block-w-delta))
-    (when input-gate-w-delta  (rewrite! learning-rate input-gate-w input-gate-w-delta))
-    (when forget-gate-w-delta (rewrite! learning-rate forget-gate-w forget-gate-w-delta))
-    (when output-gate-w-delta (rewrite! learning-rate output-gate-w output-gate-w-delta))
+    (when block-w-delta       (sgd! learning-rate block-w block-w-delta))
+    (when input-gate-w-delta  (sgd! learning-rate input-gate-w input-gate-w-delta))
+    (when forget-gate-w-delta (sgd! learning-rate forget-gate-w forget-gate-w-delta))
+    (when output-gate-w-delta (sgd! learning-rate output-gate-w output-gate-w-delta))
     ;; update recurrent connections
-    (rewrite! learning-rate block-wr block-wr-delta)
-    (rewrite! learning-rate input-gate-wr input-gate-wr-delta)
-    (rewrite! learning-rate forget-gate-wr forget-gate-wr-delta)
-    (rewrite! learning-rate output-gate-wr output-gate-wr-delta)
+    (sgd! learning-rate block-wr block-wr-delta)
+    (sgd! learning-rate input-gate-wr input-gate-wr-delta)
+    (sgd! learning-rate forget-gate-wr forget-gate-wr-delta)
+    (sgd! learning-rate output-gate-wr output-gate-wr-delta)
     ; update encoder connections
-    (rewrite! learning-rate block-we block-we-delta)
-    (rewrite! learning-rate input-gate-we input-gate-we-delta)
-    (rewrite! learning-rate forget-gate-we forget-gate-we-delta)
-    (rewrite! learning-rate output-gate-we output-gate-we-delta)
+    (sgd! learning-rate block-we block-we-delta)
+    (sgd! learning-rate input-gate-we input-gate-we-delta)
+    (sgd! learning-rate forget-gate-we forget-gate-we-delta)
+    (sgd! learning-rate output-gate-we output-gate-we-delta)
     ;; update lstm bias and peephole
-    (rewrite! learning-rate block-bias block-bias-delta)
-    (rewrite! learning-rate input-gate-bias input-gate-bias-delta)
-    (rewrite! learning-rate forget-gate-bias forget-gate-bias-delta)
-    (rewrite! learning-rate output-gate-bias output-gate-bias-delta)
-    (rewrite! learning-rate input-gate-peephole peephole-input-gate-delta)
-    (rewrite! learning-rate forget-gate-peephole peephole-forget-gate-delta)
-    (rewrite! learning-rate output-gate-peephole peephole-output-gate-delta)
+    (sgd! learning-rate block-bias block-bias-delta)
+    (sgd! learning-rate input-gate-bias input-gate-bias-delta)
+    (sgd! learning-rate forget-gate-bias forget-gate-bias-delta)
+    (sgd! learning-rate output-gate-bias output-gate-bias-delta)
+    (sgd! learning-rate input-gate-peephole peephole-input-gate-delta)
+    (sgd! learning-rate forget-gate-peephole peephole-forget-gate-delta)
+    (sgd! learning-rate output-gate-peephole peephole-output-gate-delta)
     decoder))
 
 
