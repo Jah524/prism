@@ -1,5 +1,15 @@
 # Change Log
 
+
+## [0.9.0] - 2018-7-27
+
+### change
+
+- add optimizer
+- move `clip!` to optimizer
+- `clip!` limits gradients by using l2-norm
+- `rewrite!` -> `update-param!`
+
 ## [0.8.9] - 2018-7-26
 
 ### fix
