@@ -1,6 +1,8 @@
 # Change Log
 
 
+## [0.9.1] - 2018-7-30
+
 ### improvement
 
 - `make-skip-thought-model` dumps `.encoder` as well as whole skip-thought model
