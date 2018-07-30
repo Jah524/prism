@@ -1,6 +1,18 @@
 # Change Log
 
 
+### improvement
+
+- `make-skip-thought-model` dumps `.encoder` as well as whole skip-thought model
+- `skip-thought-vector` returns actual word sequence
+  + rare word will be converted to special symbol `<unk>`
+
+### rename
+
+- function `make-skip-thought` -> `make-skip-thought-model`
+- variable `shareed?` -> `shared-decoder?`
+
+
 ## [0.9.0] - 2018-7-27
 
 ### change
