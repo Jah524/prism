@@ -102,7 +102,7 @@
               snapshot 0 ;  set to 60 as 1 hour when interval-ms is set 60000
               }} option
         all-lines-num (with-open [r (reader train-path)] (count (line-seq r)))
-        {:keys [prev-model next-model shared? ns?]} model
+        {:keys [prev-model next-model ns?]} model
         {:keys [wc em]} prev-model
         neg-cum (when ns?
                   (println(str  "["(l/format-local-time (l/local-now) :basic-date-time-no-ms)"] making distribution for negative sampling ..."))
@@ -202,41 +202,46 @@
           :em em))))
 
 (defn init-skip-thought-model
-  [wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared? ns?]
-  (-> (if shared?
+  [wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared-decoder? ns?]
+  (-> (if shared-decoder?
         (let [m (skip-thought-template wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?)]
           {:prev-model m
            :next-model m})
         (let [m1 (skip-thought-template wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?)
               m2 (skip-thought-template wc em em-size encoder-hidden-size decoder-hidden-size rnn-type ns?)]
           {:prev-model m1
-           :next-model (assoc m2 :encoder (:encoder (dissoc m1 :wc :em :decoder)))}))
-      (assoc :ns? ns? :shared? shared?)))
+           :next-model (assoc m2 :encoder (:encoder (dissoc m1 :wc :em :decoder)))})) ; uses same encoder params
+      (assoc :ns? ns? :shared-decoder? shared-decoder?)))
 
-(defn get-encoder
-  [encoder-decoder-model]
-  (let [{:keys [encoder em]} (:prev-model encoder-decoder-model)]
+(defn get-skip-thought-encoder
+  [skip-thought-model]
+  (let [{:keys [encoder em]} (:prev-model skip-thought-model)]
     (assoc encoder :em em)))
 
 
-(defn make-skip-thought
+(defn make-skip-thought-model
   [training-path embedding-path export-path em-size encoder-hidden-size decoder-hidden-size rnn-type option]
-  (let [{:keys [shared? ns? epoc] :or {shared? false ns? false epoc 1}} option
+  (let [{:keys [shared-decoder? ns? epoc] :or {shared-decoder? false ns? false epoc 1}} option
         _(println "making word list...")
         wc (util/make-wc training-path option)
         _(println "done")
         em (util/load-model embedding-path)
-        model (init-skip-thought-model wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared? ns?)]
+        model (init-skip-thought-model wc em em-size encoder-hidden-size decoder-hidden-size rnn-type shared-decoder? ns?)
+        export-path-ske (str export-path ".encoder")]
     (dotimes [epoc-c epoc]
       (train-skip-thought! model training-path (assoc option :model-path export-path :epoc epoc :epoc-c (inc epoc-c)))
-      (print (str "Saving Skip-Thought model as " export-path " ... "))
+      (print (str "Saving Skip-Thought Model   to " export-path " ... "))
       (util/save-model model export-path)
+      (println "Done")
+      (print (str "Saving Skip-Thought Encoder to " export-path-ske " ... "))
+      (util/save-model (get-skip-thought-encoder model) export-path-ske)
       (println "Done"))
     model))
 
 (defn skip-thought-vector
-  [encoder words]
-  (let [{:keys [em]} encoder
+  [skip-thought-encoder words]
+  (let [{:keys [em]} skip-thought-encoder
         context (->> words (mapv #(word->feature em %)))]
-    (ed/encoder-forward encoder context)))
+    {:actual-words (->> words (mapv #(if (get em %) % "<unk>")))
+     :vector (ed/encoder-forward skip-thought-encoder context)}))
 
